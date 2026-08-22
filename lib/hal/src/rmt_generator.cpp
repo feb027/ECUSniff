@@ -3,6 +3,11 @@
 
 namespace EcuHal {
 
+struct FlatPhase {
+    uint16_t duration;
+    uint8_t  level;
+};
+
 RmtGenerator::RmtGenerator() {
     _wheel.totalTeeth = 36;
     _wheel.missingTeeth = 1;
@@ -75,66 +80,92 @@ void RmtGenerator::prepareNextCycle() {
     if (!_needsUpdate || _pendingRpm == 0) return;
 
     EcuEngine::PulseSegment segments[EcuEngine::MAX_CYCLE_PULSES];
+    FlatPhase phases[EcuEngine::MAX_CYCLE_PULSES];
 
     // 1. Generate CKP (360 deg)
     size_t ckpCount = EcuEngine::ParametricEngine::generateCkpCycle(
         _wheel, _pendingRpm, segments, EcuEngine::MAX_CYCLE_PULSES);
 
     if (ckpCount > 0) {
-        rmt_item32_t* targetCkp = (_activeBufferIdx == 0) ? _ckpBufferB : _ckpBufferA;
-        size_t outCkp = 0;
-        for (size_t i = 0; i < ckpCount && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 2); ++i) {
-            uint32_t d0 = segments[i].duration0Us;
+        size_t phaseCount = 0;
+        for (size_t i = 0; i < ckpCount && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4); ++i) {
+            uint32_t rem0 = segments[i].duration0Us;
             uint8_t lvl0 = segments[i].level0;
-            uint32_t d1 = segments[i].duration1Us;
+            while (rem0 > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
+                uint16_t d = (rem0 > 30000) ? 30000 : static_cast<uint16_t>(rem0);
+                phases[phaseCount++] = { d, lvl0 };
+                rem0 -= d;
+            }
+            uint32_t rem1 = segments[i].duration1Us;
             uint8_t lvl1 = segments[i].level1;
-
-            if (d0 <= 30000 && d1 <= 30000) {
-                targetCkp[outCkp++] = rmt_item32_t{ static_cast<uint16_t>(d0), lvl0, static_cast<uint16_t>(d1), lvl1 };
-            } else {
-                while (d0 > 0 && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
-                    uint16_t d = (d0 > 30000) ? 30000 : static_cast<uint16_t>(d0);
-                    targetCkp[outCkp++] = rmt_item32_t{ d, lvl0, 0, 0 };
-                    d0 -= d;
-                }
-                while (d1 > 0 && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
-                    uint16_t d = (d1 > 30000) ? 30000 : static_cast<uint16_t>(d1);
-                    targetCkp[outCkp++] = rmt_item32_t{ d, lvl1, 0, 0 };
-                    d1 -= d;
-                }
+            while (rem1 > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
+                uint16_t d = (rem1 > 30000) ? 30000 : static_cast<uint16_t>(rem1);
+                phases[phaseCount++] = { d, lvl1 };
+                rem1 -= d;
             }
         }
-        targetCkp[outCkp] = rmt_item32_t{0, 0, 0, 0}; // EOT
+
+        rmt_item32_t* targetCkp = (_activeBufferIdx == 0) ? _ckpBufferB : _ckpBufferA;
+        size_t outCkp = 0;
+        for (size_t i = 0; i < phaseCount && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 1); i += 2) {
+            rmt_item32_t item{};
+            item.duration0 = phases[i].duration;
+            item.level0    = phases[i].level;
+            if (i + 1 < phaseCount) {
+                item.duration1 = phases[i + 1].duration;
+                item.level1    = phases[i + 1].level;
+            } else {
+                item.duration1 = 0;
+                item.level1    = 0;
+            }
+            targetCkp[outCkp++] = item;
+        }
+        targetCkp[outCkp] = rmt_item32_t{0, 0, 0, 0}; // Final EOT
         if (_activeBufferIdx == 0) _ckpSizeB = outCkp + 1;
         else _ckpSizeA = outCkp + 1;
     }
 
-    // 2. Generate CMP (720 deg) with 15-bit safe chunking
+    // 2. Generate CMP (720 deg) with pairwise safe RMT packing
     size_t cmpCount = EcuEngine::ParametricEngine::generateCmpCycle(
         _cam, _pendingRpm, segments, EcuEngine::MAX_CYCLE_PULSES);
 
     if (cmpCount > 0) {
-        rmt_item32_t* targetCmp = (_activeBufferIdx == 0) ? _cmpBufferB : _cmpBufferA;
-        size_t outCmp = 0;
-        for (size_t i = 0; i < cmpCount && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 2); ++i) {
+        size_t phaseCount = 0;
+        for (size_t i = 0; i < cmpCount && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4); ++i) {
             uint32_t rem = segments[i].duration0Us;
             uint8_t lvl = segments[i].level0;
-            while (rem > 0 && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
+            while (rem > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
                 uint16_t d = (rem > 30000) ? 30000 : static_cast<uint16_t>(rem);
-                targetCmp[outCmp++] = rmt_item32_t{ d, lvl, 0, 0 };
+                phases[phaseCount++] = { d, lvl };
                 rem -= d;
             }
             if (segments[i].duration1Us > 0) {
                 rem = segments[i].duration1Us;
                 lvl = segments[i].level1;
-                while (rem > 0 && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
+                while (rem > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
                     uint16_t d = (rem > 30000) ? 30000 : static_cast<uint16_t>(rem);
-                    targetCmp[outCmp++] = rmt_item32_t{ d, lvl, 0, 0 };
+                    phases[phaseCount++] = { d, lvl };
                     rem -= d;
                 }
             }
         }
-        targetCmp[outCmp] = rmt_item32_t{0, 0, 0, 0}; // EOT
+
+        rmt_item32_t* targetCmp = (_activeBufferIdx == 0) ? _cmpBufferB : _cmpBufferA;
+        size_t outCmp = 0;
+        for (size_t i = 0; i < phaseCount && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 1); i += 2) {
+            rmt_item32_t item{};
+            item.duration0 = phases[i].duration;
+            item.level0    = phases[i].level;
+            if (i + 1 < phaseCount) {
+                item.duration1 = phases[i + 1].duration;
+                item.level1    = phases[i + 1].level;
+            } else {
+                item.duration1 = 0;
+                item.level1    = 0;
+            }
+            targetCmp[outCmp++] = item;
+        }
+        targetCmp[outCmp] = rmt_item32_t{0, 0, 0, 0}; // Final EOT
         if (_activeBufferIdx == 0) _cmpSizeB = outCmp + 1;
         else _cmpSizeA = outCmp + 1;
     }
