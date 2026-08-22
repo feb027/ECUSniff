@@ -227,7 +227,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.wheel.inverted = false;
 
     // 720 deg Phase-Locking & Anti-Floating Filter
-    uint32_t gap0Us = (gapCount > 0) ? _ckpRising[gapIndices[0]] : _ckpRising[0];
+    uint32_t gap0Us = (gapCount > 0) ? (_ckpRising[gapIndices[0]] + nominalPeriod) : _ckpRising[0];
     uint32_t cycle720Us = revPeriodUs * 2;
     size_t cmpEventCount = 0; uint64_t cmpMinPulseUs = 0xFFFFFFFF;
 
