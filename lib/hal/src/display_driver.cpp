@@ -6,9 +6,9 @@ namespace EcuHal {
 LGFX_TFT_4_0::LGFX_TFT_4_0() {
     {
         auto cfg = _bus_instance.config();
-        cfg.spi_host    = HSPI_HOST;
+        cfg.spi_host    = SPI2_HOST;         // Kompatibel penuh ESP32 & ESP32-S3
         cfg.spi_mode    = 0;
-        cfg.freq_write  = 40000000;    // 40 MHz ultra-fast SPI untuk ILI9488
+        cfg.freq_write  = 40000000;          // 40 MHz ultra-fast SPI untuk ILI9488
         cfg.freq_read   = 16000000;
         cfg.spi_3wire   = false;
         cfg.use_lock    = true;

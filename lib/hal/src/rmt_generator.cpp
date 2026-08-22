@@ -20,13 +20,13 @@ RmtGenerator::RmtGenerator() {
 }
 
 bool RmtGenerator::init() {
-    Serial.println("[RMT] Initializing RMT hardware with 4 blocks (256 items) per channel...");
+    Serial.println("[RMT] Initializing RMT multi-channel hardware...");
 
     rmt_config_t config_ckp{};
     config_ckp.rmt_mode = RMT_MODE_TX;
     config_ckp.channel = CH_CKP;
     config_ckp.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CKP);
-    config_ckp.mem_block_num = 4; // 256 items
+    config_ckp.mem_block_num = MEM_BLOCKS_PER_CH;
     config_ckp.clk_div = RMT_CLK_DIV;
     config_ckp.tx_config.loop_en = true;
     config_ckp.tx_config.carrier_en = false;
@@ -36,7 +36,7 @@ bool RmtGenerator::init() {
     rmt_config_t config_cmp = config_ckp;
     config_cmp.channel = CH_CMP;
     config_cmp.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CMP);
-    config_cmp.mem_block_num = 4; // 256 items
+    config_cmp.mem_block_num = MEM_BLOCKS_PER_CH;
 
     rmt_config(&config_ckp);
     rmt_driver_install(CH_CKP, 0, 0);
@@ -52,7 +52,7 @@ bool RmtGenerator::init() {
     swapBuffer();
 
     stop();
-    Serial.println("[RMT] Multi-channel RMT 4-block Hardware Ready (CKP: GPIO 25, CMP: GPIO 26).");
+    Serial.println("[RMT] Multi-channel RMT Hardware Ready (CKP + CMP).");
     return true;
 }
 
@@ -208,7 +208,7 @@ void RmtGenerator::start() {
     if (activeCmpSize > 0) rmt_tx_start(CH_CMP, true);
 
     _running = true;
-    Serial.println("[RMT] Multi-channel continuous loop STARTED (4-block 720 deg locked).");
+    Serial.println("[RMT] Multi-channel continuous loop STARTED.");
 }
 
 void RmtGenerator::stop() {
