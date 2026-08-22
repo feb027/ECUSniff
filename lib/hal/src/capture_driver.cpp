@@ -10,6 +10,14 @@ volatile uint16_t     CaptureDriver::_targetEvents = 384;
 volatile uint32_t     CaptureDriver::_armTimeMs = 0;
 volatile uint32_t     CaptureDriver::_lastCkpUs = 0;
 volatile uint32_t     CaptureDriver::_lastCmpUs = 0;
+volatile uint32_t     CaptureDriver::_lastCkpRisingUs = 0;
+volatile uint32_t     CaptureDriver::_liveLastGapUs = 0;
+volatile uint32_t     CaptureDriver::_liveRevPeriodUs = 0;
+volatile uint32_t     CaptureDriver::_liveNominalUs = 0;
+volatile uint16_t     CaptureDriver::_liveTeethCount = 0;
+volatile uint16_t     CaptureDriver::_liveCkpEdgesSec = 0;
+volatile uint16_t     CaptureDriver::_liveCmpEdgesSec = 0;
+volatile uint32_t     CaptureDriver::_lastRateCheckMs = 0;
 CaptureEvent          CaptureDriver::_buffer[CaptureDriver::MAX_CAPTURE_EVENTS];
 
 CaptureDriver::CaptureDriver() {}
@@ -41,7 +49,7 @@ void CaptureDriver::stop() {
 void CaptureDriver::update() {
     uint32_t nowMs = millis();
     if (_state == CaptureState::Armed) {
-        if ((nowMs - _armTimeMs) > 2000) {
+        if ((nowMs - _armTimeMs) > 2500) {
             _state = CaptureState::Done;
         }
     } else if (_state == CaptureState::Recording) {
@@ -53,50 +61,73 @@ void CaptureDriver::update() {
     }
 }
 
-void IRAM_ATTR CaptureDriver::isrCkpHandler() {
-    if (_state == CaptureState::Idle || _state == CaptureState::Done) return;
+void CaptureDriver::getLiveMetrics(LiveSignalMetrics& outMetrics) {
+    uint32_t nowUs = micros();
+    outMetrics.ckpActive = (_lastCkpUs != 0 && (nowUs - _lastCkpUs) < 150000);
+    outMetrics.cmpActive = (_lastCmpUs != 0 && (nowUs - _lastCmpUs) < 300000);
+    outMetrics.cmp2Active = false;
+    outMetrics.ckpRateHz = _liveCkpEdgesSec;
+    outMetrics.cmpRateHz = _liveCmpEdgesSec;
+    outMetrics.lastGapUs = _liveLastGapUs;
+    outMetrics.revPeriodUs = _liveRevPeriodUs;
+    outMetrics.nominalPeriodUs = _liveNominalUs;
+    outMetrics.teethPerRev = _liveTeethCount;
+}
 
+void IRAM_ATTR CaptureDriver::isrCkpHandler() {
     uint32_t now = micros();
     if (_lastCkpUs != 0 && (now - _lastCkpUs) < GLITCH_FILTER_US) return;
     _lastCkpUs = now;
+    _liveCkpEdgesSec++;
 
     uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CKP - 32)) & 0x01;
 
-    if (_state == CaptureState::Armed) {
+    if (lvl == 1) {
+        if (_lastCkpRisingUs != 0) {
+            uint32_t dt = now - _lastCkpRisingUs;
+            if (_liveNominalUs == 0) _liveNominalUs = dt;
+            else if (dt < (uint32_t)(_liveNominalUs * 1.5f)) {
+                _liveNominalUs = (_liveNominalUs * 7 + dt) / 8;
+            } else if (dt >= (uint32_t)(_liveNominalUs * 1.6f)) {
+                if (_liveLastGapUs != 0) _liveRevPeriodUs = now - _liveLastGapUs;
+                _liveLastGapUs = now;
+
+                if (_state == CaptureState::Armed) {
+                    _state = CaptureState::Recording;
+                }
+            }
+        }
+        _lastCkpRisingUs = now;
+    }
+
+    if (_state == CaptureState::Armed && _liveNominalUs == 0) {
         _state = CaptureState::Recording;
     }
 
     if (_state == CaptureState::Recording) {
         if (_eventCount < MAX_CAPTURE_EVENTS) {
-            _buffer[_eventCount] = { now, 0, lvl };
-            _eventCount++;
-            if (_eventCount >= _targetEvents) {
-                _state = CaptureState::Done;
-            }
+            _buffer[_eventCount++] = { now, 0, lvl };
+            if (_eventCount >= _targetEvents) _state = CaptureState::Done;
         }
     }
 }
 
 void IRAM_ATTR CaptureDriver::isrCmpHandler() {
-    if (_state == CaptureState::Idle || _state == CaptureState::Done) return;
-
     uint32_t now = micros();
     if (_lastCmpUs != 0 && (now - _lastCmpUs) < GLITCH_FILTER_US) return;
     _lastCmpUs = now;
+    _liveCmpEdgesSec++;
 
     uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CMP - 32)) & 0x01;
 
-    if (_state == CaptureState::Armed) {
+    if (_state == CaptureState::Armed && (_lastCkpUs == 0 || (now - _lastCkpUs) > 100000)) {
         _state = CaptureState::Recording;
     }
 
     if (_state == CaptureState::Recording) {
         if (_eventCount < MAX_CAPTURE_EVENTS) {
-            _buffer[_eventCount] = { now, 1, lvl };
-            _eventCount++;
-            if (_eventCount >= _targetEvents) {
-                _state = CaptureState::Done;
-            }
+            _buffer[_eventCount++] = { now, 1, lvl };
+            if (_eventCount >= _targetEvents) _state = CaptureState::Done;
         }
     }
 }

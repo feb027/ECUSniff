@@ -115,6 +115,10 @@ void taskCore0UiWeb(void *pvParameters) {
         // 4. Live Telemetry Web Push (~10 Hz)
         if (now - lastWebUpdate >= 100) {
             lastWebUpdate = now;
+            EcuHal::LiveSignalMetrics metrics{};
+            captureDriver.getLiveMetrics(metrics);
+            engineState.health = sniffer.evaluateHealth(metrics.ckpActive, metrics.cmpActive, metrics.cmp2Active,
+                                                        metrics.revPeriodUs, metrics.nominalPeriodUs, metrics.lastGapUs);
             engineState.ckpActive = engineState.isRunning;
             engineState.cmp1Active = engineState.isRunning;
             if (menuMgr) {

@@ -80,7 +80,7 @@ function _drawStandbyGrid(mainId, miniId, probeId) {
     }
 
     if (probe) {
-        probe.innerText = "Pin: GPIO 34 (CKP IN) & GPIO 35 (CMP IN) — Filter Derau 5µs Aktif";
+        probe.innerText = "Pin: GPIO 34 (CKP IN) & GPIO 35 (CMP IN) — Live Health Inspector Aktif";
     }
 }
 
@@ -89,13 +89,39 @@ function updateCaptureTelemetry(msg) {
 
     const badge = document.getElementById('capStateBadge');
     const btnArm = document.getElementById('btnArmCapture');
+    const probe = document.getElementById('capProbeReadout');
+
+    if (msg.health && probe) {
+        const h = msg.health;
+        probe.innerText = `CKP: ${h.ckpOk ? 'OK' : 'DISCONNECTED'} | CMP: ${h.cmp1Ok ? 'OK' : 'IDLE'} | ${h.msg}`;
+    }
 
     if (badge) {
-        const stateLabels = ["STANDBY", "SIAP MEREKAM", "MEREKAM...", "SELESAI"];
-        const stateClasses = ["standby", "armed", "recording", "complete"];
         const curIdx = msg.capState || 0;
-        badge.innerText = stateLabels[curIdx] || "STANDBY";
-        badge.className = `mode-badge state-${stateClasses[curIdx] || "standby"}`;
+        if (curIdx === 1) {
+            badge.innerText = "MENUNGGU 0° GAP...";
+            badge.className = "mode-badge state-armed";
+        } else if (curIdx === 2) {
+            badge.innerText = "MEREKAM 720°...";
+            badge.className = "mode-badge state-recording";
+        } else if (curIdx === 3) {
+            badge.innerText = "CAPTURE SELESAI";
+            badge.className = "mode-badge state-complete";
+        } else {
+            if (msg.health && msg.health.quality === 3) {
+                badge.innerText = "720° PHASE LOCKED";
+                badge.className = "mode-badge state-armed";
+            } else if (msg.health && msg.health.quality === 2) {
+                badge.innerText = "MENYINKRONKAN...";
+                badge.className = "mode-badge state-standby";
+            } else if (msg.health && msg.health.quality === 1) {
+                badge.innerText = "DERAU TINGGI";
+                badge.className = "mode-badge state-stop";
+            } else {
+                badge.innerText = "TIDAK ADA SINYAL";
+                badge.className = "mode-badge state-standby";
+            }
+        }
 
         if (btnArm) {
             if (curIdx === 1) {
@@ -105,8 +131,8 @@ function updateCaptureTelemetry(msg) {
                 btnArm.innerText = "Sedang Merekam...";
                 btnArm.className = "btn-power-full btn-stop";
             } else {
-                btnArm.innerText = "Mulai Capture";
-                btnArm.className = "btn-power-full btn-start";
+                btnArm.innerText = (msg.health && msg.health.quality === 3) ? "Rekam (Phase-Locked)" : "Mulai Capture";
+                btnArm.className = (msg.health && msg.health.quality === 3) ? "btn-power-full btn-start" : "btn-power-full btn-standby";
             }
         }
     }

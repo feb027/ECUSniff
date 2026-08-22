@@ -124,6 +124,16 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
         }
     }
 
+    JsonObject hl = doc["health"].to<JsonObject>();
+    hl["quality"] = static_cast<uint8_t>(state.health.quality);
+    hl["ckpOk"] = state.health.ckpOk;
+    hl["cmp1Ok"] = state.health.cmp1Ok;
+    hl["cmp2Ok"] = state.health.cmp2Ok;
+    hl["liveRpm"] = state.health.liveRpm;
+    hl["liveTeeth"] = state.health.liveTeeth;
+    hl["jitter"] = state.health.jitterPercent;
+    hl["msg"] = state.health.diagnosticMsg;
+
     String out;
     serializeJson(doc, out);
     _ws.textAll(out);

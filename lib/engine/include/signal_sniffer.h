@@ -28,6 +28,8 @@ public:
     SignalSniffer();
 
     SnifferResult decode(const RawSignalEdge* events, size_t eventCount);
+    SignalHealthStatus evaluateHealth(bool ckpActive, bool cmpActive, bool cmp2Active,
+                                      uint32_t revPeriodUs, uint32_t nominalUs, uint32_t lastGapUs);
 
 private:
     uint32_t _ckpRising[384];

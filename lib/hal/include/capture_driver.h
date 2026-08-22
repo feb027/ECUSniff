@@ -17,6 +17,18 @@ struct CaptureEvent {
     uint8_t  level;   // 0: LOW, 1: HIGH
 };
 
+struct LiveSignalMetrics {
+    bool     ckpActive;
+    bool     cmpActive;
+    bool     cmp2Active;
+    uint32_t ckpRateHz;
+    uint32_t cmpRateHz;
+    uint32_t lastGapUs;
+    uint32_t revPeriodUs;
+    uint32_t nominalPeriodUs;
+    uint16_t teethPerRev;
+};
+
 class CaptureDriver {
 public:
     static constexpr size_t   MAX_CAPTURE_EVENTS = 512;
@@ -27,6 +39,7 @@ public:
     void arm(uint16_t targetEvents = 384);
     void stop();
     void update();
+    void getLiveMetrics(LiveSignalMetrics& outMetrics);
 
     bool isDone() const { return _state == CaptureState::Done; }
     CaptureState getState() const { return _state; }
@@ -43,6 +56,14 @@ private:
     static volatile uint32_t     _armTimeMs;
     static volatile uint32_t     _lastCkpUs;
     static volatile uint32_t     _lastCmpUs;
+    static volatile uint32_t     _lastCkpRisingUs;
+    static volatile uint32_t     _liveLastGapUs;
+    static volatile uint32_t     _liveRevPeriodUs;
+    static volatile uint32_t     _liveNominalUs;
+    static volatile uint16_t     _liveTeethCount;
+    static volatile uint16_t     _liveCkpEdgesSec;
+    static volatile uint16_t     _liveCmpEdgesSec;
+    static volatile uint32_t     _lastRateCheckMs;
     static CaptureEvent          _buffer[MAX_CAPTURE_EVENTS];
 };
 

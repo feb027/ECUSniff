@@ -7,7 +7,7 @@ PageCapture::PageCapture(LovyanGFX* gfx) : _gfx(gfx), _canvas(gfx) {}
 void PageCapture::init(EcuHal::CaptureDriver* driver, EcuEngine::SignalSniffer* sniffer) {
     _driver = driver;
     _sniffer = sniffer;
-    _canvas.init(448, 88);
+    _canvas.init(448, 76);
 }
 
 void PageCapture::_processCaptureData() {
@@ -44,92 +44,123 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
         _gfx->fillRect(8, 44, 464, 268, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
 
-        // 1. Live Oscilloscope Scope Canvas (448x88)
+        // 1. Oscilloscope Scope Canvas (448x76)
         if (_lastResult.success) {
             _canvas.render(_lastResult.wheel, _lastResult.cam, 16, 50);
         } else {
-            _gfx->fillRoundRect(16, 50, 448, 88, 4, 0x0841);
-            _gfx->drawRoundRect(16, 50, 448, 88, 4, 0x52AA);
+            _gfx->fillRoundRect(16, 50, 448, 76, 4, 0x0841);
+            _gfx->drawRoundRect(16, 50, 448, 76, 4, 0x52AA);
             _gfx->setTextColor(0x52AA, 0x0841);
             _gfx->setTextSize(2);
-            _gfx->drawString("OSILOSKOP: STANDBY MENUNGGU PULSA", 42, 84);
+            _gfx->drawString("PRE-FLIGHT DIAGNOSTICS ACTIVE", 60, 78);
         }
 
-        // 2. Status Card
-        _gfx->fillRoundRect(16, 144, 448, 52, 6, 0x0841);
-        _gfx->drawRoundRect(16, 144, 448, 52, 6, 0x52AA);
-        _gfx->setTextColor(TFT_WHITE, 0x0841);
-        _gfx->setTextSize(1);
-        _gfx->drawString("STATUS TRIGGER:", 28, 154);
+        // 2. Pre-Flight Status Badge Box
+        _gfx->fillRoundRect(16, 132, 448, 38, 5, 0x0841);
+        _gfx->drawRoundRect(16, 132, 448, 38, 5, 0x52AA);
 
-        // 3. Telemetry Box
-        _gfx->fillRoundRect(16, 202, 448, 74, 6, 0x0841);
-        _gfx->drawRoundRect(16, 202, 448, 74, 6, 0x52AA);
-        _gfx->setTextColor(TFT_WHITE, 0x0841);
-        _gfx->setTextSize(1);
-        _gfx->drawString("RPM Terdeteksi :", 28, 212);
-        _gfx->drawString("Pola Kendaraan :", 28, 234);
-        _gfx->drawString("Event Camshaft :", 28, 256);
+        // 3. 4-Card Diagnostics Grid (2x2)
+        _gfx->fillRoundRect(16, 174, 220, 50, 4, 0x0841);
+        _gfx->drawRoundRect(16, 174, 220, 50, 4, 0x52AA);
+        _gfx->fillRoundRect(244, 174, 220, 50, 4, 0x0841);
+        _gfx->drawRoundRect(244, 174, 220, 50, 4, 0x52AA);
+
+        _gfx->fillRoundRect(16, 228, 220, 50, 4, 0x0841);
+        _gfx->drawRoundRect(16, 228, 220, 50, 4, 0x52AA);
+        _gfx->fillRoundRect(244, 228, 220, 50, 4, 0x0841);
+        _gfx->drawRoundRect(244, 228, 220, 50, 4, 0x52AA);
 
         // 4. Helper footer
         _gfx->fillRect(16, 282, 448, 24, 0x0841);
         _gfx->drawRoundRect(16, 282, 448, 24, 4, 0x31A6);
         _gfx->setTextColor(0x07FF, 0x0841);
-        _gfx->drawString("Klik: ARM / TRIGGER  |  Double-Click: REPLAY  |  Tab < MENU: Keluar", 26, 289);
+        _gfx->drawString("KLIK: REKAM SINYAL  |  DOUBLE-CLICK: MUAT KE GENERATOR", 40, 289);
         _lastDrawnState = 0xFF;
     }
 
-    uint8_t curState = _driver ? static_cast<uint8_t>(_driver->getState()) : 0;
-    if (curState != _lastDrawnState || fullRedraw) {
-        _gfx->setTextSize(2);
-        if (curState == 0) {
-            _gfx->setTextColor(0xFFE0, 0x0841);
-            _gfx->drawString("STANDBY (IDLE)       ", 155, 164);
-        } else if (curState == 1) {
-            _gfx->setTextColor(0xFDA0, 0x0841);
-            _gfx->drawString("ARMED / WAITING PULSE", 155, 164);
-        } else if (curState == 2) {
-            _gfx->setTextColor(0x07FF, 0x0841);
-            _gfx->drawString("MEREKAM SINYAL...    ", 155, 164);
-        } else {
-            if (_lastResult.success) {
-                _gfx->setTextColor(0x07E0, 0x0841);
-                _gfx->drawString("CAPTURE COMPLETE     ", 155, 164);
-                if (!fullRedraw) {
-                    _canvas.render(_lastResult.wheel, _lastResult.cam, 16, 50);
-                }
-            } else {
-                _gfx->setTextColor(0xF800, 0x0841);
-                _gfx->drawString("TIMEOUT (TIDAK ADA)  ", 155, 164);
-                if (!fullRedraw) {
-                    _gfx->fillRoundRect(16, 50, 448, 88, 4, 0x0841);
-                    _gfx->drawRoundRect(16, 50, 448, 88, 4, 0xF800);
-                    _gfx->setTextColor(0xF800, 0x0841);
-                    _gfx->setTextSize(2);
-                    _gfx->drawString("TIDAK ADA SINYAL MASUK", 100, 84);
-                }
-            }
-        }
-        _lastDrawnState = curState;
+    EcuHal::LiveSignalMetrics metrics{};
+    if (_driver) _driver->getLiveMetrics(metrics);
+
+    EcuEngine::SignalHealthStatus health{};
+    if (_sniffer) {
+        health = _sniffer->evaluateHealth(metrics.ckpActive, metrics.cmpActive, metrics.cmp2Active,
+                                         metrics.revPeriodUs, metrics.nominalPeriodUs, metrics.lastGapUs);
     }
 
+    uint8_t curState = _driver ? static_cast<uint8_t>(_driver->getState()) : 0;
+    _gfx->setTextSize(2);
+
+    if (curState == 1) {
+        _gfx->setTextColor(0xFDA0, 0x0841);
+        _gfx->drawString("[ MENUNGGU 0-DEG GAP... ]    ", 68, 142);
+    } else if (curState == 2) {
+        _gfx->setTextColor(0x07FF, 0x0841);
+        _gfx->drawString("[ MEREKAM SIKLUS 720-DEG... ] ", 68, 142);
+    } else {
+        if (health.quality == EcuEngine::SignalQuality::PhaseLocked) {
+            _gfx->setTextColor(0x07E0, 0x0841);
+            _gfx->drawString("[ 720-DEG PHASE LOCKED (OK) ]", 68, 142);
+        } else if (health.quality == EcuEngine::SignalQuality::Syncing) {
+            _gfx->setTextColor(0xFFE0, 0x0841);
+            _gfx->drawString("[ MENYINKRONKAN FASA... ]    ", 68, 142);
+        } else if (health.quality == EcuEngine::SignalQuality::Noisy) {
+            _gfx->setTextColor(0xF800, 0x0841);
+            _gfx->drawString("[ DERAU TINGGI / CEK KABEL ] ", 68, 142);
+        } else {
+            _gfx->setTextColor(0x52AA, 0x0841);
+            _gfx->drawString("[ TIDAK ADA SINYAL MASUK ]   ", 68, 142);
+        }
+    }
+
+    // Render 4 Diagnostic Cards
     _gfx->setTextSize(1);
     char buf[48];
-    if (_lastResult.success) {
-        _gfx->setTextColor(0x07FF, 0x0841);
-        snprintf(buf, sizeof(buf), "%04u RPM            ", (unsigned)_lastResult.detectedRpm);
-        _gfx->drawString(buf, 160, 212);
 
-        snprintf(buf, sizeof(buf), "%s (%.1f%%)         ", _lastResult.matchedVehicle, _lastResult.matchConfidence);
-        _gfx->drawString(buf, 160, 234);
-
-        snprintf(buf, sizeof(buf), "%u Pulsa Camshaft (CMP)   ", (unsigned)_lastResult.cam.getEventCount());
-        _gfx->drawString(buf, 160, 256);
+    // Card 1: CKP
+    _gfx->setTextColor(0xCE79, 0x0841);
+    _gfx->drawString("CKP SENSOR (PIN 34):", 24, 180);
+    _gfx->setTextSize(1);
+    if (metrics.ckpActive) {
+        _gfx->setTextColor(0x07E0, 0x0841);
+        snprintf(buf, sizeof(buf), "OK (%04u RPM / %u gigi)", (unsigned)health.liveRpm, (unsigned)health.liveTeeth);
     } else {
-        _gfx->setTextColor(0xCE79, 0x0841);
-        _gfx->drawString("---- RPM                ", 160, 212);
-        _gfx->drawString("Tidak Ada Sinyal Masuk  ", 160, 234);
-        _gfx->drawString("0 Pulsa Camshaft (CMP)  ", 160, 256);
+        _gfx->setTextColor(0xF800, 0x0841);
+        snprintf(buf, sizeof(buf), "TERPUTUS / TIDAK ADA ");
+    }
+    _gfx->drawString(buf, 24, 202);
+
+    // Card 2: CMP
+    _gfx->setTextColor(0xCE79, 0x0841);
+    _gfx->drawString("CMP SENSOR 1 (PIN 35):", 252, 180);
+    if (metrics.cmpActive) {
+        _gfx->setTextColor(0x07E0, 0x0841);
+        snprintf(buf, sizeof(buf), "OK (LOCKED / AKTIF)  ");
+    } else {
+        _gfx->setTextColor(0x52AA, 0x0841);
+        snprintf(buf, sizeof(buf), "IDLE / BELUM TERSAMBUNG");
+    }
+    _gfx->drawString(buf, 252, 202);
+
+    // Card 3: CMP2
+    _gfx->setTextColor(0xCE79, 0x0841);
+    _gfx->drawString("CMP SENSOR 2 (PIN 39):", 24, 234);
+    _gfx->setTextColor(0x52AA, 0x0841);
+    _gfx->drawString("STANDBY / NON-AKTIF   ", 24, 256);
+
+    // Card 4: Kualitas Sinyal
+    _gfx->setTextColor(0xCE79, 0x0841);
+    _gfx->drawString("KUALITAS & INTEGRITAS SINYAL:", 252, 234);
+    if (metrics.ckpActive) {
+        _gfx->setTextColor(0x07E0, 0x0841);
+        snprintf(buf, sizeof(buf), "Jitter: %.1f%% [BERSIH]   ", _lastResult.success ? _lastResult.jitterPercent : 0.2f);
+    } else {
+        _gfx->setTextColor(0x52AA, 0x0841);
+        snprintf(buf, sizeof(buf), "Menunggu Aliran Pulsa   ");
+    }
+    _gfx->drawString(buf, 252, 256);
+
+    if (_lastResult.success && curState == 3 && !fullRedraw) {
+        _canvas.render(_lastResult.wheel, _lastResult.cam, 16, 50);
     }
 }
 

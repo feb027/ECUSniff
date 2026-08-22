@@ -112,7 +112,6 @@ void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
     size_t tempCount = clusterCount;
     for (size_t i = 0; i < tempCount; ++i) {
         float avgA = clusters[i].sumAngle / (float)clusters[i].count;
-        // Snap to clean automotive degree resolution (0.5 deg / exact integer deg)
         float cleanA = roundf(avgA * 2.0f) / 2.0f;
         if (fabsf(cleanA - roundf(cleanA)) < 0.25f) cleanA = roundf(cleanA);
         while (cleanA >= 720.0f) cleanA -= 720.0f;
@@ -128,6 +127,37 @@ void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
     }
     outCam.clear();
     for (size_t i = 0; i < tempCount; ++i) outCam.addEvent(tempEvs[i].angle, tempEvs[i].high);
+}
+
+SignalHealthStatus SignalSniffer::evaluateHealth(bool ckpActive, bool cmpActive, bool cmp2Active,
+                                                uint32_t revPeriodUs, uint32_t nominalUs, uint32_t lastGapUs) {
+    SignalHealthStatus h{};
+    h.ckpOk = ckpActive; h.cmp1Ok = cmpActive; h.cmp2Ok = cmp2Active;
+    if (!ckpActive && !cmpActive) {
+        h.quality = SignalQuality::NoSignal;
+        strncpy(h.diagnosticMsg, "Kabel Terputus / Generator Mati", sizeof(h.diagnosticMsg));
+        return h;
+    }
+    if (ckpActive) {
+        if (revPeriodUs > 1000 && revPeriodUs < 1200000) {
+            h.liveRpm = (uint32_t)(60000000ULL / revPeriodUs);
+            if (nominalUs > 0) h.liveTeeth = (uint16_t)roundf((float)revPeriodUs / (float)nominalUs);
+            if (h.liveTeeth >= 4 && h.liveTeeth <= 120) {
+                h.quality = SignalQuality::PhaseLocked;
+                snprintf(h.diagnosticMsg, sizeof(h.diagnosticMsg), cmpActive ? "720-deg Locked (%u RPM)" : "CKP Locked (%u RPM)", (unsigned)h.liveRpm);
+            } else {
+                h.quality = SignalQuality::Noisy;
+                strncpy(h.diagnosticMsg, "Derau CKP / Pola Tidak Dikenal", sizeof(h.diagnosticMsg));
+            }
+        } else {
+            h.quality = SignalQuality::Syncing;
+            strncpy(h.diagnosticMsg, "Menyinkronkan Fasa CKP...", sizeof(h.diagnosticMsg));
+        }
+    } else if (cmpActive) {
+        h.quality = SignalQuality::PhaseLocked;
+        strncpy(h.diagnosticMsg, "Standalone CMP Mode", sizeof(h.diagnosticMsg));
+    }
+    return h;
 }
 
 SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCount) {
