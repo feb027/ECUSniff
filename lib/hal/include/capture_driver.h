@@ -20,11 +20,11 @@ struct CaptureEvent {
 class CaptureDriver {
 public:
     static constexpr size_t   MAX_CAPTURE_EVENTS = 512;
-    static constexpr uint32_t GLITCH_FILTER_US   = 5; // Rejects spikes < 5us
+    static constexpr uint32_t GLITCH_FILTER_US   = 5;
 
     CaptureDriver();
     void init();
-    void arm(uint16_t targetEvents = 256);
+    void arm(uint16_t targetEvents = 384);
     void stop();
     void update();
 
@@ -40,6 +40,7 @@ private:
     static volatile CaptureState _state;
     static volatile uint16_t     _eventCount;
     static volatile uint16_t     _targetEvents;
+    static volatile uint32_t     _armTimeMs;
     static volatile uint32_t     _lastCkpUs;
     static volatile uint32_t     _lastCmpUs;
     static CaptureEvent          _buffer[MAX_CAPTURE_EVENTS];

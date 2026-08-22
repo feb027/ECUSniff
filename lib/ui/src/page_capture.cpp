@@ -15,14 +15,15 @@ void PageCapture::_processCaptureData() {
 
     const EcuHal::CaptureEvent* rawBuf = _driver->getBuffer();
     uint16_t count = _driver->getEventCount();
+    if (count == 0 || !rawBuf) return;
 
-    EcuEngine::RawSignalEdge edges[384];
+    static EcuEngine::RawSignalEdge s_edges[384];
     size_t copyCount = count > 384 ? 384 : count;
     for (size_t i = 0; i < copyCount; ++i) {
-        edges[i] = { rawBuf[i].timestampUs, rawBuf[i].channel, rawBuf[i].level };
+        s_edges[i] = { rawBuf[i].timestampUs, rawBuf[i].channel, rawBuf[i].level };
     }
 
-    _lastResult = _sniffer->decode(edges, copyCount);
+    _lastResult = _sniffer->decode(s_edges, copyCount);
 }
 
 void PageCapture::render(uint8_t subTab, bool fullRedraw, bool isEditMode) {

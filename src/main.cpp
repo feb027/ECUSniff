@@ -232,7 +232,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         taskCore0UiWeb,
         "UiWebTask",
-        8192,
+        12288,
         NULL,
         1,
         NULL,

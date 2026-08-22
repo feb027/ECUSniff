@@ -54,8 +54,6 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.success = false;
     if (eventCount < 16) return res;
 
-    // 1. Separate CKP Rising and Falling Edges with deduplication
-    uint32_t ckpRising[256];
     size_t risingCount = 0;
     uint64_t totalHighUs = 0;
     size_t highPulseCount = 0;
@@ -64,11 +62,11 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     for (size_t i = 0; i < eventCount; ++i) {
         if (events[i].channel == 0) {
             if (events[i].level == 1 && lastCkpLvl != 1) {
-                if (risingCount < 256) ckpRising[risingCount++] = events[i].timestampUs;
+                if (risingCount < 384) _ckpRising[risingCount++] = events[i].timestampUs;
                 lastCkpLvl = 1;
             } else if (events[i].level == 0 && lastCkpLvl != 0) {
-                if (risingCount > 0 && events[i].timestampUs > ckpRising[risingCount - 1]) {
-                    totalHighUs += (events[i].timestampUs - ckpRising[risingCount - 1]);
+                if (risingCount > 0 && events[i].timestampUs > _ckpRising[risingCount - 1]) {
+                    totalHighUs += (events[i].timestampUs - _ckpRising[risingCount - 1]);
                     highPulseCount++;
                 }
                 lastCkpLvl = 0;
@@ -77,19 +75,14 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     }
     if (risingCount < 10) return res;
 
-    // 2. Calculate Inter-Tooth Intervals & Median Nominal Period
-    uint32_t intervals[256];
-    uint32_t sortIntervals[256];
     size_t intervalCount = risingCount - 1;
-
     for (size_t i = 0; i < intervalCount; ++i) {
-        intervals[i] = ckpRising[i + 1] - ckpRising[i];
-        sortIntervals[i] = intervals[i];
+        _intervals[i] = _ckpRising[i + 1] - _ckpRising[i];
+        _sortIntervals[i] = _intervals[i];
     }
-    uint32_t nominalPeriod = _findMedian(sortIntervals, intervalCount);
+    uint32_t nominalPeriod = _findMedian(_sortIntervals, intervalCount);
     if (nominalPeriod < 20) return res;
 
-    // 3. Locate Missing Tooth Gaps (>= 1.55x Nominal) with min separation of 3 teeth
     size_t gapIndices[16];
     size_t gapCount = 0;
     uint64_t totalDeviationUs = 0;
@@ -97,12 +90,12 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     uint32_t gapThreshold = (uint32_t)(nominalPeriod * 1.55f);
 
     for (size_t i = 0; i < intervalCount && gapCount < 16; ++i) {
-        if (intervals[i] >= gapThreshold) {
+        if (_intervals[i] >= gapThreshold) {
             if (gapCount == 0 || (i - gapIndices[gapCount - 1]) >= 3) {
                 gapIndices[gapCount++] = i;
             }
         } else {
-            totalDeviationUs += (intervals[i] > nominalPeriod) ? (intervals[i] - nominalPeriod) : (nominalPeriod - intervals[i]);
+            totalDeviationUs += (_intervals[i] > nominalPeriod) ? (_intervals[i] - nominalPeriod) : (nominalPeriod - _intervals[i]);
             normalToothCount++;
         }
     }
@@ -111,21 +104,20 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         ? ((float)totalDeviationUs / (float)normalToothCount / (float)nominalPeriod) * 100.0f 
         : 0.0f;
 
-    // 4. Calculate Total Teeth (N) and Missing Teeth (M)
     uint16_t totalTeeth = 36;
     uint8_t missingTeeth = 1;
     uint32_t revPeriodUs = 0;
 
     if (gapCount >= 2) {
         size_t physicalTeethInRev = gapIndices[1] - gapIndices[0];
-        float gapRatio = (float)intervals[gapIndices[0]] / (float)nominalPeriod;
+        float gapRatio = (float)_intervals[gapIndices[0]] / (float)nominalPeriod;
         missingTeeth = (uint8_t)roundf(gapRatio - 1.0f);
         if (missingTeeth < 1) missingTeeth = 1;
         if (missingTeeth > 4) missingTeeth = 4;
         totalTeeth = physicalTeethInRev + missingTeeth;
-        revPeriodUs = ckpRising[gapIndices[1]] - ckpRising[gapIndices[0]];
+        revPeriodUs = _ckpRising[gapIndices[1]] - _ckpRising[gapIndices[0]];
     } else if (gapCount == 1) {
-        float gapRatio = (float)intervals[gapIndices[0]] / (float)nominalPeriod;
+        float gapRatio = (float)_intervals[gapIndices[0]] / (float)nominalPeriod;
         missingTeeth = (uint8_t)roundf(gapRatio - 1.0f);
         if (missingTeeth < 1) missingTeeth = 1;
         if (missingTeeth > 4) missingTeeth = 4;
@@ -143,9 +135,8 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         revPeriodUs = nominalPeriod * totalTeeth;
     }
 
-    if (revPeriodUs == 0) return res;
+    if (revPeriodUs < 1000) return res; // Guard against divide by zero
 
-    // 5. Calculate Detected RPM & Measured Duty Cycle
     res.detectedRpm = (uint32_t)(60000000ULL / revPeriodUs);
     if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
 
@@ -162,8 +153,9 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
 
     // 6. Map & Cluster Camshaft (CMP) Events (0 - 720 deg)
     res.cam.clear();
-    uint32_t syncRefUs = (gapCount > 0) ? ckpRising[gapIndices[0]] : ckpRising[0];
+    uint32_t syncRefUs = (gapCount > 0) ? _ckpRising[gapIndices[0]] : _ckpRising[0];
     uint32_t cycle720Us = revPeriodUs * 2;
+    if (cycle720Us == 0) return res; // Guard against modulo by zero
 
     for (size_t i = 0; i < eventCount; ++i) {
         if (events[i].channel == 1) {

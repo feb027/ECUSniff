@@ -30,6 +30,10 @@ public:
     SnifferResult decode(const RawSignalEdge* events, size_t eventCount);
 
 private:
+    uint32_t _ckpRising[384];
+    uint32_t _intervals[384];
+    uint32_t _sortIntervals[384];
+
     uint32_t _findMedian(uint32_t* arr, size_t n);
     void     _matchVehicleProfile(SnifferResult& res);
 };
