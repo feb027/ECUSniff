@@ -27,7 +27,8 @@ void PageCapture::_processCaptureData() {
 }
 
 void PageCapture::render(uint8_t subTab, bool fullRedraw, bool isEditMode) {
-    if (_driver && _driver->isDone() && !_lastResult.success) {
+    if (_driver && _driver->isDone() && !_hasProcessedCapture) {
+        _hasProcessedCapture = true;
         _processCaptureData();
     }
 
@@ -159,8 +160,11 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
     }
     _gfx->drawString(buf, 252, 256);
 
-    if (_lastResult.success && curState == 3 && !fullRedraw) {
-        _canvas.render(_lastResult.wheel, _lastResult.cam, 16, 50);
+    if (curState != _lastDrawnState) {
+        if (_lastResult.success && curState == 3) {
+            _canvas.render(_lastResult.wheel, _lastResult.cam, 16, 50);
+        }
+        _lastDrawnState = curState;
     }
 }
 
@@ -254,6 +258,7 @@ void PageCapture::onEncoderClick(uint8_t subTab) {
             _driver->stop();
         } else {
             _lastResult.success = false;
+            _hasProcessedCapture = false;
             _driver->arm(384);
         }
     }

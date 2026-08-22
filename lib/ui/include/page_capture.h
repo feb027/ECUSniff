@@ -28,6 +28,7 @@ private:
 
     uint8_t  _lastDrawnState{0xFF};
     uint32_t _lastDrawnRpm{0xFFFFFFFF};
+    bool     _hasProcessedCapture{false};
 
     void _processCaptureData();
     void _renderLiveTab(bool fullRedraw);
