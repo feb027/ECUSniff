@@ -20,6 +20,7 @@ struct SnifferResult {
     char             summary[64]{0};
     char             matchedVehicle[48]{"Belum Terdeteksi"};
     float            matchConfidence{0.0f};
+    float            jitterPercent{0.0f};
 };
 
 class SignalSniffer {

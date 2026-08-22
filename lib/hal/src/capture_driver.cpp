@@ -36,6 +36,16 @@ void CaptureDriver::stop() {
     _state = CaptureState::Idle;
 }
 
+void CaptureDriver::update() {
+    if (_state == CaptureState::Recording) {
+        uint32_t now = micros();
+        if (_lastCkpUs != 0 && (now - _lastCkpUs) > 400000 && _eventCount >= 32) {
+            _state = CaptureState::Done;
+        }
+    }
+}
+
+
 void IRAM_ATTR CaptureDriver::isrCkpHandler() {
     if (_state == CaptureState::Idle || _state == CaptureState::Done) return;
 

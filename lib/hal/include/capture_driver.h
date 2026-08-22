@@ -26,6 +26,7 @@ public:
     void init();
     void arm(uint16_t targetEvents = 256);
     void stop();
+    void update();
 
     bool isDone() const { return _state == CaptureState::Done; }
     CaptureState getState() const { return _state; }

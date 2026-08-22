@@ -52,22 +52,28 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
 SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCount) {
     SnifferResult res;
     res.success = false;
-
     if (eventCount < 16) return res;
 
-    // 1. Extract CKP Rising Edges
+    // 1. Extract CKP Edges & Calculate Real Duty Cycle
     uint32_t ckpTimes[256];
     size_t ckpCount = 0;
+    uint64_t totalHighUs = 0;
+    size_t highPulseCount = 0;
 
     for (size_t i = 0; i < eventCount && ckpCount < 256; ++i) {
-        if (events[i].channel == 0 && events[i].level == 1) {
-            ckpTimes[ckpCount++] = events[i].timestampUs;
+        if (events[i].channel == 0) {
+            if (events[i].level == 1) {
+                ckpTimes[ckpCount++] = events[i].timestampUs;
+                if (i + 1 < eventCount && events[i + 1].channel == 0 && events[i + 1].level == 0) {
+                    totalHighUs += (events[i + 1].timestampUs - events[i].timestampUs);
+                    highPulseCount++;
+                }
+            }
         }
     }
-
     if (ckpCount < 10) return res;
 
-    // 2. Calculate Inter-Tooth Intervals
+    // 2. Calculate Inter-Tooth Intervals & Median Nominal Period
     uint32_t intervals[256];
     uint32_t sortIntervals[256];
     size_t intervalCount = ckpCount - 1;
@@ -76,21 +82,29 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         intervals[i] = ckpTimes[i + 1] - ckpTimes[i];
         sortIntervals[i] = intervals[i];
     }
-
     uint32_t nominalPeriod = _findMedian(sortIntervals, intervalCount);
     if (nominalPeriod < 10) return res;
 
-    // 3. Locate Missing Tooth Gaps
+    // 3. Locate Missing Tooth Gaps & Calculate Jitter
     size_t gapIndices[16];
     size_t gapCount = 0;
+    uint64_t totalDeviationUs = 0;
+    size_t normalToothCount = 0;
 
     for (size_t i = 0; i < intervalCount && gapCount < 16; ++i) {
         if (intervals[i] > (nominalPeriod * 3 / 2)) {
             gapIndices[gapCount++] = i;
+        } else {
+            totalDeviationUs += (intervals[i] > nominalPeriod) ? (intervals[i] - nominalPeriod) : (nominalPeriod - intervals[i]);
+            normalToothCount++;
         }
     }
 
-    // 4. Calculate Total Teeth (N) and Missing Teeth (M)
+    res.jitterPercent = (normalToothCount > 0) 
+        ? ((float)totalDeviationUs / (float)normalToothCount / (float)nominalPeriod) * 100.0f 
+        : 0.0f;
+
+    // 4. Calculate Total Teeth (N) and Adaptive Gap (M)
     uint16_t totalTeeth = 36;
     uint8_t missingTeeth = 1;
     uint32_t revPeriodUs = 0;
@@ -98,14 +112,16 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     if (gapCount >= 2) {
         size_t teethInRev = gapIndices[1] - gapIndices[0];
         float gapRatio = (float)intervals[gapIndices[0]] / (float)nominalPeriod;
-
-        missingTeeth = (gapRatio >= 2.5f) ? 2 : 1;
+        missingTeeth = (uint8_t)roundf(gapRatio - 1.0f);
+        if (missingTeeth < 1) missingTeeth = 1;
+        if (missingTeeth > 4) missingTeeth = 4;
         totalTeeth = teethInRev + missingTeeth;
-
         revPeriodUs = ckpTimes[gapIndices[1]] - ckpTimes[gapIndices[0]];
     } else if (gapCount == 1) {
         float gapRatio = (float)intervals[gapIndices[0]] / (float)nominalPeriod;
-        missingTeeth = (gapRatio >= 2.5f) ? 2 : 1;
+        missingTeeth = (uint8_t)roundf(gapRatio - 1.0f);
+        if (missingTeeth < 1) missingTeeth = 1;
+        if (missingTeeth > 4) missingTeeth = 4;
         totalTeeth = (intervalCount > 30 && intervalCount < 45) ? 36 : (intervalCount >= 45 ? 60 : 36);
         revPeriodUs = nominalPeriod * totalTeeth;
     } else {
@@ -116,17 +132,23 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
 
     if (revPeriodUs == 0) return res;
 
-    // 5. Calculate Detected RPM
+    // 5. Calculate Detected RPM & Measured Duty Cycle
     res.detectedRpm = (uint32_t)(60000000ULL / revPeriodUs);
     if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
+
+    float measuredDuty = (highPulseCount > 0) 
+        ? ((float)totalHighUs / (float)highPulseCount / (float)nominalPeriod) 
+        : 0.50f;
+    if (measuredDuty < 0.10f) measuredDuty = 0.10f;
+    if (measuredDuty > 0.90f) measuredDuty = 0.90f;
 
     res.wheel.totalTeeth = totalTeeth;
     res.wheel.missingTeeth = missingTeeth;
     res.wheel.missingPosition = 0;
-    res.wheel.dutyCycle = 0.50f;
+    res.wheel.dutyCycle = measuredDuty;
     res.wheel.inverted = false;
 
-    // 6. Map Camshaft (CMP) Events
+    // 6. Map & Cluster Camshaft (CMP) Events (0 - 720 deg)
     res.cam.clear();
     uint32_t syncRefUs = (gapCount > 0) ? ckpTimes[gapIndices[0]] : ckpTimes[0];
 
@@ -134,16 +156,29 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         if (events[i].channel == 1) {
             int32_t deltaT = (int32_t)(events[i].timestampUs - syncRefUs);
             if (deltaT >= 0) {
-                float angle = ((float)(deltaT % (revPeriodUs * 2)) / (float)(revPeriodUs * 2)) * 720.0f;
-                res.cam.addEvent(angle, events[i].level == 1);
+                float rawAngle = ((float)(deltaT % (revPeriodUs * 2)) / (float)(revPeriodUs * 2)) * 720.0f;
+                bool isHigh = (events[i].level == 1);
+                
+                // Clustering: check if already exists within +/- 3.5 deg
+                bool foundClose = false;
+                const CmpEvent* existing = res.cam.getEvents();
+                for (size_t k = 0; k < res.cam.getEventCount(); ++k) {
+                    if (existing[k].levelHigh == isHigh && fabsf(existing[k].angleDeg - rawAngle) < 3.5f) {
+                        foundClose = true;
+                        break;
+                    }
+                }
+                if (!foundClose && res.cam.getEventCount() < 16) {
+                    res.cam.addEvent(rawAngle, isHigh);
+                }
             }
         }
     }
 
     _matchVehicleProfile(res);
-
-    snprintf(res.summary, sizeof(res.summary), "%u-%u CKP @ %u RPM, %u Cam",
-             res.wheel.totalTeeth, res.wheel.missingTeeth, (unsigned)res.detectedRpm, (unsigned)res.cam.getEventCount());
+    snprintf(res.summary, sizeof(res.summary), "%u-%u CKP @ %u RPM, Duty %.0f%%, Jitter %.1f%%",
+             res.wheel.totalTeeth, res.wheel.missingTeeth, (unsigned)res.detectedRpm,
+             res.wheel.dutyCycle * 100.0f, res.jitterPercent);
     res.success = true;
     return res;
 }

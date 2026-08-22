@@ -101,6 +101,7 @@ void taskCore0UiWeb(void *pvParameters) {
         }
 
         // 3. Update RPM Controller (Fixed, Cranking, Sweep)
+        captureDriver.update();
         if (now - lastRpmUpdate >= 20) {
             uint32_t dt = now - lastRpmUpdate;
             lastRpmUpdate = now;
