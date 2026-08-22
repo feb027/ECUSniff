@@ -16,8 +16,8 @@ void PageCapture::_processCaptureData() {
     const EcuHal::CaptureEvent* rawBuf = _driver->getBuffer();
     uint16_t count = _driver->getEventCount();
 
-    EcuEngine::RawSignalEdge edges[256];
-    size_t copyCount = count > 256 ? 256 : count;
+    EcuEngine::RawSignalEdge edges[384];
+    size_t copyCount = count > 384 ? 384 : count;
     for (size_t i = 0; i < copyCount; ++i) {
         edges[i] = { rawBuf[i].timestampUs, rawBuf[i].channel, rawBuf[i].level };
     }
@@ -74,7 +74,7 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
         _gfx->fillRect(16, 282, 448, 24, 0x0841);
         _gfx->drawRoundRect(16, 282, 448, 24, 4, 0x31A6);
         _gfx->setTextColor(0x07FF, 0x0841);
-        _gfx->drawString("Klik: ARM / TRIGGER  |  Double-Click: REPLAY  |  Hold: Menu", 40, 289);
+        _gfx->drawString("Klik: ARM / TRIGGER  |  Double-Click: REPLAY  |  Tab < MENU: Keluar", 26, 289);
         _lastDrawnState = 0xFF;
     }
 
@@ -91,31 +91,44 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
             _gfx->setTextColor(0x07FF, 0x0841);
             _gfx->drawString("MEREKAM SINYAL...    ", 155, 164);
         } else {
-            _gfx->setTextColor(0x07E0, 0x0841);
-            _gfx->drawString("CAPTURE COMPLETE     ", 155, 164);
-            if (!fullRedraw && _lastResult.success) {
-                _canvas.render(_lastResult.wheel, _lastResult.cam, 16, 50);
+            if (_lastResult.success) {
+                _gfx->setTextColor(0x07E0, 0x0841);
+                _gfx->drawString("CAPTURE COMPLETE     ", 155, 164);
+                if (!fullRedraw) {
+                    _canvas.render(_lastResult.wheel, _lastResult.cam, 16, 50);
+                }
+            } else {
+                _gfx->setTextColor(0xF800, 0x0841);
+                _gfx->drawString("TIMEOUT (TIDAK ADA)  ", 155, 164);
+                if (!fullRedraw) {
+                    _gfx->fillRoundRect(16, 50, 448, 88, 4, 0x0841);
+                    _gfx->drawRoundRect(16, 50, 448, 88, 4, 0xF800);
+                    _gfx->setTextColor(0xF800, 0x0841);
+                    _gfx->setTextSize(2);
+                    _gfx->drawString("TIDAK ADA SINYAL MASUK", 100, 84);
+                }
             }
         }
         _lastDrawnState = curState;
     }
 
     _gfx->setTextSize(1);
-    _gfx->setTextColor(0x07FF, 0x0841);
     char buf[48];
     if (_lastResult.success) {
+        _gfx->setTextColor(0x07FF, 0x0841);
         snprintf(buf, sizeof(buf), "%04u RPM            ", (unsigned)_lastResult.detectedRpm);
         _gfx->drawString(buf, 160, 212);
 
-        snprintf(buf, sizeof(buf), "%s (%.1f%%)", _lastResult.matchedVehicle, _lastResult.matchConfidence);
+        snprintf(buf, sizeof(buf), "%s (%.1f%%)         ", _lastResult.matchedVehicle, _lastResult.matchConfidence);
         _gfx->drawString(buf, 160, 234);
 
         snprintf(buf, sizeof(buf), "%u Pulsa Camshaft (CMP)   ", (unsigned)_lastResult.cam.getEventCount());
         _gfx->drawString(buf, 160, 256);
     } else {
-        _gfx->drawString("--- RPM            ", 160, 212);
-        _gfx->drawString("Menunggu Sinyal... ", 160, 234);
-        _gfx->drawString("---                ", 160, 256);
+        _gfx->setTextColor(0xCE79, 0x0841);
+        _gfx->drawString("---- RPM                ", 160, 212);
+        _gfx->drawString("Tidak Ada Sinyal Masuk  ", 160, 234);
+        _gfx->drawString("0 Pulsa Camshaft (CMP)  ", 160, 256);
     }
 }
 
@@ -209,7 +222,7 @@ void PageCapture::onEncoderClick(uint8_t subTab) {
             _driver->stop();
         } else {
             _lastResult.success = false;
-            _driver->arm(256);
+            _driver->arm(384);
         }
     }
 }

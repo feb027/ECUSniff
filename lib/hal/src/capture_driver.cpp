@@ -6,7 +6,7 @@ namespace EcuHal {
 
 volatile CaptureState CaptureDriver::_state = CaptureState::Idle;
 volatile uint16_t     CaptureDriver::_eventCount = 0;
-volatile uint16_t     CaptureDriver::_targetEvents = 256;
+volatile uint16_t     CaptureDriver::_targetEvents = 384;
 volatile uint32_t     CaptureDriver::_lastCkpUs = 0;
 volatile uint32_t     CaptureDriver::_lastCmpUs = 0;
 CaptureEvent          CaptureDriver::_buffer[CaptureDriver::MAX_CAPTURE_EVENTS];
@@ -39,21 +39,21 @@ void CaptureDriver::stop() {
 void CaptureDriver::update() {
     if (_state == CaptureState::Recording) {
         uint32_t now = micros();
-        if (_lastCkpUs != 0 && (now - _lastCkpUs) > 400000 && _eventCount >= 32) {
+        if (_lastCkpUs != 0 && (now - _lastCkpUs) > 400000) {
             _state = CaptureState::Done;
         }
     }
 }
 
-
 void IRAM_ATTR CaptureDriver::isrCkpHandler() {
     if (_state == CaptureState::Idle || _state == CaptureState::Done) return;
 
     uint32_t now = micros();
-    if (_lastCkpUs != 0 && (now - _lastCkpUs) < GLITCH_FILTER_US) return; // Glitch filter
+    if (_lastCkpUs != 0 && (now - _lastCkpUs) < GLITCH_FILTER_US) return;
     _lastCkpUs = now;
 
-    uint8_t lvl = digitalRead(PinConfig::CAP_CKP);
+    // Fast hardware register read (GPIO 34 is bit 2 of GPIO.in1)
+    uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CKP - 32)) & 0x01;
 
     if (_state == CaptureState::Armed) {
         _state = CaptureState::Recording;
@@ -74,10 +74,11 @@ void IRAM_ATTR CaptureDriver::isrCmpHandler() {
     if (_state != CaptureState::Recording) return;
 
     uint32_t now = micros();
-    if (_lastCmpUs != 0 && (now - _lastCmpUs) < GLITCH_FILTER_US) return; // Glitch filter
+    if (_lastCmpUs != 0 && (now - _lastCmpUs) < GLITCH_FILTER_US) return;
     _lastCmpUs = now;
 
-    uint8_t lvl = digitalRead(PinConfig::CAP_CMP);
+    // Fast hardware register read (GPIO 35 is bit 3 of GPIO.in1)
+    uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CMP - 32)) & 0x01;
 
     if (_eventCount < MAX_CAPTURE_EVENTS) {
         _buffer[_eventCount] = { now, 1, lvl };

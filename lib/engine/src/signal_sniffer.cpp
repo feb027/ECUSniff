@@ -54,46 +54,53 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.success = false;
     if (eventCount < 16) return res;
 
-    // 1. Extract CKP Edges & Calculate Real Duty Cycle
-    uint32_t ckpTimes[256];
-    size_t ckpCount = 0;
+    // 1. Separate CKP Rising and Falling Edges with deduplication
+    uint32_t ckpRising[256];
+    size_t risingCount = 0;
     uint64_t totalHighUs = 0;
     size_t highPulseCount = 0;
 
-    for (size_t i = 0; i < eventCount && ckpCount < 256; ++i) {
+    int8_t lastCkpLvl = -1;
+    for (size_t i = 0; i < eventCount; ++i) {
         if (events[i].channel == 0) {
-            if (events[i].level == 1) {
-                ckpTimes[ckpCount++] = events[i].timestampUs;
-                if (i + 1 < eventCount && events[i + 1].channel == 0 && events[i + 1].level == 0) {
-                    totalHighUs += (events[i + 1].timestampUs - events[i].timestampUs);
+            if (events[i].level == 1 && lastCkpLvl != 1) {
+                if (risingCount < 256) ckpRising[risingCount++] = events[i].timestampUs;
+                lastCkpLvl = 1;
+            } else if (events[i].level == 0 && lastCkpLvl != 0) {
+                if (risingCount > 0 && events[i].timestampUs > ckpRising[risingCount - 1]) {
+                    totalHighUs += (events[i].timestampUs - ckpRising[risingCount - 1]);
                     highPulseCount++;
                 }
+                lastCkpLvl = 0;
             }
         }
     }
-    if (ckpCount < 10) return res;
+    if (risingCount < 10) return res;
 
     // 2. Calculate Inter-Tooth Intervals & Median Nominal Period
     uint32_t intervals[256];
     uint32_t sortIntervals[256];
-    size_t intervalCount = ckpCount - 1;
+    size_t intervalCount = risingCount - 1;
 
     for (size_t i = 0; i < intervalCount; ++i) {
-        intervals[i] = ckpTimes[i + 1] - ckpTimes[i];
+        intervals[i] = ckpRising[i + 1] - ckpRising[i];
         sortIntervals[i] = intervals[i];
     }
     uint32_t nominalPeriod = _findMedian(sortIntervals, intervalCount);
-    if (nominalPeriod < 10) return res;
+    if (nominalPeriod < 20) return res;
 
-    // 3. Locate Missing Tooth Gaps & Calculate Jitter
+    // 3. Locate Missing Tooth Gaps (>= 1.55x Nominal) with min separation of 3 teeth
     size_t gapIndices[16];
     size_t gapCount = 0;
     uint64_t totalDeviationUs = 0;
     size_t normalToothCount = 0;
+    uint32_t gapThreshold = (uint32_t)(nominalPeriod * 1.55f);
 
     for (size_t i = 0; i < intervalCount && gapCount < 16; ++i) {
-        if (intervals[i] > (nominalPeriod * 3 / 2)) {
-            gapIndices[gapCount++] = i;
+        if (intervals[i] >= gapThreshold) {
+            if (gapCount == 0 || (i - gapIndices[gapCount - 1]) >= 3) {
+                gapIndices[gapCount++] = i;
+            }
         } else {
             totalDeviationUs += (intervals[i] > nominalPeriod) ? (intervals[i] - nominalPeriod) : (nominalPeriod - intervals[i]);
             normalToothCount++;
@@ -104,25 +111,31 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         ? ((float)totalDeviationUs / (float)normalToothCount / (float)nominalPeriod) * 100.0f 
         : 0.0f;
 
-    // 4. Calculate Total Teeth (N) and Adaptive Gap (M)
+    // 4. Calculate Total Teeth (N) and Missing Teeth (M)
     uint16_t totalTeeth = 36;
     uint8_t missingTeeth = 1;
     uint32_t revPeriodUs = 0;
 
     if (gapCount >= 2) {
-        size_t teethInRev = gapIndices[1] - gapIndices[0];
+        size_t physicalTeethInRev = gapIndices[1] - gapIndices[0];
         float gapRatio = (float)intervals[gapIndices[0]] / (float)nominalPeriod;
         missingTeeth = (uint8_t)roundf(gapRatio - 1.0f);
         if (missingTeeth < 1) missingTeeth = 1;
         if (missingTeeth > 4) missingTeeth = 4;
-        totalTeeth = teethInRev + missingTeeth;
-        revPeriodUs = ckpTimes[gapIndices[1]] - ckpTimes[gapIndices[0]];
+        totalTeeth = physicalTeethInRev + missingTeeth;
+        revPeriodUs = ckpRising[gapIndices[1]] - ckpRising[gapIndices[0]];
     } else if (gapCount == 1) {
         float gapRatio = (float)intervals[gapIndices[0]] / (float)nominalPeriod;
         missingTeeth = (uint8_t)roundf(gapRatio - 1.0f);
         if (missingTeeth < 1) missingTeeth = 1;
         if (missingTeeth > 4) missingTeeth = 4;
-        totalTeeth = (intervalCount > 30 && intervalCount < 45) ? 36 : (intervalCount >= 45 ? 60 : 36);
+        
+        if (intervalCount >= 50) totalTeeth = 60;
+        else if (intervalCount >= 30) totalTeeth = 36;
+        else if (intervalCount >= 20) totalTeeth = 24;
+        else if (intervalCount >= 10) totalTeeth = 12;
+        else totalTeeth = 4;
+
         revPeriodUs = nominalPeriod * totalTeeth;
     } else {
         missingTeeth = 0;
@@ -136,9 +149,8 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.detectedRpm = (uint32_t)(60000000ULL / revPeriodUs);
     if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
 
-    float measuredDuty = (highPulseCount > 0) 
-        ? ((float)totalHighUs / (float)highPulseCount / (float)nominalPeriod) 
-        : 0.50f;
+    float avgHigh = (highPulseCount > 0) ? ((float)totalHighUs / (float)highPulseCount) : (nominalPeriod * 0.5f);
+    float measuredDuty = avgHigh / (float)nominalPeriod;
     if (measuredDuty < 0.10f) measuredDuty = 0.10f;
     if (measuredDuty > 0.90f) measuredDuty = 0.90f;
 
@@ -150,20 +162,20 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
 
     // 6. Map & Cluster Camshaft (CMP) Events (0 - 720 deg)
     res.cam.clear();
-    uint32_t syncRefUs = (gapCount > 0) ? ckpTimes[gapIndices[0]] : ckpTimes[0];
+    uint32_t syncRefUs = (gapCount > 0) ? ckpRising[gapIndices[0]] : ckpRising[0];
+    uint32_t cycle720Us = revPeriodUs * 2;
 
     for (size_t i = 0; i < eventCount; ++i) {
         if (events[i].channel == 1) {
             int32_t deltaT = (int32_t)(events[i].timestampUs - syncRefUs);
             if (deltaT >= 0) {
-                float rawAngle = ((float)(deltaT % (revPeriodUs * 2)) / (float)(revPeriodUs * 2)) * 720.0f;
+                float rawAngle = ((float)(deltaT % cycle720Us) / (float)cycle720Us) * 720.0f;
                 bool isHigh = (events[i].level == 1);
                 
-                // Clustering: check if already exists within +/- 3.5 deg
                 bool foundClose = false;
                 const CmpEvent* existing = res.cam.getEvents();
                 for (size_t k = 0; k < res.cam.getEventCount(); ++k) {
-                    if (existing[k].levelHigh == isHigh && fabsf(existing[k].angleDeg - rawAngle) < 3.5f) {
+                    if (existing[k].levelHigh == isHigh && fabsf(existing[k].angleDeg - rawAngle) < 4.0f) {
                         foundClose = true;
                         break;
                     }
