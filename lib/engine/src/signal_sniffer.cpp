@@ -111,7 +111,13 @@ void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
     TempCamEvent tempEvs[16];
     size_t tempCount = clusterCount;
     for (size_t i = 0; i < tempCount; ++i) {
-        tempEvs[i] = { clusters[i].sumAngle / (float)clusters[i].count, clusters[i].isHigh };
+        float avgA = clusters[i].sumAngle / (float)clusters[i].count;
+        // Snap to clean automotive degree resolution (0.5 deg / exact integer deg)
+        float cleanA = roundf(avgA * 2.0f) / 2.0f;
+        if (fabsf(cleanA - roundf(cleanA)) < 0.25f) cleanA = roundf(cleanA);
+        while (cleanA >= 720.0f) cleanA -= 720.0f;
+        while (cleanA < 0.0f) cleanA += 720.0f;
+        tempEvs[i] = { cleanA, clusters[i].isHigh };
     }
     for (size_t i = 0; i < tempCount; ++i) {
         for (size_t j = i + 1; j < tempCount; ++j) {
@@ -226,8 +232,10 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.wheel.dutyCycle = clampVal(avgHigh / (float)nominalPeriod, 0.10f, 0.90f);
     res.wheel.inverted = false;
 
-    // 720 deg Phase-Locking & Anti-Floating Filter
-    uint32_t gap0Us = (gapCount > 0) ? (_ckpRising[gapIndices[0]] + nominalPeriod) : _ckpRising[0];
+    // 720 deg Phase-Locking: Tooth 1 Rising Edge minus 1 Tooth Pitch gives EXACT 0.0 deg!
+    uint32_t gap0Us = (gapCount > 0 && (gapIndices[0] + 1) < risingCount) 
+        ? (_ckpRising[gapIndices[0] + 1] - nominalPeriod) 
+        : _ckpRising[0];
     uint32_t cycle720Us = revPeriodUs * 2;
     size_t cmpEventCount = 0; uint64_t cmpMinPulseUs = 0xFFFFFFFF;
 
