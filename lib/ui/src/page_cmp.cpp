@@ -23,12 +23,8 @@ void PageCmp::_renderRow(uint8_t idx, const char* label, bool isSelected) {
 
 void PageCmp::render(const EcuEngine::CamEventTable& cam, 
                      bool isEditMode, uint8_t selectedItem, bool fullRedraw) {
-    const char* events[] = {
-        "Event 1: 120.0 deg -> HIGH",
-        "Event 2: 180.0 deg -> LOW ",
-        "Event 3: 420.0 deg -> HIGH",
-        "Event 4: 470.0 deg -> LOW "
-    };
+    uint8_t count = cam.getEventCount();
+    const auto* evs = cam.getEvents();
 
     if (fullRedraw) {
         _gfx->fillRect(8, 44, 464, 268, 0x10A2);
@@ -38,17 +34,30 @@ void PageCmp::render(const EcuEngine::CamEventTable& cam,
         _gfx->setTextColor(0x07E0, 0x10A2);
         _gfx->drawString("TABEL SUDUT CAMSHAFT (CMP)", 24, 54);
 
-        for (uint8_t i = 0; i < 4; ++i) {
-            _renderRow(i, events[i], isEditMode && (selectedItem == i));
+        if (count == 0) {
+            _gfx->setTextColor(0xCE79, 0x10A2);
+            _gfx->setTextSize(2);
+            _gfx->drawString("Tidak Ada Pulsa Cam (0 Event)", 32, 100);
+            return;
+        }
+
+        for (uint8_t i = 0; i < 4 && i < count; ++i) {
+            char buf[48];
+            snprintf(buf, sizeof(buf), "Event %u: %5.1f deg -> %s",
+                     i + 1, evs[i].angleDeg, evs[i].levelHigh ? "HIGH" : "LOW ");
+            _renderRow(i, buf, isEditMode && (selectedItem == i));
         }
         _lastDrawnItem = selectedItem;
         return;
     }
 
     if (_lastDrawnItem != selectedItem) {
-        for (uint8_t i = 0; i < 4; ++i) {
+        for (uint8_t i = 0; i < 4 && i < count; ++i) {
+            char buf[48];
+            snprintf(buf, sizeof(buf), "Event %u: %5.1f deg -> %s",
+                     i + 1, evs[i].angleDeg, evs[i].levelHigh ? "HIGH" : "LOW ");
             bool isSel = isEditMode && (selectedItem == i);
-            _renderRow(i, events[i], isSel);
+            _renderRow(i, buf, isSel);
         }
         _lastDrawnItem = selectedItem;
     }

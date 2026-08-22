@@ -168,6 +168,24 @@ void MenuManager::onEncoderTurn(int32_t delta,
                 } else if (_editRow == 4) {
                     if (delta != 0) wheel.inverted = !wheel.inverted;
                 }
+            } else if (_genTab == 3) {
+                uint8_t count = cam.getEventCount();
+                if (_editRow < count && count > 0) {
+                    EcuEngine::CmpEvent tempEvents[16];
+                    const auto* evs = cam.getEvents();
+                    for (uint8_t i = 0; i < count; ++i) {
+                        tempEvents[i] = evs[i];
+                    }
+                    float newAngle = tempEvents[_editRow].angleDeg + (delta * 5.0f);
+                    if (newAngle < 0.0f) newAngle = 0.0f;
+                    if (newAngle > 720.0f) newAngle = 720.0f;
+                    tempEvents[_editRow].angleDeg = newAngle;
+
+                    cam.clear();
+                    for (uint8_t i = 0; i < count; ++i) {
+                        cam.addEvent(tempEvents[i].angleDeg, tempEvents[i].levelHigh);
+                    }
+                }
             }
         }
     }

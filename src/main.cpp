@@ -50,6 +50,10 @@ void taskCore0UiWeb(void *pvParameters) {
             menuMgr->onEncoderTurn(delta, engineState, wheelCfg, camCfg);
             signalGen.setPattern(wheelCfg, camCfg);
             signalGen.setRpm(engineState.targetRpm);
+            if (engineState.isRunning) {
+                signalGen.prepareNextCycle();
+                signalGen.swapBuffer();
+            }
         }
 
         // 2. Button State Machine

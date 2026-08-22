@@ -129,6 +129,7 @@ function connectWebSocket() {
                 updateEngineUi();
 
                 // Live Sync Pattern from Physical Wheel & Cam
+                let patternChanged = false;
                 if (msg.ckp) {
                     const c = msg.ckp;
                     let changed = (currentPattern.ckp.totalTeeth !== c.totalTeeth ||
@@ -138,9 +139,33 @@ function connectWebSocket() {
                                    currentPattern.ckp.inverted !== c.inverted);
                     if (changed) {
                         currentPattern.ckp = { ...c };
-                        updateTunerInputsFromState();
-                        if (scope) scope.render(currentPattern);
+                        patternChanged = true;
                     }
+                }
+
+                if (msg.cmp && Array.isArray(msg.cmp)) {
+                    let cmpChanged = false;
+                    if (msg.cmp.length !== currentPattern.cmp.events.length) {
+                        cmpChanged = true;
+                    } else {
+                        for (let i = 0; i < msg.cmp.length; ++i) {
+                            if (Math.abs(msg.cmp[i].angle - currentPattern.cmp.events[i].angle) > 0.1 ||
+                                msg.cmp[i].high !== currentPattern.cmp.events[i].high) {
+                                cmpChanged = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (cmpChanged) {
+                        currentPattern.cmp.events = JSON.parse(JSON.stringify(msg.cmp));
+                        patternChanged = true;
+                    }
+                }
+
+                if (patternChanged) {
+                    updateTunerInputsFromState();
+                    renderCamEvents();
+                    if (scope) scope.render(currentPattern);
                 }
 
                 // Update Sniffer Cockpit UI
