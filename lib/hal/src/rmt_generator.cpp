@@ -18,7 +18,7 @@ bool RmtGenerator::init() {
     config_ckp.rmt_mode = RMT_MODE_TX;
     config_ckp.channel = CH_CKP;
     config_ckp.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CKP);
-    config_ckp.mem_block_num = 2; // 2 blocks = 128 slots
+    config_ckp.mem_block_num = 2;
     config_ckp.clk_div = RMT_CLK_DIV;
     config_ckp.tx_config.loop_en = true;
     config_ckp.tx_config.carrier_en = false;
@@ -82,32 +82,61 @@ void RmtGenerator::prepareNextCycle() {
 
     if (ckpCount > 0) {
         rmt_item32_t* targetCkp = (_activeBufferIdx == 0) ? _ckpBufferB : _ckpBufferA;
-        for (size_t i = 0; i < ckpCount; ++i) {
-            targetCkp[i].duration0 = static_cast<uint16_t>(segments[i].duration0Us);
-            targetCkp[i].level0    = segments[i].level0;
-            targetCkp[i].duration1 = static_cast<uint16_t>(segments[i].duration1Us);
-            targetCkp[i].level1    = segments[i].level1;
+        size_t outCkp = 0;
+        for (size_t i = 0; i < ckpCount && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 2); ++i) {
+            uint32_t d0 = segments[i].duration0Us;
+            uint8_t lvl0 = segments[i].level0;
+            uint32_t d1 = segments[i].duration1Us;
+            uint8_t lvl1 = segments[i].level1;
+
+            if (d0 <= 30000 && d1 <= 30000) {
+                targetCkp[outCkp++] = rmt_item32_t{ static_cast<uint16_t>(d0), lvl0, static_cast<uint16_t>(d1), lvl1 };
+            } else {
+                while (d0 > 0 && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
+                    uint16_t d = (d0 > 30000) ? 30000 : static_cast<uint16_t>(d0);
+                    targetCkp[outCkp++] = rmt_item32_t{ d, lvl0, 0, 0 };
+                    d0 -= d;
+                }
+                while (d1 > 0 && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
+                    uint16_t d = (d1 > 30000) ? 30000 : static_cast<uint16_t>(d1);
+                    targetCkp[outCkp++] = rmt_item32_t{ d, lvl1, 0, 0 };
+                    d1 -= d;
+                }
+            }
         }
-        targetCkp[ckpCount] = rmt_item32_t{0, 0, 0, 0}; // EOT
-        if (_activeBufferIdx == 0) _ckpSizeB = ckpCount + 1;
-        else _ckpSizeA = ckpCount + 1;
+        targetCkp[outCkp] = rmt_item32_t{0, 0, 0, 0}; // EOT
+        if (_activeBufferIdx == 0) _ckpSizeB = outCkp + 1;
+        else _ckpSizeA = outCkp + 1;
     }
 
-    // 2. Generate CMP (720 deg)
+    // 2. Generate CMP (720 deg) with 15-bit safe chunking
     size_t cmpCount = EcuEngine::ParametricEngine::generateCmpCycle(
         _cam, _pendingRpm, segments, EcuEngine::MAX_CYCLE_PULSES);
 
     if (cmpCount > 0) {
         rmt_item32_t* targetCmp = (_activeBufferIdx == 0) ? _cmpBufferB : _cmpBufferA;
-        for (size_t i = 0; i < cmpCount; ++i) {
-            targetCmp[i].duration0 = static_cast<uint16_t>(segments[i].duration0Us);
-            targetCmp[i].level0    = segments[i].level0;
-            targetCmp[i].duration1 = static_cast<uint16_t>(segments[i].duration1Us);
-            targetCmp[i].level1    = segments[i].level1;
+        size_t outCmp = 0;
+        for (size_t i = 0; i < cmpCount && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 2); ++i) {
+            uint32_t rem = segments[i].duration0Us;
+            uint8_t lvl = segments[i].level0;
+            while (rem > 0 && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
+                uint16_t d = (rem > 30000) ? 30000 : static_cast<uint16_t>(rem);
+                targetCmp[outCmp++] = rmt_item32_t{ d, lvl, 0, 0 };
+                rem -= d;
+            }
+            if (segments[i].duration1Us > 0) {
+                rem = segments[i].duration1Us;
+                lvl = segments[i].level1;
+                while (rem > 0 && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 2)) {
+                    uint16_t d = (rem > 30000) ? 30000 : static_cast<uint16_t>(rem);
+                    targetCmp[outCmp++] = rmt_item32_t{ d, lvl, 0, 0 };
+                    rem -= d;
+                }
+            }
         }
-        targetCmp[cmpCount] = rmt_item32_t{0, 0, 0, 0}; // EOT
-        if (_activeBufferIdx == 0) _cmpSizeB = cmpCount + 1;
-        else _cmpSizeA = cmpCount + 1;
+        targetCmp[outCmp] = rmt_item32_t{0, 0, 0, 0}; // EOT
+        if (_activeBufferIdx == 0) _cmpSizeB = outCmp + 1;
+        else _cmpSizeA = outCmp + 1;
     }
 }
 
