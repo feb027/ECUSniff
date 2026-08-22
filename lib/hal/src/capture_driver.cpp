@@ -46,7 +46,8 @@ void CaptureDriver::update() {
         }
     } else if (_state == CaptureState::Recording) {
         uint32_t nowUs = micros();
-        if (_lastCkpUs != 0 && (nowUs - _lastCkpUs) > 300000) {
+        uint32_t lastPulseUs = (_lastCkpUs > _lastCmpUs) ? _lastCkpUs : _lastCmpUs;
+        if (lastPulseUs != 0 && (nowUs - lastPulseUs) > 300000) {
             _state = CaptureState::Done;
         }
     }
@@ -77,7 +78,7 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
 }
 
 void IRAM_ATTR CaptureDriver::isrCmpHandler() {
-    if (_state != CaptureState::Recording) return;
+    if (_state == CaptureState::Idle || _state == CaptureState::Done) return;
 
     uint32_t now = micros();
     if (_lastCmpUs != 0 && (now - _lastCmpUs) < GLITCH_FILTER_US) return;
@@ -85,11 +86,17 @@ void IRAM_ATTR CaptureDriver::isrCmpHandler() {
 
     uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CMP - 32)) & 0x01;
 
-    if (_eventCount < MAX_CAPTURE_EVENTS) {
-        _buffer[_eventCount] = { now, 1, lvl };
-        _eventCount++;
-        if (_eventCount >= _targetEvents) {
-            _state = CaptureState::Done;
+    if (_state == CaptureState::Armed) {
+        _state = CaptureState::Recording;
+    }
+
+    if (_state == CaptureState::Recording) {
+        if (_eventCount < MAX_CAPTURE_EVENTS) {
+            _buffer[_eventCount] = { now, 1, lvl };
+            _eventCount++;
+            if (_eventCount >= _targetEvents) {
+                _state = CaptureState::Done;
+            }
         }
     }
 }

@@ -5,6 +5,17 @@
 
 namespace EcuEngine {
 
+struct CamCluster {
+    float sumAngle;
+    uint16_t count;
+    bool isHigh;
+};
+
+struct TempCamEvent {
+    float angle;
+    bool high;
+};
+
 SignalSniffer::SignalSniffer() {}
 
 uint32_t SignalSniffer::_findMedian(uint32_t* arr, size_t n) {
@@ -43,16 +54,76 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
     } else if (N == 12 && M == 1) {
         strncpy(res.matchedVehicle, "Suzuki / Daihatsu (12-1)", sizeof(res.matchedVehicle));
         res.matchConfidence = 98.5f;
+    } else if (N == 0) {
+        strncpy(res.matchedVehicle, "Standalone Camshaft (CMP)", sizeof(res.matchedVehicle));
+        res.matchConfidence = 97.0f;
     } else {
         snprintf(res.matchedVehicle, sizeof(res.matchedVehicle), "Pola Kustom (%u-%u)", N, M);
         res.matchConfidence = 95.0f;
     }
 }
 
+void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
+                                     uint32_t syncRefUs, uint32_t cycle720Us,
+                                     CamEventTable& outCam, float tolDeg) {
+    if (cycle720Us == 0 || !events) return;
+
+    CamCluster clusters[16];
+    size_t clusterCount = 0;
+
+    for (size_t i = 0; i < count; ++i) {
+        if (events[i].channel == 1) {
+            int32_t deltaT = (int32_t)(events[i].timestampUs - syncRefUs);
+            while (deltaT < 0) deltaT += cycle720Us;
+            float rawAngle = ((float)(deltaT % cycle720Us) / (float)cycle720Us) * 720.0f;
+            bool isHigh = (events[i].level == 1);
+
+            int matchIdx = -1;
+            for (size_t k = 0; k < clusterCount; ++k) {
+                if (clusters[k].isHigh == isHigh) {
+                    float diff = fabsf((clusters[k].sumAngle / (float)clusters[k].count) - rawAngle);
+                    if (diff > 360.0f) diff = 720.0f - diff;
+                    if (diff < tolDeg) {
+                        matchIdx = (int)k;
+                        break;
+                    }
+                }
+            }
+
+            if (matchIdx >= 0) {
+                clusters[matchIdx].sumAngle += rawAngle;
+                clusters[matchIdx].count++;
+            } else if (clusterCount < 16) {
+                clusters[clusterCount++] = { rawAngle, 1, isHigh };
+            }
+        }
+    }
+
+    TempCamEvent tempEvs[16];
+    size_t tempCount = clusterCount;
+    for (size_t i = 0; i < tempCount; ++i) {
+        tempEvs[i] = { clusters[i].sumAngle / (float)clusters[i].count, clusters[i].isHigh };
+    }
+    for (size_t i = 0; i < tempCount; ++i) {
+        for (size_t j = i + 1; j < tempCount; ++j) {
+            if (tempEvs[j].angle < tempEvs[i].angle) {
+                TempCamEvent tmp = tempEvs[i];
+                tempEvs[i] = tempEvs[j];
+                tempEvs[j] = tmp;
+            }
+        }
+    }
+
+    outCam.clear();
+    for (size_t i = 0; i < tempCount; ++i) {
+        outCam.addEvent(tempEvs[i].angle, tempEvs[i].high);
+    }
+}
+
 SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCount) {
     SnifferResult res;
     res.success = false;
-    if (eventCount < 16) return res;
+    if (eventCount < 8) return res;
 
     size_t risingCount = 0;
     uint64_t totalHighUs = 0;
@@ -73,8 +144,42 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
             }
         }
     }
-    if (risingCount < 10) return res;
 
+    // MODE A: STANDALONE CMP (Tanpa Sinyal CKP)
+    if (risingCount < 6) {
+        size_t cmpRising = 0;
+        int8_t lastLvl = -1;
+        for (size_t i = 0; i < eventCount; ++i) {
+            if (events[i].channel == 1) {
+                if (events[i].level == 1 && lastLvl != 1) {
+                    if (cmpRising < 384) _ckpRising[cmpRising++] = events[i].timestampUs;
+                    lastLvl = 1;
+                } else if (events[i].level == 0) {
+                    lastLvl = 0;
+                }
+            }
+        }
+        if (cmpRising < 2) return res;
+
+        uint32_t camPeriodUs = (_ckpRising[cmpRising - 1] - _ckpRising[0]) / (cmpRising - 1);
+        if (camPeriodUs < 1000) return res;
+
+        res.detectedRpm = (uint32_t)(120000000ULL / camPeriodUs);
+        if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
+
+        res.wheel.totalTeeth = 0;
+        res.wheel.missingTeeth = 0;
+        res.wheel.dutyCycle = 0.5f;
+
+        _clusterCamEvents(events, eventCount, _ckpRising[0], camPeriodUs, res.cam, 15.0f);
+        _matchVehicleProfile(res);
+        snprintf(res.summary, sizeof(res.summary), "CMP Standalone: %u Pulsa @ %u RPM",
+                 (unsigned)res.cam.getEventCount(), (unsigned)res.detectedRpm);
+        res.success = true;
+        return res;
+    }
+
+    // MODE B: DUAL CKP + CMP CAPTURE
     size_t intervalCount = risingCount - 1;
     for (size_t i = 0; i < intervalCount; ++i) {
         _intervals[i] = _ckpRising[i + 1] - _ckpRising[i];
@@ -135,7 +240,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         revPeriodUs = nominalPeriod * totalTeeth;
     }
 
-    if (revPeriodUs < 1000) return res; // Guard against divide by zero
+    if (revPeriodUs < 1000) return res;
 
     res.detectedRpm = (uint32_t)(60000000ULL / revPeriodUs);
     if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
@@ -151,37 +256,14 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.wheel.dutyCycle = measuredDuty;
     res.wheel.inverted = false;
 
-    // 6. Map & Cluster Camshaft (CMP) Events (0 - 720 deg)
-    res.cam.clear();
     uint32_t syncRefUs = (gapCount > 0) ? _ckpRising[gapIndices[0]] : _ckpRising[0];
     uint32_t cycle720Us = revPeriodUs * 2;
-    if (cycle720Us == 0) return res; // Guard against modulo by zero
-
-    for (size_t i = 0; i < eventCount; ++i) {
-        if (events[i].channel == 1) {
-            int32_t deltaT = (int32_t)(events[i].timestampUs - syncRefUs);
-            while (deltaT < 0) deltaT += cycle720Us;
-            float rawAngle = ((float)(deltaT % cycle720Us) / (float)cycle720Us) * 720.0f;
-            bool isHigh = (events[i].level == 1);
-            
-            bool foundClose = false;
-            const CmpEvent* existing = res.cam.getEvents();
-            for (size_t k = 0; k < res.cam.getEventCount(); ++k) {
-                if (existing[k].levelHigh == isHigh && fabsf(existing[k].angleDeg - rawAngle) < 5.0f) {
-                    foundClose = true;
-                    break;
-                }
-            }
-            if (!foundClose && res.cam.getEventCount() < 16) {
-                res.cam.addEvent(rawAngle, isHigh);
-            }
-        }
-    }
+    _clusterCamEvents(events, eventCount, syncRefUs, cycle720Us, res.cam, 12.0f);
 
     _matchVehicleProfile(res);
-    snprintf(res.summary, sizeof(res.summary), "%u-%u CKP @ %u RPM, Duty %.0f%%, Jitter %.1f%%",
+    snprintf(res.summary, sizeof(res.summary), "%u-%u CKP @ %u RPM (%u Pulsa Cam)",
              res.wheel.totalTeeth, res.wheel.missingTeeth, (unsigned)res.detectedRpm,
-             res.wheel.dutyCycle * 100.0f, res.jitterPercent);
+             (unsigned)res.cam.getEventCount());
     res.success = true;
     return res;
 }

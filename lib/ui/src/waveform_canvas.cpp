@@ -14,7 +14,7 @@ WaveformCanvas::~WaveformCanvas() {
 bool WaveformCanvas::init(int32_t width, int32_t height) {
     _width = width;
     _height = height;
-    _sprite.setColorDepth(8); // 8-bit color depth menghemat RAM (440x80 = 35KB RAM)
+    _sprite.setColorDepth(8);
     if (_sprite.createSprite(_width, _height) == nullptr) {
         return false;
     }
@@ -37,21 +37,17 @@ void WaveformCanvas::render(const EcuEngine::ParametricWheel& wheel,
 void WaveformCanvas::_drawGrid() {
     _sprite.fillSprite(0x00); // Black
 
-    // Outer border
     _sprite.drawRect(0, 0, _width, _height, 0x39E7); // Dark gray border
 
-    // Vertical angle divider lines (0, 180, 360, 540, 720 deg)
     for (int i = 1; i <= 3; ++i) {
         int32_t x = (i * _width) / 4;
         for (int32_t y = 2; y < _height - 2; y += 4) {
-            _sprite.drawPixel(x, y, 0x52AA); // Dotted gridline
+            _sprite.drawPixel(x, y, 0x52AA);
         }
     }
 
-    // Mid divider between CKP & CMP
     _sprite.drawFastHLine(0, 40, _width, 0x2965);
 
-    // Channel labels
     _sprite.setTextSize(1);
     _sprite.setTextColor(TFT_YELLOW, 0x00);
     _sprite.drawString("CKP", 4, 4);
@@ -59,7 +55,6 @@ void WaveformCanvas::_drawGrid() {
     _sprite.setTextColor(TFT_GREEN, 0x00);
     _sprite.drawString("CMP", 4, 44);
 
-    // Angle text markers
     _sprite.setTextColor(TFT_LIGHTGRAY, 0x00);
     _sprite.drawString("0", 25, 4);
     _sprite.drawString("360", (_width / 2) - 8, 4);
@@ -67,13 +62,18 @@ void WaveformCanvas::_drawGrid() {
 }
 
 void WaveformCanvas::_drawCkpTrace(const EcuEngine::ParametricWheel& wheel) {
-    if (!wheel.isValid()) return;
-
     int32_t yHigh = 12;
     int32_t yLow  = 34;
-    size_t totalTeeth = static_cast<size_t>(wheel.totalTeeth) * 2; // 720 deg
-    float pxPerTooth = static_cast<float>(_width - 30) / static_cast<float>(totalTeeth);
     int32_t xOffset = 25;
+    int32_t availableW = _width - 30;
+
+    if (!wheel.isValid() || wheel.totalTeeth == 0) {
+        _sprite.drawFastHLine(xOffset, yLow, availableW, TFT_YELLOW);
+        return;
+    }
+
+    size_t totalTeeth = static_cast<size_t>(wheel.totalTeeth) * 2; // 720 deg
+    float pxPerTooth = static_cast<float>(availableW) / static_cast<float>(totalTeeth);
 
     int32_t lastX = xOffset;
     int32_t lastY = yLow;
@@ -93,13 +93,9 @@ void WaveformCanvas::_drawCkpTrace(const EcuEngine::ParametricWheel& wheel) {
             lastX = xEnd;
             lastY = yLow;
         } else {
-            // Rising
             _sprite.drawLine(lastX, lastY, xStart, yHigh, TFT_YELLOW);
-            // High level
             _sprite.drawFastHLine(xStart, yHigh, xMid - xStart, TFT_YELLOW);
-            // Falling
             _sprite.drawLine(xMid, yHigh, xMid, yLow, TFT_YELLOW);
-            // Low level
             _sprite.drawFastHLine(xMid, yLow, xEnd - xMid, TFT_YELLOW);
             lastX = xEnd;
             lastY = yLow;
@@ -128,8 +124,13 @@ void WaveformCanvas::_drawCmpTrace(const EcuEngine::CamEventTable& cam) {
         int32_t eventX = xOffset + static_cast<int32_t>((ev[i].angleDeg / 720.0f) * availableW);
         int32_t nextY = ev[i].levelHigh ? yHigh : yLow;
 
-        _sprite.drawLine(lastX, lastY, eventX, lastY, TFT_GREEN);
-        _sprite.drawLine(eventX, lastY, eventX, nextY, TFT_GREEN);
+        if (eventX > lastX) {
+            _sprite.drawFastHLine(lastX, lastY, eventX - lastX, TFT_GREEN);
+        }
+        int32_t topY = (lastY < nextY) ? lastY : nextY;
+        int32_t h = abs(nextY - lastY) + 1;
+        _sprite.drawFastVLine(eventX, topY, h, TFT_GREEN);
+
         lastX = eventX;
         lastY = nextY;
     }

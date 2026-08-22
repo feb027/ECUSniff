@@ -36,6 +36,9 @@ private:
 
     uint32_t _findMedian(uint32_t* arr, size_t n);
     void     _matchVehicleProfile(SnifferResult& res);
+    void     _clusterCamEvents(const RawSignalEdge* events, size_t count,
+                               uint32_t syncRefUs, uint32_t cycle720Us,
+                               CamEventTable& outCam, float tolDeg);
 };
 
 } // namespace EcuEngine
