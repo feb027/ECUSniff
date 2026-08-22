@@ -49,7 +49,7 @@ private:
     uint16_t _lastTotalTeeth{0xFFFF};
     uint8_t  _lastMissingTeeth{0xFF};
 
-    void _drawEditFrames(bool isEditMode, uint8_t editRow, const EcuEngine::ParametricWheel& wheel);
+    void _drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel);
     void _applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam);
 };
 

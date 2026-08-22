@@ -231,6 +231,12 @@ function updateEngineUi() {
     }
     const badges = ["MODE: FIX", "MODE: CRANK", "MODE: SWEEP"];
     document.getElementById('activeModeBadge').innerText = badges[engineState.runMode] || "MODE: FIX";
+
+    const statusBadge = document.getElementById('genStatusBadge');
+    if (statusBadge) {
+        statusBadge.innerText = engineState.isRunning ? 'RUNNING' : 'STOPPED';
+        statusBadge.className = `mode-badge ${engineState.isRunning ? 'state-complete' : 'state-standby'}`;
+    }
 }
 
 // 4. Signal Capture Trigger & Actions

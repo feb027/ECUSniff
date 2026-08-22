@@ -89,12 +89,27 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _lastIsRunning = state.isRunning;
     }
 
-    if (curMode != _lastMode || fullRedraw) {
+    if (curMode != _lastMode || state.isRunning != _lastIsRunning || fullRedraw) {
         const char* modeNames[] = { "FIX", "CRANK", "SWEEP" };
         _gfx->setTextColor(0x07E0, 0x0841);
         _gfx->setTextSize(3);
         _gfx->drawString("        ", 254, 165);
         _gfx->drawString(modeNames[curMode % 3], 254, 165);
+
+        // Clear and Draw Live State Badge (RUNNING vs STOPPED)
+        if (state.isRunning) {
+            _gfx->fillRoundRect(354, 152, 98, 40, 4, 0x03E0);
+            _gfx->drawRoundRect(354, 152, 98, 40, 4, 0x07E0);
+            _gfx->setTextColor(0x07E0, 0x03E0);
+            _gfx->setTextSize(2);
+            _gfx->drawCenterString("RUNNING", 403, 164);
+        } else {
+            _gfx->fillRoundRect(354, 152, 98, 40, 4, 0x3800);
+            _gfx->drawRoundRect(354, 152, 98, 40, 4, 0xF800);
+            _gfx->setTextColor(0xF800, 0x3800);
+            _gfx->setTextSize(2);
+            _gfx->drawCenterString("STOPPED", 403, 164);
+        }
         _lastMode = curMode;
     }
 
@@ -124,14 +139,14 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         if (!fullRedraw) _canvas.render(wheel, cam, 16, 50);
     }
 
-    if (isEditMode != _lastIsEditMode || editRow != _lastEditRow) {
-        _drawEditFrames(isEditMode, editRow, wheel);
+    if (isEditMode != _lastIsEditMode || editRow != _lastEditRow || state.isRunning != _lastIsRunning) {
+        _drawEditFrames(isEditMode, editRow, state.isRunning, wheel);
         _lastIsEditMode = isEditMode;
         _lastEditRow = editRow;
     }
 }
 
-void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, const EcuEngine::ParametricWheel& wheel) {
+void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel) {
     uint32_t cRpm = (isEditMode && editRow == 0) ? 0xF800 : 0x52AA;
     uint32_t cMode = (isEditMode && editRow == 1) ? 0xF800 : 0x52AA;
     uint32_t cWheel = (isEditMode && editRow == 2) ? 0xF800 : 0x52AA;
@@ -150,8 +165,13 @@ void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, const EcuE
         else if (editRow == 1) _gfx->drawString(">>> EDIT MODE: Putar (FIX/CRANK/SWEEP) | Dbl-Click: Pindah Baris <<<", 20, 289);
         else if (editRow == 2) _gfx->drawString(">>> EDIT POLA: Putar (Ganti Pola Mesin) | Dbl-Click: Pindah Baris <<<", 20, 289);
     } else {
-        _gfx->setTextColor(0x07FF, 0x0841);
-        _gfx->drawString("Klik: Mode Edit  |  Tahan 0.8s: START/STOP  |  Tahan 1.5s: Menu", 32, 289);
+        if (isRunning) {
+            _gfx->setTextColor(0x07E0, 0x0841);
+            _gfx->drawString("[ON/RUNNING] Tahan 0.8s: STOP  |  Tahan 1.5s: Menu Utama", 36, 289);
+        } else {
+            _gfx->setTextColor(0x07FF, 0x0841);
+            _gfx->drawString("[OFF/STOPPED] Tahan 0.8s: START  |  Tahan 1.5s: Menu Utama", 34, 289);
+        }
     }
 }
 
