@@ -116,3 +116,11 @@ Pastikan seluruh konfigurasi HAL mengacu pada pin berikut:
 - Dekoder sinyal wajib mengintegrasikan modul Auto-Match Database OEM (Toyota, Honda, Bosch, Yamaha, Mazda, Suzuki) beserta persentase kecocokan (*confidence %*).
 - Modul web wajib menyediakan endpoint ekspor log rekaman mikrodetik (`/api/export_csv`) untuk analisis spreadsheet dan logic analyzer (Saleae / Sigrok PulseView).
 
+## 18. Continuous Git Milestone Commit & Push Standard
+- Setiap kali sebuah milestone, fitur baru, refaktorisasi arsitektur, atau perbaikan bug selesai dikerjakan dan diverifikasi:
+  1. Pastikan audit kepatuhan baris (`check_lines.py`) lulus 100%.
+  2. Lakukan git staging dan commit dengan format pesan konvensional (`feat:`, `fix:`, `refactor:`, `docs:`).
+  3. Lakukan push langsung ke remote repositori GitHub (`git push origin main`).
+- Dilarang membiarkan perubahan besar menumpuk tanpa commit/push untuk mencegah kehilangan riwayat progres kerja.
+
+
