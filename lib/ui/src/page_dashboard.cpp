@@ -167,10 +167,10 @@ void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRun
     } else {
         if (isRunning) {
             _gfx->setTextColor(0x07E0, 0x0841);
-            _gfx->drawString("[ON/RUNNING] Tahan 0.8s: STOP  |  Tahan 1.5s: Menu Utama", 36, 289);
+            _gfx->drawString("[RUNNING] Tahan Knob 0.6s: STOP  |  Tab < MENU: Keluar", 36, 289);
         } else {
             _gfx->setTextColor(0x07FF, 0x0841);
-            _gfx->drawString("[OFF/STOPPED] Tahan 0.8s: START  |  Tahan 1.5s: Menu Utama", 34, 289);
+            _gfx->drawString("[STOPPED] Tahan Knob 0.6s: START  |  Tab < MENU: Keluar", 34, 289);
         }
     }
 }

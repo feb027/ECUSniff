@@ -58,15 +58,10 @@ void taskCore0UiWeb(void *pvParameters) {
             btnPressTime = now;
             btnWasDown = true;
             longPressHandled = false;
-            superLongPressHandled = false;
         } else if (btnIsDown && btnWasDown) {
             uint32_t holdTime = now - btnPressTime;
-            if (!superLongPressHandled && holdTime >= 1500) {
-                // Super Long Press (1.5s): Return to Main Menu Hub
-                superLongPressHandled = true;
-                if (menuMgr) menuMgr->returnToMainHub();
-            } else if (!longPressHandled && holdTime >= 800 && holdTime < 1500) {
-                // Long Press (0.8s): START / STOP Toggle
+            if (!longPressHandled && holdTime >= 600) {
+                // Long Press (>= 600ms): Reliable START / STOP Toggle (Never exit to menu)
                 longPressHandled = true;
                 clickCount = 0;
                 engineState.isRunning = !engineState.isRunning;
@@ -83,7 +78,7 @@ void taskCore0UiWeb(void *pvParameters) {
                 }
             }
         } else if (!btnIsDown && btnWasDown) {
-            if (!longPressHandled && !superLongPressHandled) {
+            if (!longPressHandled) {
                 clickCount++;
                 lastReleaseTime = now;
             }
