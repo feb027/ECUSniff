@@ -6,6 +6,7 @@
 #include "rpm_controller.h"
 #include "display_driver.h"
 #include "encoder_driver.h"
+#include "joystick_driver.h"
 #include "rmt_generator.h"
 #include "capture_driver.h"
 #include "signal_sniffer.h"
@@ -15,6 +16,7 @@
 // Hardware & Controller instances
 static EcuHal::DisplayDriver        display;
 static EcuHal::EncoderDriver        encoder;
+static EcuHal::JoystickDriver       joystick;
 static EcuHal::RmtGenerator         signalGen;
 static EcuHal::CaptureDriver        captureDriver;
 static EcuEngine::SignalSniffer     sniffer;
@@ -27,7 +29,7 @@ static EcuEngine::EngineRuntimeState engineState;
 static EcuEngine::ParametricWheel    wheelCfg;
 static EcuEngine::CamEventTable      camCfg;
 
-// Task Core 0: Web, Multi-Screen UI Rendering, and Encoder Polling
+// Task Core 0: Web, Multi-Screen UI Rendering, Joystick, and Encoder Polling
 void taskCore0UiWeb(void *pvParameters) {
     uint32_t lastWebUpdate = 0;
     uint32_t lastRpmUpdate = 0;
@@ -38,12 +40,17 @@ void taskCore0UiWeb(void *pvParameters) {
     uint8_t  clickCount = 0;
     bool     btnWasDown = false;
     bool     longPressHandled = false;
-    bool     superLongPressHandled = false;
 
     for (;;) {
         uint32_t now = millis();
 
-        // 1. Polling Rotary Encoder Turn
+        // 0. Polling HW-504 Joystick Navigation & Action
+        EcuHal::JoyAction joyAct = joystick.update();
+        if (joyAct != EcuHal::JoyAction::None && menuMgr) {
+            menuMgr->onJoystickAction(joyAct, engineState, wheelCfg, camCfg);
+        }
+
+        // 1. Polling Rotary Encoder Turn (Precision Value Tuning)
         encoder.read();
         int32_t delta = encoder.getDelta();
         if (delta != 0 && menuMgr) {
@@ -56,7 +63,7 @@ void taskCore0UiWeb(void *pvParameters) {
             }
         }
 
-        // 2. Button State Machine
+        // 2. Rotary Switch Long Press: Dedicated Hardware START / STOP Toggle
         bool btnIsDown = (digitalRead(PinConfig::ENC_SW) == LOW);
         if (btnIsDown && !btnWasDown) {
             btnPressTime = now;
@@ -65,7 +72,6 @@ void taskCore0UiWeb(void *pvParameters) {
         } else if (btnIsDown && btnWasDown) {
             uint32_t holdTime = now - btnPressTime;
             if (!longPressHandled && holdTime >= 600) {
-                // Long Press (>= 600ms): Reliable START / STOP Toggle (Never exit to menu)
                 longPressHandled = true;
                 clickCount = 0;
                 engineState.isRunning = !engineState.isRunning;
@@ -242,6 +248,7 @@ void setup() {
     engineState.runMode = EcuEngine::EngineRunMode::FixedRpm;
 
     encoder.init();
+    joystick.init();
     captureDriver.init();
     signalGen.init();
     signalGen.setPattern(wheelCfg, camCfg);

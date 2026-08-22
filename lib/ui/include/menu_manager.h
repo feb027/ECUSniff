@@ -3,6 +3,7 @@
 #include "engine_types.h"
 #include "capture_driver.h"
 #include "signal_sniffer.h"
+#include "joystick_driver.h"
 #include "page_main_hub.h"
 #include "page_dashboard.h"
 #include "page_ckp.h"
@@ -30,6 +31,11 @@ public:
                        EcuEngine::EngineRuntimeState& state,
                        EcuEngine::ParametricWheel& wheel,
                        EcuEngine::CamEventTable& cam);
+
+    void onJoystickAction(EcuHal::JoyAction action,
+                          EcuEngine::EngineRuntimeState& state,
+                          EcuEngine::ParametricWheel& wheel,
+                          EcuEngine::CamEventTable& cam);
 
     void onEncoderClick();
     void onEncoderDoubleClick(EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam);
