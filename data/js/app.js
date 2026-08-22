@@ -22,10 +22,12 @@ function initApp() {
     scope.render(currentPattern);
     initWheelDatabase();
     renderCamEvents();
+    initCaptureModule();
     connectWebSocket();
 
     window.addEventListener('resize', () => {
         if (scope && currentPattern) scope.render(currentPattern);
+        if (typeof renderCapturePreview === 'function') renderCapturePreview();
     });
 }
 
@@ -45,6 +47,8 @@ function switchMainModule(mod, userTriggered = true) {
 
     if (isGen && scope) {
         setTimeout(() => scope.render(currentPattern), 50);
+    } else if (!isGen && typeof renderCapturePreview === 'function') {
+        setTimeout(() => renderCapturePreview(), 50);
     }
 }
 
@@ -119,6 +123,11 @@ function connectWebSocket() {
                     }
                 }
 
+                // Update Sniffer Cockpit UI
+                if (typeof updateCaptureTelemetry === 'function') {
+                    updateCaptureTelemetry(msg);
+                }
+
                 // Live Physical Screen & Tab Sync
                 if (typeof msg.uiLevel !== 'undefined') {
                     handlePhysicalSync(msg);
@@ -151,24 +160,6 @@ function handlePhysicalSync(msg) {
             switchTab('viewMonitor', navBtns[0], false);
         } else if ((msg.tab === 2 || msg.tab === 3) && !isBrowsingDb && navBtns[2]) {
             switchTab('viewTuner', navBtns[2], false);
-        }
-    }
-
-    // 3. Capture Status & Telemetry Sync
-    if (msg.uiLevel === 2) {
-        const badge = document.getElementById('capStateBadge');
-        if (badge) {
-            if (msg.capState === 0) badge.innerText = 'STANDBY';
-            else if (msg.capState === 1) badge.innerText = 'ARMED';
-            else if (msg.capState === 2) badge.innerText = 'RECORDING';
-            else if (msg.capState === 3) badge.innerText = 'COMPLETE';
-        }
-
-        if (msg.capRpm > 0) {
-            document.getElementById('capRpm').value = `${msg.capRpm} RPM`;
-        }
-        if (msg.capVehicle && msg.capVehicle.length > 0) {
-            document.getElementById('capPattern').value = msg.capVehicle;
         }
     }
 }
@@ -222,16 +213,14 @@ function updateEngineUi() {
     document.getElementById('activeModeBadge').innerText = badges[engineState.runMode] || "MODE: FIX";
 }
 
-// 3. Signal Capture & Sniffer Actions
+// 3. Signal Capture Trigger & Actions
 function triggerCaptureArm() {
     sendCommand('arm_capture');
-    document.getElementById('capStateBadge').innerText = 'ARMED / WAITING';
-    document.getElementById('capPattern').value = 'Mendengarkan pulsa di GPIO 34...';
-}
-
-function replayCapturedToGenerator() {
-    switchMainModule('generator', true);
-    switchTab('viewMonitor', document.querySelectorAll('.nav-item')[0], true);
+    const badge = document.getElementById('capStateBadge');
+    if (badge) {
+        badge.innerText = 'ARMED';
+        badge.className = 'mode-badge state-armed';
+    }
 }
 
 function exportCaptureCsv() {

@@ -115,25 +115,57 @@
             </section>
         </div>
 
-        <!-- MODULE 2: CAPTURE / SNIFFER -->
+        <!-- MODULE 2: CAPTURE / SNIFFER (COCKPIT UPGRADE) -->
         <div id="moduleCapture" style="display: none;">
+            <!-- 1. Captured Oscilloscope Card -->
+            <div class="scope-card">
+                <div class="scope-header-row">
+                    <span class="scope-title">OSILOSKOP SINYAL CAPTURE (720°)</span>
+                    <div class="scope-actions">
+                        <button class="btn-cap-tool" onclick="setCapZoom(60, this)">60°</button>
+                        <button class="btn-cap-tool active" onclick="setCapZoom(120, this)">120°</button>
+                        <button class="btn-cap-tool" onclick="setCapZoom(720, this)">720°</button>
+                        <button class="btn-cap-tool btn-gap" onclick="jumpCapToGap()">Lompat ke Gap</button>
+                    </div>
+                </div>
+
+                <div class="minimap-box"><canvas id="capScopeMinimap"></canvas></div>
+                <div class="main-scope-box"><canvas id="capScopeMain"></canvas></div>
+                <div id="capProbeReadout" class="probe-bar">Perekam pulsa GPIO 34 (CKP) & GPIO 35 (CMP) — Filter 5µs</div>
+            </div>
+
+            <!-- 2. Auto-Match & Telemetry Card -->
             <div class="cockpit-card">
-                <div class="flex-between">
-                    <h3 class="card-heading">STATUS SIGNAL SNIFFER</h3>
-                    <span id="capStateBadge" class="mode-badge">STANDBY</span>
+                <div class="rpm-main-row">
+                    <div class="rpm-group">
+                        <span id="capRpmDisplay" class="rpm-value">----</span>
+                        <span class="rpm-unit">RPM</span>
+                    </div>
+                    <div id="capStateBadge" class="mode-badge state-standby">STANDBY</div>
                 </div>
-                <p class="wheel-desc">Filter Derau Busi Aktif (&ge;5&mu;s). Pin: GPIO 34 (CKP IN) & GPIO 35 (CMP IN)</p>
-                <div class="form-grid" style="margin-top: 8px;">
-                    <div class="form-item"><label>RPM Terdeteksi</label><input type="text" id="capRpm" value="--- RPM" readonly></div>
-                    <div class="form-item"><label>Pola Roda Auto-Match</label><input type="text" id="capPattern" value="Menunggu pulsa..." readonly></div>
-                </div>
-                <div class="storage-row" style="margin-top: 10px;">
-                    <button id="btnArmCapture" class="btn-power-full btn-start" style="min-height: 42px;" onclick="triggerCaptureArm()">ARM / RECORD TRIGGER</button>
+
+                <div class="wheel-name" id="capVehicleName" style="color: #10B981; font-size: 0.95rem; margin-top: 4px;">Menunggu pemicu pulsa sensor mobil...</div>
+
+                <!-- 4-Box Technical Metrics -->
+                <div class="metric-grid-4">
+                    <div class="metric-box"><div id="metricTeeth" class="metric-val">36T</div><div class="metric-lbl">Total Gigi</div></div>
+                    <div class="metric-box"><div id="metricMissing" class="metric-val">1 Gap</div><div class="metric-lbl">Missing</div></div>
+                    <div class="metric-box"><div id="metricDuty" class="metric-val">50%</div><div class="metric-lbl">Duty Cycle</div></div>
+                    <div class="metric-box"><div id="metricGapRatio" class="metric-val">2.0x</div><div class="metric-lbl">Gap Ratio</div></div>
                 </div>
             </div>
 
+            <!-- 3. Camshaft Pulse Timeline Card -->
             <div class="cockpit-card">
-                <h3 class="card-heading">AKSI HASIL CAPTURE & EKSPOR</h3>
+                <h3 class="card-heading">TIMELINE SUDUT NOKEN AS CMP (0° - 720°)</h3>
+                <div id="capCamTimeline" class="cam-timeline-strip">
+                    <span class="timeline-empty">Menunggu pulsa cam (CMP)...</span>
+                </div>
+            </div>
+
+            <!-- 4. Action & Trigger Deck -->
+            <div class="cockpit-card">
+                <button id="btnArmCapture" class="btn-power-full btn-start" style="min-height: 44px; margin-bottom: 8px;" onclick="triggerCaptureArm()">ARM / RECORD TRIGGER</button>
                 <div class="storage-row">
                     <button class="btn-select-wheel" onclick="replayCapturedToGenerator()">Replay ke Generator</button>
                     <button class="btn-select-wheel" onclick="exportCaptureCsv()">Unduh Log CSV</button>
@@ -150,10 +182,11 @@
         <button class="nav-item" onclick="switchTab('viewTuner', this)"><span class="nav-label">TUNER / EDIT</span></button>
     </nav>
 
-    <!-- Scripts -->
+    <!-- Modular Scripts -->
     <script src="/js/wheel_db.js"></script>
     <script src="/js/ui_database.js"></script>
     <script src="/js/ui_tuner.js"></script>
+    <script src="/js/ui_capture.js"></script>
     <script src="/js/scope.js"></script>
     <script src="/js/app.js"></script>
 </body>
