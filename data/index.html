@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ECUSniff - Automotive Signal Platform</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Top Compact Header -->
+    <header class="app-header">
+        <div class="header-top">
+            <div class="brand">
+                <span class="brand-badge">ECUSniff</span>
+                <span class="brand-sub">Automotive Lab</span>
+            </div>
+            <div id="connStatus" class="status-pill status-offline">
+                <span class="status-dot"></span>
+                <span id="connText">Menghubungkan...</span>
+            </div>
+        </div>
+        <div class="module-bar">
+            <button id="btnModGen" class="btn-module active" onclick="switchMainModule('generator')">GENERATOR SINYAL</button>
+            <button id="btnModCap" class="btn-module" onclick="switchMainModule('capture')">CAPTURE / SNIFFER</button>
+        </div>
+    </header>
+
+    <!-- Main View Area -->
+    <main class="main-content">
+        <!-- MODULE 1: GENERATOR -->
+        <div id="moduleGenerator">
+            <!-- TAB 1: MONITOR & PRECISION SCOPE -->
+            <section id="viewMonitor" class="tab-view active">
+                <div class="scope-card">
+                    <div class="scope-header-row">
+                        <span class="scope-title">OSILOSKOP DUAL-TRACE</span>
+                        <div class="scope-actions">
+                            <button class="btn-tool" onclick="setZoom(60, this)">60°</button>
+                            <button class="btn-tool active" onclick="setZoom(120, this)">120°</button>
+                            <button class="btn-tool" onclick="setZoom(720, this)">720°</button>
+                            <button class="btn-tool btn-gap" onclick="jumpToGap()">Lompat ke Gap</button>
+                        </div>
+                    </div>
+
+                    <div class="minimap-box"><canvas id="scopeMinimap"></canvas></div>
+                    <div class="main-scope-box"><canvas id="scopeMain"></canvas></div>
+                    <div id="probeReadout" class="probe-bar">Geser layar (swipe) dengan jari untuk menelusuri 0° - 720°</div>
+                </div>
+
+                <div class="cockpit-card">
+                    <div class="rpm-main-row">
+                        <div class="rpm-group">
+                            <span id="rpmNum" class="rpm-value">0850</span>
+                            <span class="rpm-unit">RPM</span>
+                        </div>
+                        <div class="mode-badge" id="activeModeBadge">MODE: FIX</div>
+                    </div>
+
+                    <div class="slider-wrap">
+                        <input type="range" id="rpmSlider" min="100" max="9000" step="50" value="850" oninput="onRpmSlider(this.value)">
+                    </div>
+
+                    <div class="quick-rpm-grid">
+                        <button class="btn-step" onclick="setRpm(200)">200 Crank</button>
+                        <button class="btn-step active" onclick="setRpm(850)">850 Idle</button>
+                        <button class="btn-step" onclick="setRpm(3000)">3000 Cruise</button>
+                        <button class="btn-step" onclick="setRpm(6500)">6500 Redline</button>
+                    </div>
+
+                    <div class="sim-mode-grid">
+                        <label class="mode-item"><input type="radio" name="modeRadio" value="0" checked onchange="onModeSelect(0)"><span>FIX</span></label>
+                        <label class="mode-item"><input type="radio" name="modeRadio" value="1" onchange="onModeSelect(1)"><span>CRANK</span></label>
+                        <label class="mode-item"><input type="radio" name="modeRadio" value="2" onchange="onModeSelect(2)"><span>SWEEP</span></label>
+                    </div>
+                </div>
+
+                <button id="btnPower" class="btn-power-full btn-start" onclick="toggleEngine()">START GENERATOR</button>
+            </section>
+
+            <!-- TAB 2: WHEEL DATABASE -->
+            <section id="viewDatabase" class="tab-view">
+                <div class="db-search-box">
+                    <input type="search" id="wheelSearch" placeholder="Cari pola (Toyota, Honda, 60-2, 4G63, NMAX)..." class="input-search" oninput="filterWheelDb()">
+                    <div class="category-strip" id="catScroll"></div>
+                </div>
+                <div id="wheelGrid" class="wheel-list"></div>
+            </section>
+
+            <!-- TAB 3: TUNER -->
+            <section id="viewTuner" class="tab-view">
+                <div class="cockpit-card">
+                    <h3 class="card-heading">Parameter Roda Crank (CKP)</h3>
+                    <div class="form-grid">
+                        <div class="form-item"><label>Total Gigi (N)</label><input type="number" id="tunerTeeth" value="36" min="4" max="120" onchange="applyTunerParams()"></div>
+                        <div class="form-item"><label>Missing Gap (M)</label><input type="number" id="tunerMissing" value="1" min="0" max="4" onchange="applyTunerParams()"></div>
+                        <div class="form-item"><label>Posisi Gap</label><input type="number" id="tunerPos" value="0" min="0" max="120" onchange="applyTunerParams()"></div>
+                        <div class="form-item"><label>Duty Cycle (%)</label><input type="number" id="tunerDuty" value="50" min="10" max="90" step="5" onchange="applyTunerParams()"></div>
+                    </div>
+                    <div class="checkbox-row"><label><input type="checkbox" id="tunerInvert" onchange="applyTunerParams()"> Invert Polaritas Pulsa CKP</label></div>
+                </div>
+
+                <div class="cockpit-card">
+                    <div class="flex-between"><h3 class="card-heading">Tabel Sudut Camshaft (CMP)</h3><button class="btn-action-sm" onclick="addCamEvent()">+ Tambah Sudut</button></div>
+                    <div id="tunerCmpList" class="cam-event-list"></div>
+                </div>
+
+                <div class="cockpit-card">
+                    <h3 class="card-heading">Simpan & Ekspor Profil</h3>
+                    <div class="storage-row">
+                        <input type="text" id="customProfileName" placeholder="Nama profil" class="input-text">
+                        <button class="btn-action-sm" onclick="saveCustomTune()">Simpan</button>
+                        <button class="btn-action-sm" onclick="downloadTuneJson()">Unduh JSON</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- MODULE 2: CAPTURE / SNIFFER -->
+        <div id="moduleCapture" style="display: none;">
+            <div class="cockpit-card">
+                <div class="flex-between">
+                    <h3 class="card-heading">STATUS SIGNAL SNIFFER</h3>
+                    <span id="capStateBadge" class="mode-badge">STANDBY</span>
+                </div>
+                <p class="wheel-desc">Filter Derau Busi Aktif (&ge;5&mu;s). Pin: GPIO 34 (CKP IN) & GPIO 35 (CMP IN)</p>
+                <div class="form-grid" style="margin-top: 8px;">
+                    <div class="form-item"><label>RPM Terdeteksi</label><input type="text" id="capRpm" value="--- RPM" readonly></div>
+                    <div class="form-item"><label>Pola Roda Auto-Match</label><input type="text" id="capPattern" value="Menunggu pulsa..." readonly></div>
+                </div>
+                <div class="storage-row" style="margin-top: 10px;">
+                    <button id="btnArmCapture" class="btn-power-full btn-start" style="min-height: 42px;" onclick="triggerCaptureArm()">ARM / RECORD TRIGGER</button>
+                </div>
+            </div>
+
+            <div class="cockpit-card">
+                <h3 class="card-heading">AKSI HASIL CAPTURE & EKSPOR</h3>
+                <div class="storage-row">
+                    <button class="btn-select-wheel" onclick="replayCapturedToGenerator()">Replay ke Generator</button>
+                    <button class="btn-select-wheel" onclick="exportCaptureCsv()">Unduh Log CSV</button>
+                    <button class="btn-select-wheel" onclick="runLoopbackTest()">Uji Loopback (25->34)</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation Bar for Generator -->
+    <nav id="generatorBottomNav" class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('viewMonitor', this)"><span class="nav-label">MONITOR</span></button>
+        <button class="nav-item" onclick="switchTab('viewDatabase', this)"><span class="nav-label">DATABASE RODA</span></button>
+        <button class="nav-item" onclick="switchTab('viewTuner', this)"><span class="nav-label">TUNER / EDIT</span></button>
+    </nav>
+
+    <!-- Scripts -->
+    <script src="/js/wheel_db.js"></script>
+    <script src="/js/ui_database.js"></script>
+    <script src="/js/ui_tuner.js"></script>
+    <script src="/js/scope.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
