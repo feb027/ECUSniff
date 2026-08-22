@@ -31,15 +31,35 @@ function initApp() {
     });
 }
 
-// 1. Navigation & Module Switcher (Bi-Directional)
+// 1. Slide-Over Drawer Navigation
+function toggleDrawer(open) {
+    const drawer = document.getElementById('navDrawer');
+    const backdrop = document.getElementById('drawerBackdrop');
+    if (drawer) drawer.classList.toggle('open', open);
+    if (backdrop) backdrop.classList.toggle('open', open);
+}
+
+function selectDrawerModule(mod) {
+    toggleDrawer(false);
+    switchMainModule(mod, true);
+}
+
+// 2. Module & Sub-Tab Switcher
 function switchMainModule(mod, userTriggered = true) {
     const isGen = (mod === 'generator');
     document.getElementById('moduleGenerator').style.display = isGen ? 'block' : 'none';
     document.getElementById('moduleCapture').style.display = isGen ? 'none' : 'block';
     document.getElementById('generatorBottomNav').style.display = isGen ? 'flex' : 'none';
 
-    document.getElementById('btnModGen').classList.toggle('active', isGen);
-    document.getElementById('btnModCap').classList.toggle('active', !isGen);
+    const itemGen = document.getElementById('drawerItemGen');
+    const itemCap = document.getElementById('drawerItemCap');
+    if (itemGen) itemGen.classList.toggle('active', isGen);
+    if (itemCap) itemCap.classList.toggle('active', !isGen);
+
+    const titleEl = document.getElementById('headerActiveTitle');
+    if (titleEl) {
+        titleEl.innerText = isGen ? 'GENERATOR SINYAL' : 'SIGNAL CAPTURE / SNIFFER';
+    }
 
     if (userTriggered) {
         sendCommand('set_ui_level', isGen ? 1 : 2);
@@ -80,7 +100,7 @@ function jumpToGap() {
     scope.jumpToGap();
 }
 
-// 2. WebSocket & Master-Master Real-Time Sync
+// 3. WebSocket & Master-Master Real-Time Sync
 function connectWebSocket() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${proto}//${location.host}/ws`);
@@ -213,12 +233,12 @@ function updateEngineUi() {
     document.getElementById('activeModeBadge').innerText = badges[engineState.runMode] || "MODE: FIX";
 }
 
-// 3. Signal Capture Trigger & Actions
+// 4. Signal Capture Trigger & Actions
 function triggerCaptureArm() {
     sendCommand('arm_capture');
     const badge = document.getElementById('capStateBadge');
     if (badge) {
-        badge.innerText = 'ARMED';
+        badge.innerText = 'SIAP MEREKAM';
         badge.className = 'mode-badge state-armed';
     }
 }

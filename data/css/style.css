@@ -22,7 +22,7 @@ body {
     padding-bottom: 60px;
 }
 
-/* App Header */
+/* Minimalist App Header */
 .app-header {
     background: var(--bg-card);
     border-bottom: 1px solid var(--border);
@@ -30,14 +30,18 @@ body {
 }
 .header-top {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 8px 12px;
+    padding: 8px 12px; height: 44px;
 }
-.brand { display: flex; align-items: baseline; gap: 6px; }
-.brand-badge {
-    background: #0284C7; color: #fff; font-weight: 800; font-size: 0.8rem;
-    padding: 2px 6px; border-radius: 3px; letter-spacing: 0.05em;
+.btn-drawer-toggle {
+    background: transparent; border: none; color: #fff;
+    font-size: 1.25rem; line-height: 1; padding: 4px 8px; cursor: pointer;
+    border-radius: 4px;
 }
-.brand-sub { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+.btn-drawer-toggle:active { background: var(--bg-input); }
+.header-title-text {
+    font-size: 0.82rem; font-weight: 800; color: #F3F4F6;
+    letter-spacing: 0.04em; text-transform: uppercase;
+}
 
 .status-pill {
     display: flex; align-items: center; gap: 5px;
@@ -47,16 +51,48 @@ body {
 .status-offline { background: rgba(239, 68, 68, 0.15); color: #F87171; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-.module-bar {
-    display: grid; grid-template-columns: 1fr 1fr;
-    background: #0D131F; border-top: 1px solid var(--border);
+/* Slide-Over Drawer Navigation */
+.drawer-backdrop {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px); z-index: 200;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
 }
-.btn-module {
+.drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+.nav-drawer {
+    position: fixed; top: 0; bottom: 0; left: 0; width: 280px; max-width: 85vw;
+    background: #0B0F17; border-right: 1px solid var(--border);
+    z-index: 201; transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; flex-direction: column;
+}
+.nav-drawer.open { transform: translateX(0); }
+
+.drawer-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--bg-card);
+}
+.drawer-header-title { font-size: 0.8rem; font-weight: 800; color: #fff; letter-spacing: 0.05em; }
+.btn-close-drawer {
     background: transparent; border: none; color: var(--text-muted);
-    padding: 8px 0; font-size: 0.72rem; font-weight: 600; cursor: pointer;
-    border-bottom: 2px solid transparent;
+    font-size: 1.3rem; line-height: 1; cursor: pointer;
 }
-.btn-module.active { color: #38BDF8; border-bottom-color: #38BDF8; }
+.drawer-list { padding: 8px 0; overflow-y: auto; flex: 1; }
+.drawer-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; color: var(--text-primary); text-decoration: none;
+    border-left: 3px solid transparent; cursor: pointer; transition: background 0.15s;
+}
+.drawer-item:hover { background: rgba(255, 255, 255, 0.03); }
+.drawer-item.active { background: rgba(2, 132, 199, 0.15); border-left-color: var(--accent-blue); }
+.drawer-item.disabled { opacity: 0.5; cursor: not-allowed; }
+.drawer-item-title { font-size: 0.82rem; font-weight: 700; color: #fff; }
+.drawer-item-sub { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+.drawer-badge {
+    font-size: 0.58rem; font-weight: 700; padding: 2px 6px; border-radius: 3px; font-family: monospace;
+}
+.badge-active { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+.badge-future { background: rgba(107, 114, 128, 0.2); color: #9CA3AF; }
 
 /* Main Content Views */
 .main-content { padding: 8px 10px; }
@@ -68,10 +104,7 @@ body {
     background: var(--bg-card); border: 1px solid var(--border);
     border-radius: 4px; padding: 8px;
 }
-.scope-header-row {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 4px;
-}
+.scope-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .scope-title { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; }
 .scope-actions { display: flex; gap: 3px; }
 .btn-tool, .btn-cap-tool {
