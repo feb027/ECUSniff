@@ -78,29 +78,14 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
     uint32_t now = micros();
     if (_lastCkpUs != 0 && (now - _lastCkpUs) < GLITCH_FILTER_US) return;
     _lastCkpUs = now;
-    _liveCkpEdgesSec++;
+
+    if (_state == CaptureState::Idle || _state == CaptureState::Done) {
+        return; // ZERO overhead when not recording
+    }
 
     uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CKP - 32)) & 0x01;
 
-    if (lvl == 1) {
-        if (_lastCkpRisingUs != 0) {
-            uint32_t dt = now - _lastCkpRisingUs;
-            if (_liveNominalUs == 0) _liveNominalUs = dt;
-            else if (dt < (uint32_t)(_liveNominalUs * 1.5f)) {
-                _liveNominalUs = (_liveNominalUs * 7 + dt) / 8;
-            } else if (dt >= (uint32_t)(_liveNominalUs * 1.6f)) {
-                if (_liveLastGapUs != 0) _liveRevPeriodUs = now - _liveLastGapUs;
-                _liveLastGapUs = now;
-
-                if (_state == CaptureState::Armed) {
-                    _state = CaptureState::Recording;
-                }
-            }
-        }
-        _lastCkpRisingUs = now;
-    }
-
-    if (_state == CaptureState::Armed && _liveNominalUs == 0) {
+    if (_state == CaptureState::Armed) {
         _state = CaptureState::Recording;
     }
 
@@ -116,11 +101,14 @@ void IRAM_ATTR CaptureDriver::isrCmpHandler() {
     uint32_t now = micros();
     if (_lastCmpUs != 0 && (now - _lastCmpUs) < GLITCH_FILTER_US) return;
     _lastCmpUs = now;
-    _liveCmpEdgesSec++;
+
+    if (_state == CaptureState::Idle || _state == CaptureState::Done) {
+        return; // ZERO overhead when not recording
+    }
 
     uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CMP - 32)) & 0x01;
 
-    if (_state == CaptureState::Armed && (_lastCkpUs == 0 || (now - _lastCkpUs) > 100000)) {
+    if (_state == CaptureState::Armed) {
         _state = CaptureState::Recording;
     }
 

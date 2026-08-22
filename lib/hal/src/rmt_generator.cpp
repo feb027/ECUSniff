@@ -8,6 +8,9 @@ struct FlatPhase {
     uint8_t  level;
 };
 
+static EcuEngine::PulseSegment s_segments[EcuEngine::MAX_CYCLE_PULSES];
+static FlatPhase s_phases[EcuEngine::MAX_CYCLE_PULSES];
+
 RmtGenerator::RmtGenerator() {
     _wheel.totalTeeth = 36;
     _wheel.missingTeeth = 1;
@@ -17,13 +20,13 @@ RmtGenerator::RmtGenerator() {
 }
 
 bool RmtGenerator::init() {
-    Serial.println("[RMT] Initializing RMT multi-channel hardware (CKP + CMP)...");
+    Serial.println("[RMT] Initializing RMT hardware with 4 blocks (256 items) per channel...");
 
     rmt_config_t config_ckp{};
     config_ckp.rmt_mode = RMT_MODE_TX;
     config_ckp.channel = CH_CKP;
     config_ckp.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CKP);
-    config_ckp.mem_block_num = 2;
+    config_ckp.mem_block_num = 4; // 256 items
     config_ckp.clk_div = RMT_CLK_DIV;
     config_ckp.tx_config.loop_en = true;
     config_ckp.tx_config.carrier_en = false;
@@ -33,12 +36,7 @@ bool RmtGenerator::init() {
     rmt_config_t config_cmp = config_ckp;
     config_cmp.channel = CH_CMP;
     config_cmp.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CMP);
-    config_cmp.mem_block_num = 2;
-
-    rmt_config_t config_cmp2 = config_ckp;
-    config_cmp2.channel = CH_CMP2;
-    config_cmp2.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CMP2);
-    config_cmp2.mem_block_num = 2;
+    config_cmp.mem_block_num = 4; // 256 items
 
     rmt_config(&config_ckp);
     rmt_driver_install(CH_CKP, 0, 0);
@@ -46,19 +44,15 @@ bool RmtGenerator::init() {
     rmt_config(&config_cmp);
     rmt_driver_install(CH_CMP, 0, 0);
 
-    rmt_config(&config_cmp2);
-    rmt_driver_install(CH_CMP2, 0, 0);
-
     rmt_set_tx_loop_mode(CH_CKP, true);
     rmt_set_tx_loop_mode(CH_CMP, true);
-    rmt_set_tx_loop_mode(CH_CMP2, true);
 
     _needsUpdate = true;
     prepareNextCycle();
     swapBuffer();
 
     stop();
-    Serial.println("[RMT] Multi-channel RMT Initialized (CKP: GPIO 25, CMP: GPIO 26).");
+    Serial.println("[RMT] Multi-channel RMT 4-block Hardware Ready (CKP: GPIO 25, CMP: GPIO 26).");
     return true;
 }
 
@@ -79,28 +73,25 @@ void RmtGenerator::setRpm(uint32_t targetRpm) {
 void RmtGenerator::prepareNextCycle() {
     if (!_needsUpdate || _pendingRpm == 0) return;
 
-    EcuEngine::PulseSegment segments[EcuEngine::MAX_CYCLE_PULSES];
-    FlatPhase phases[EcuEngine::MAX_CYCLE_PULSES];
-
-    // 1. Generate CKP (360 deg)
+    // 1. Generate CKP (720 deg)
     size_t ckpCount = EcuEngine::ParametricEngine::generateCkpCycle(
-        _wheel, _pendingRpm, segments, EcuEngine::MAX_CYCLE_PULSES);
+        _wheel, _pendingRpm, s_segments, EcuEngine::MAX_CYCLE_PULSES);
 
     if (ckpCount > 0) {
         size_t phaseCount = 0;
         for (size_t i = 0; i < ckpCount && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4); ++i) {
-            uint32_t rem0 = segments[i].duration0Us;
-            uint8_t lvl0 = segments[i].level0;
+            uint32_t rem0 = s_segments[i].duration0Us;
+            uint8_t lvl0 = s_segments[i].level0;
             while (rem0 > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
                 uint16_t d = (rem0 > 30000) ? 30000 : static_cast<uint16_t>(rem0);
-                phases[phaseCount++] = { d, lvl0 };
+                s_phases[phaseCount++] = { d, lvl0 };
                 rem0 -= d;
             }
-            uint32_t rem1 = segments[i].duration1Us;
-            uint8_t lvl1 = segments[i].level1;
+            uint32_t rem1 = s_segments[i].duration1Us;
+            uint8_t lvl1 = s_segments[i].level1;
             while (rem1 > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
                 uint16_t d = (rem1 > 30000) ? 30000 : static_cast<uint16_t>(rem1);
-                phases[phaseCount++] = { d, lvl1 };
+                s_phases[phaseCount++] = { d, lvl1 };
                 rem1 -= d;
             }
         }
@@ -109,11 +100,11 @@ void RmtGenerator::prepareNextCycle() {
         size_t outCkp = 0;
         for (size_t i = 0; i < phaseCount && outCkp < (EcuEngine::MAX_CYCLE_PULSES - 1); i += 2) {
             rmt_item32_t item{};
-            item.duration0 = phases[i].duration;
-            item.level0    = phases[i].level;
+            item.duration0 = s_phases[i].duration;
+            item.level0    = s_phases[i].level;
             if (i + 1 < phaseCount) {
-                item.duration1 = phases[i + 1].duration;
-                item.level1    = phases[i + 1].level;
+                item.duration1 = s_phases[i + 1].duration;
+                item.level1    = s_phases[i + 1].level;
             } else {
                 item.duration1 = 0;
                 item.level1    = 0;
@@ -125,26 +116,26 @@ void RmtGenerator::prepareNextCycle() {
         else _ckpSizeA = outCkp + 1;
     }
 
-    // 2. Generate CMP (720 deg) with pairwise safe RMT packing
+    // 2. Generate CMP (720 deg)
     size_t cmpCount = EcuEngine::ParametricEngine::generateCmpCycle(
-        _cam, _pendingRpm, segments, EcuEngine::MAX_CYCLE_PULSES);
+        _cam, _pendingRpm, s_segments, EcuEngine::MAX_CYCLE_PULSES);
 
     if (cmpCount > 0) {
         size_t phaseCount = 0;
         for (size_t i = 0; i < cmpCount && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4); ++i) {
-            uint32_t rem = segments[i].duration0Us;
-            uint8_t lvl = segments[i].level0;
+            uint32_t rem = s_segments[i].duration0Us;
+            uint8_t lvl = s_segments[i].level0;
             while (rem > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
                 uint16_t d = (rem > 30000) ? 30000 : static_cast<uint16_t>(rem);
-                phases[phaseCount++] = { d, lvl };
+                s_phases[phaseCount++] = { d, lvl };
                 rem -= d;
             }
-            if (segments[i].duration1Us > 0) {
-                rem = segments[i].duration1Us;
-                lvl = segments[i].level1;
+            if (s_segments[i].duration1Us > 0) {
+                rem = s_segments[i].duration1Us;
+                lvl = s_segments[i].level1;
                 while (rem > 0 && phaseCount < (EcuEngine::MAX_CYCLE_PULSES - 4)) {
                     uint16_t d = (rem > 30000) ? 30000 : static_cast<uint16_t>(rem);
-                    phases[phaseCount++] = { d, lvl };
+                    s_phases[phaseCount++] = { d, lvl };
                     rem -= d;
                 }
             }
@@ -154,11 +145,11 @@ void RmtGenerator::prepareNextCycle() {
         size_t outCmp = 0;
         for (size_t i = 0; i < phaseCount && outCmp < (EcuEngine::MAX_CYCLE_PULSES - 1); i += 2) {
             rmt_item32_t item{};
-            item.duration0 = phases[i].duration;
-            item.level0    = phases[i].level;
+            item.duration0 = s_phases[i].duration;
+            item.level0    = s_phases[i].level;
             if (i + 1 < phaseCount) {
-                item.duration1 = phases[i + 1].duration;
-                item.level1    = phases[i + 1].level;
+                item.duration1 = s_phases[i + 1].duration;
+                item.level1    = s_phases[i + 1].level;
             } else {
                 item.duration1 = 0;
                 item.level1    = 0;
@@ -217,13 +208,12 @@ void RmtGenerator::start() {
     if (activeCmpSize > 0) rmt_tx_start(CH_CMP, true);
 
     _running = true;
-    Serial.println("[RMT] Multi-channel continuous loop STARTED (720 deg locked).");
+    Serial.println("[RMT] Multi-channel continuous loop STARTED (4-block 720 deg locked).");
 }
 
 void RmtGenerator::stop() {
     rmt_tx_stop(CH_CKP);
     rmt_tx_stop(CH_CMP);
-    rmt_tx_stop(CH_CMP2);
     _running = false;
     Serial.println("[RMT] Multi-channel continuous loop STOPPED.");
 }
