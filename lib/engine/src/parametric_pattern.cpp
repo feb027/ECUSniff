@@ -71,30 +71,32 @@ size_t ParametricEngine::generateCkpCycle(const ParametricWheel& wheel,
         return 0;
     }
 
-    size_t totalTeeth = static_cast<size_t>(wheel.totalTeeth); // 1 Crank Revolution (360 deg)
-    if (totalTeeth > maxSegments) {
+    size_t totalCycleTeeth = static_cast<size_t>(wheel.totalTeeth) * 2; // 2 Revolutions (720 deg)
+    if (totalCycleTeeth > maxSegments) {
         return 0;
     }
 
-    uint32_t revPeriodUs = TimingMath::calculateRevPeriodUs(rpm);
-    uint32_t slotUs = revPeriodUs / wheel.totalTeeth;
-    uint32_t highUs = static_cast<uint32_t>(slotUs * wheel.dutyCycle);
-    uint32_t lowUs = slotUs - highUs;
+    uint32_t cycleTotalUs = TimingMath::calculateCyclePeriodUs(rpm);
 
     size_t outIdx = 0;
-    for (uint16_t t = 0; t < wheel.totalTeeth; ++t) {
-        PulseSegment seg{};
-        bool isMissing = (t >= wheel.missingPosition && 
-                          t < (wheel.missingPosition + wheel.missingTeeth));
+    for (size_t t = 0; t < totalCycleTeeth; ++t) {
+        uint32_t tStartUs = (uint32_t)(((uint64_t)t * cycleTotalUs) / totalCycleTeeth);
+        uint32_t tEndUs   = (uint32_t)(((uint64_t)(t + 1) * cycleTotalUs) / totalCycleTeeth);
+        uint32_t toothPeriodUs = tEndUs - tStartUs;
+        uint32_t highUs = static_cast<uint32_t>(toothPeriodUs * wheel.dutyCycle);
+        uint32_t lowUs  = toothPeriodUs - highUs;
 
+        uint16_t toothInRev = t % wheel.totalTeeth;
+        bool isMissing = (toothInRev >= wheel.missingPosition && 
+                          toothInRev < (wheel.missingPosition + wheel.missingTeeth));
+
+        PulseSegment seg{};
         if (isMissing) {
-            // Missing tooth gap: level 0 sepanjang slot waktu gigi
             seg.duration0Us = highUs;
             seg.level0 = 0;
             seg.duration1Us = lowUs;
             seg.level1 = 0;
         } else {
-            // Normal tooth: Square wave
             seg.duration0Us = highUs;
             seg.level0 = wheel.inverted ? 0 : 1;
             seg.duration1Us = lowUs;
@@ -123,7 +125,7 @@ size_t ParametricEngine::generateCmpCycle(const CamEventTable& cam,
     bool currentLevel = !ev[0].levelHigh;
 
     for (uint8_t i = 0; i < count && outIdx < maxSegments; ++i) {
-        uint32_t eventTimeUs = TimingMath::angleToTimeUs(ev[i].angleDeg, rpm);
+        uint32_t eventTimeUs = (uint32_t)(((uint64_t)ev[i].angleDeg * cycleTotalUs) / 720.0f);
         if (eventTimeUs > lastTimeUs) {
             PulseSegment seg{};
             seg.duration0Us = eventTimeUs - lastTimeUs;
