@@ -39,6 +39,8 @@ private:
     void     _clusterCamEvents(const RawSignalEdge* events, size_t count,
                                uint32_t syncRefUs, uint32_t cycle720Us,
                                CamEventTable& outCam, float tolDeg);
+    uint32_t _calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
+                                  uint32_t gap0Us, uint32_t revUs, uint32_t cycle720Us);
 };
 
 } // namespace EcuEngine
