@@ -105,9 +105,24 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
         }
     }
 
+    doc["wheelName"] = state.activeWheelName;
     doc["capState"] = state.captureState;
     doc["capRpm"] = state.captureRpm;
     doc["capVehicle"] = state.matchedVehicle;
+
+    if (state.capTotalTeeth > 0) {
+        JsonObject capCkp = doc["capCkp"].to<JsonObject>();
+        capCkp["totalTeeth"] = state.capTotalTeeth;
+        capCkp["missingTeeth"] = state.capMissingTeeth;
+        capCkp["dutyCycle"] = state.capDutyCycle;
+
+        JsonArray capCmpArr = doc["capCmp"].to<JsonArray>();
+        for (uint8_t i = 0; i < state.capCamCount && i < 8; ++i) {
+            JsonObject evObj = capCmpArr.add<JsonObject>();
+            evObj["angle"] = state.capCamAngles[i];
+            evObj["high"] = state.capCamHighs[i];
+        }
+    }
 
     String out;
     serializeJson(doc, out);

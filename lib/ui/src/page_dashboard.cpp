@@ -116,14 +116,7 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     }
 
     if (wheel.totalTeeth != _lastTotalTeeth || wheel.missingTeeth != _lastMissingTeeth || fullRedraw) {
-        const char* name = "Pola Kustom";
-        for (size_t i = 0; i < PRESET_COUNT; ++i) {
-            if (PRESETS[i].totalTeeth == wheel.totalTeeth && PRESETS[i].missingTeeth == wheel.missingTeeth) {
-                name = PRESETS[i].name;
-                _activePresetIdx = i;
-                break;
-            }
-        }
+        const char* name = (state.activeWheelName[0] != '\0') ? state.activeWheelName : "Pola Kustom";
         _gfx->setTextColor(0x07E0, 0x0841);
         _gfx->setTextSize(2);
         _gfx->drawString("                             ", 26, 234);
@@ -199,6 +192,7 @@ void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
         if (nextIdx >= (int32_t)PRESET_COUNT) nextIdx = 0;
         _activePresetIdx = nextIdx;
         _applyPreset(_activePresetIdx, wheel, cam);
+        strncpy(state.activeWheelName, PRESETS[_activePresetIdx].name, sizeof(state.activeWheelName));
     }
 }
 

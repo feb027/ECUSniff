@@ -54,6 +54,7 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
         return;
     }
 
+    bool isRedraw = _needsFullRedraw;
     // 1. Draw Top Tab Bar
     if (_needsFullRedraw) {
         _gfx->fillScreen(TFT_BLACK);
@@ -63,7 +64,7 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
         _drawGeneratorTabBar(false);
     }
 
-    bool tabChanged = (_lastTab != _genTab);
+    bool tabChanged = (_lastTab != _genTab) || isRedraw;
     _lastTab = _genTab;
 
     // 2. Render Active Content Area

@@ -160,21 +160,20 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     for (size_t i = 0; i < eventCount; ++i) {
         if (events[i].channel == 1) {
             int32_t deltaT = (int32_t)(events[i].timestampUs - syncRefUs);
-            if (deltaT >= 0) {
-                float rawAngle = ((float)(deltaT % cycle720Us) / (float)cycle720Us) * 720.0f;
-                bool isHigh = (events[i].level == 1);
-                
-                bool foundClose = false;
-                const CmpEvent* existing = res.cam.getEvents();
-                for (size_t k = 0; k < res.cam.getEventCount(); ++k) {
-                    if (existing[k].levelHigh == isHigh && fabsf(existing[k].angleDeg - rawAngle) < 4.0f) {
-                        foundClose = true;
-                        break;
-                    }
+            while (deltaT < 0) deltaT += cycle720Us;
+            float rawAngle = ((float)(deltaT % cycle720Us) / (float)cycle720Us) * 720.0f;
+            bool isHigh = (events[i].level == 1);
+            
+            bool foundClose = false;
+            const CmpEvent* existing = res.cam.getEvents();
+            for (size_t k = 0; k < res.cam.getEventCount(); ++k) {
+                if (existing[k].levelHigh == isHigh && fabsf(existing[k].angleDeg - rawAngle) < 5.0f) {
+                    foundClose = true;
+                    break;
                 }
-                if (!foundClose && res.cam.getEventCount() < 16) {
-                    res.cam.addEvent(rawAngle, isHigh);
-                }
+            }
+            if (!foundClose && res.cam.getEventCount() < 16) {
+                res.cam.addEvent(rawAngle, isHigh);
             }
         }
     }

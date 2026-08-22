@@ -111,44 +111,46 @@ function updateCaptureTelemetry(msg) {
         }
     }
 
-    if (msg.capRpm > 0) {
-        lastCapturedData.rpm = msg.capRpm;
-        lastCapturedData.hasData = true;
-        const rpmEl = document.getElementById('capRpmDisplay');
-        if (rpmEl) rpmEl.innerText = String(msg.capRpm).padStart(4, '0');
-    }
+    if (msg.capState === 3) {
+        if (msg.capRpm > 0) {
+            lastCapturedData.rpm = msg.capRpm;
+            lastCapturedData.hasData = true;
+            const rpmEl = document.getElementById('capRpmDisplay');
+            if (rpmEl) rpmEl.innerText = String(msg.capRpm).padStart(4, '0');
+        }
 
-    if (msg.capVehicle && msg.capVehicle.length > 0 && msg.capVehicle !== "Belum Terdeteksi") {
-        lastCapturedData.vehicle = msg.capVehicle;
-        lastCapturedData.hasData = true;
-        const vEl = document.getElementById('capVehicleName');
-        if (vEl) vEl.innerText = msg.capVehicle;
-    }
+        if (msg.capVehicle && msg.capVehicle.length > 0 && msg.capVehicle !== "Belum Terdeteksi") {
+            lastCapturedData.vehicle = msg.capVehicle;
+            const vEl = document.getElementById('capVehicleName');
+            if (vEl) vEl.innerText = msg.capVehicle;
+        }
 
-    if (msg.ckp && (msg.capRpm > 0 || msg.capState === 3)) {
-        lastCapturedData.totalTeeth = msg.ckp.totalTeeth || 0;
-        lastCapturedData.missingTeeth = msg.ckp.missingTeeth || 0;
-        lastCapturedData.duty = Math.round((msg.ckp.dutyCycle || 0.5) * 100);
+        if (msg.capCkp) {
+            lastCapturedData.totalTeeth = msg.capCkp.totalTeeth || 0;
+            lastCapturedData.missingTeeth = msg.capCkp.missingTeeth || 0;
+            lastCapturedData.duty = Math.round((msg.capCkp.dutyCycle || 0.5) * 100);
 
-        const tEl = document.getElementById('metricTeeth');
-        const mEl = document.getElementById('metricMissing');
-        const dEl = document.getElementById('metricDuty');
-        const rEl = document.getElementById('metricGapRatio');
+            const tEl = document.getElementById('metricTeeth');
+            const mEl = document.getElementById('metricMissing');
+            const dEl = document.getElementById('metricDuty');
+            const rEl = document.getElementById('metricGapRatio');
 
-        if (tEl) tEl.innerText = `${lastCapturedData.totalTeeth}T`;
-        if (mEl) mEl.innerText = `${lastCapturedData.missingTeeth} Gap`;
-        if (dEl) dEl.innerText = `${lastCapturedData.duty}%`;
-        if (rEl) rEl.innerText = lastCapturedData.missingTeeth >= 2 ? "3.0x" : "2.0x";
-    }
+            if (tEl) tEl.innerText = `${lastCapturedData.totalTeeth}T`;
+            if (mEl) mEl.innerText = `${lastCapturedData.missingTeeth} Gap`;
+            if (dEl) dEl.innerText = `${lastCapturedData.duty}%`;
+            if (rEl) rEl.innerText = lastCapturedData.missingTeeth >= 2 ? "3.0x" : "2.0x";
+        }
 
-    if (msg.cmp && Array.isArray(msg.cmp) && msg.cmp.length > 0) {
-        lastCapturedData.camEvents = msg.cmp;
-        renderCamTimeline(msg.cmp);
-    }
+        if (msg.capCmp && Array.isArray(msg.capCmp)) {
+            lastCapturedData.camEvents = msg.capCmp;
+            renderCamTimeline(msg.capCmp);
+        }
 
-    if (msg.capState === 3 && capScope) {
-        lastCapturedData.hasData = true;
-        renderCapturePreview();
+        if (capScope && lastCapturedData.totalTeeth > 0) {
+            renderCapturePreview();
+        }
+    } else if (msg.capState === 0 && !lastCapturedData.hasData) {
+        _drawStandbyGrid('capScopeMain', 'capScopeMinimap', 'capProbeReadout');
     }
 }
 

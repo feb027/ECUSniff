@@ -89,6 +89,7 @@ function applyWheelFromDb(wheelId) {
     const w = all.find(x => x.id === wheelId);
     if (!w) return;
 
+    currentPattern.name = w.name;
     currentPattern.ckp = { ...w.ckp };
     currentPattern.cmp.events = JSON.parse(JSON.stringify(w.cmp));
 

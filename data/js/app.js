@@ -211,7 +211,13 @@ function handlePhysicalSync(msg) {
 
 function sendCommand(cmd, val = 0) {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ cmd, val, ckp: currentPattern.ckp, cmp: currentPattern.cmp.events }));
+        ws.send(JSON.stringify({
+            cmd,
+            val,
+            name: currentPattern.name || "Pola Kustom",
+            ckp: currentPattern.ckp,
+            cmp: currentPattern.cmp.events
+        }));
     }
 }
 

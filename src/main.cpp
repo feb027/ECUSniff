@@ -125,6 +125,17 @@ void taskCore0UiWeb(void *pvParameters) {
                 if (capRes.success) {
                     engineState.captureRpm = capRes.detectedRpm;
                     strncpy(engineState.matchedVehicle, capRes.matchedVehicle, sizeof(engineState.matchedVehicle));
+                    engineState.capTotalTeeth = capRes.wheel.totalTeeth;
+                    engineState.capMissingTeeth = capRes.wheel.missingTeeth;
+                    engineState.capDutyCycle = capRes.wheel.dutyCycle;
+                    engineState.capCamCount = capRes.cam.getEventCount();
+                    const auto* cev = capRes.cam.getEvents();
+                    if (cev) {
+                        for (uint8_t k = 0; k < engineState.capCamCount && k < 8; ++k) {
+                            engineState.capCamAngles[k] = cev[k].angleDeg;
+                            engineState.capCamHighs[k] = cev[k].levelHigh;
+                        }
+                    }
                 }
             }
             webManager.updateLiveTelemetry(engineState, wheelCfg, camCfg);
@@ -177,6 +188,10 @@ void setup() {
         } else if (cmd == "set_tab") {
             if (menuMgr) menuMgr->setGenTab(val);
         } else if (cmd == "set_pattern") {
+            String name = doc["name"] | doc["wheelName"] | "";
+            if (name.length() > 0) {
+                strncpy(engineState.activeWheelName, name.c_str(), sizeof(engineState.activeWheelName));
+            }
             if (doc["ckp"].is<JsonObjectConst>()) {
                 JsonObjectConst ckp = doc["ckp"];
                 wheelCfg.totalTeeth = ckp["totalTeeth"] | 36;
@@ -195,9 +210,13 @@ void setup() {
                 }
             }
             signalGen.setPattern(wheelCfg, camCfg);
+            if (engineState.isRunning) {
+                signalGen.prepareNextCycle();
+                signalGen.swapBuffer();
+            }
             if (menuMgr) menuMgr->markNeedsRedraw();
         } else if (cmd == "arm_capture") {
-            captureDriver.arm(256);
+            captureDriver.arm(384);
         }
     });
     webManager.setCaptureDriver(&captureDriver);

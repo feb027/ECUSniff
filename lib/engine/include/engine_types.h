@@ -72,11 +72,18 @@ struct EngineRuntimeState {
     SweepConfig    sweep{};
 
     // Bi-directional UI & Sniffer sync fields
+    char     activeWheelName[48]{"Honda / Ford 36-1"};
     uint8_t  uiLevel{0};      // 0: MainHub, 1: Generator, 2: Capture
     uint8_t  activeTab{1};    // 0: Menu, 1: Dash/Live, 2: Ckp/Data, 3: Cmp/Cam
     uint8_t  captureState{0}; // 0: Idle, 1: Armed, 2: Recording, 3: Done
     uint32_t captureRpm{0};
     char     matchedVehicle[48]{"Belum Terdeteksi"};
+    uint16_t capTotalTeeth{0};
+    uint8_t  capMissingTeeth{0};
+    float    capDutyCycle{0.5f};
+    uint8_t  capCamCount{0};
+    float    capCamAngles[8]{0};
+    bool     capCamHighs[8]{false};
 };
 
 } // namespace EcuEngine
