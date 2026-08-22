@@ -53,13 +53,11 @@ function _drawStandbyGrid(mainId, miniId, probeId) {
         ctx.fillStyle = '#05080E';
         ctx.fillRect(0, 0, w, h);
 
-        // Subtle dark grid
         ctx.strokeStyle = '#111827';
         ctx.lineWidth = 1;
         for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
         for (let y = 0; y < h; y += 25) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 
-        // Flat standby baseline
         ctx.strokeStyle = '#374151';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -89,7 +87,6 @@ function _drawStandbyGrid(mainId, miniId, probeId) {
 function updateCaptureTelemetry(msg) {
     if (!msg) return;
 
-    // 1. Status Badge
     const badge = document.getElementById('capStateBadge');
     const btnArm = document.getElementById('btnArmCapture');
 
@@ -114,7 +111,6 @@ function updateCaptureTelemetry(msg) {
         }
     }
 
-    // 2. RPM & Vehicle Info
     if (msg.capRpm > 0) {
         lastCapturedData.rpm = msg.capRpm;
         lastCapturedData.hasData = true;
@@ -129,7 +125,6 @@ function updateCaptureTelemetry(msg) {
         if (vEl) vEl.innerText = msg.capVehicle;
     }
 
-    // 3. Technical Geometry Metrics
     if (msg.ckp && (msg.capRpm > 0 || msg.capState === 3)) {
         lastCapturedData.totalTeeth = msg.ckp.totalTeeth || 0;
         lastCapturedData.missingTeeth = msg.ckp.missingTeeth || 0;
@@ -146,7 +141,6 @@ function updateCaptureTelemetry(msg) {
         if (rEl) rEl.innerText = lastCapturedData.missingTeeth >= 2 ? "3.0x" : "2.0x";
     }
 
-    // 4. Cam Events Timeline
     if (msg.cmp && Array.isArray(msg.cmp) && msg.cmp.length > 0) {
         lastCapturedData.camEvents = msg.cmp;
         renderCamTimeline(msg.cmp);
@@ -188,6 +182,42 @@ function setCapZoom(spanDeg, btn) {
 
 function jumpCapToGap() {
     if (capScope) capScope.jumpToGap();
+}
+
+function saveCapturedToDatabase() {
+    if (!lastCapturedData.hasData || lastCapturedData.totalTeeth === 0) {
+        alert("Belum ada data capture yang terekam. Silakan tekan 'Mulai Capture' terlebih dahulu.");
+        return;
+    }
+
+    const defaultName = lastCapturedData.vehicle !== "Belum Terdeteksi" 
+        ? `${lastCapturedData.vehicle} (Capture)` 
+        : `Rekaman ${lastCapturedData.totalTeeth}-${lastCapturedData.missingTeeth} (${lastCapturedData.rpm} RPM)`;
+
+    const name = prompt("Beri nama pola kendaraan hasil capture ini:", defaultName);
+    if (!name || name.trim() === '') return;
+
+    let custom = getCustomWheels();
+    const newWheel = {
+        id: `custom_${Date.now()}`,
+        name: name.trim(),
+        category: 'Kustom / Rekaman',
+        desc: `Hasil capture: ${lastCapturedData.totalTeeth}-${lastCapturedData.missingTeeth} CKP @ ${lastCapturedData.rpm} RPM (${(lastCapturedData.camEvents || []).length} Pulsa Cam)`,
+        ckp: {
+            totalTeeth: lastCapturedData.totalTeeth,
+            missingTeeth: lastCapturedData.missingTeeth,
+            missingPosition: 0,
+            dutyCycle: (lastCapturedData.duty || 50) / 100.0,
+            inverted: false
+        },
+        cmp: JSON.parse(JSON.stringify(lastCapturedData.camEvents || []))
+    };
+
+    custom.unshift(newWheel);
+    localStorage.setItem('ecusniff_custom_wheels', JSON.stringify(custom));
+    filterWheelDb();
+
+    alert(`Pola "${newWheel.name}" berhasil disimpan ke Database Roda! Anda dapat membukanya kapan saja di tab 'DATABASE RODA'.`);
 }
 
 function replayCapturedToGenerator() {

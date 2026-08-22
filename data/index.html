@@ -206,8 +206,11 @@
             <!-- 4. Action & Trigger Deck -->
             <div class="cockpit-card">
                 <button id="btnArmCapture" class="btn-power-full btn-start" style="min-height: 44px; margin-bottom: 8px;" onclick="triggerCaptureArm()">Mulai Capture</button>
-                <div class="storage-row">
+                <div class="storage-row" style="margin-bottom: 6px;">
+                    <button class="btn-select-wheel" style="border-color: #059669; color: #34D399; font-weight: 700;" onclick="saveCapturedToDatabase()">Simpan ke Database Roda</button>
                     <button class="btn-select-wheel" onclick="replayCapturedToGenerator()">Muat ke Generator</button>
+                </div>
+                <div class="storage-row">
                     <button class="btn-select-wheel" onclick="exportCaptureCsv()">Unduh Log CSV</button>
                     <button class="btn-select-wheel" onclick="runLoopbackTest()">Uji Mandiri (Loopback)</button>
                 </div>
