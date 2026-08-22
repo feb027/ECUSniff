@@ -75,8 +75,13 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _lastTotalTeeth = 0xFFFF;
     }
 
+    bool isRunningChanged = (state.isRunning != _lastIsRunning);
+    bool rpmChanged = (activeRpm != _lastRpm);
+    bool modeChanged = (curMode != _lastMode);
+    bool editChanged = (isEditMode != _lastIsEditMode || editRow != _lastEditRow);
+
     // Dynamic Updates
-    if (activeRpm != _lastRpm || state.isRunning != _lastIsRunning) {
+    if (rpmChanged || isRunningChanged || fullRedraw) {
         char rpmStr[8];
         snprintf(rpmStr, sizeof(rpmStr), "%04u", (unsigned)activeRpm);
         _gfx->setTextColor(0xFFE0, 0x0841);
@@ -85,11 +90,9 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _gfx->setTextSize(2);
         _gfx->setTextColor(0x07FF, 0x0841);
         _gfx->drawString("RPM", 162, 174);
-        _lastRpm = activeRpm;
-        _lastIsRunning = state.isRunning;
     }
 
-    if (curMode != _lastMode || state.isRunning != _lastIsRunning || fullRedraw) {
+    if (modeChanged || isRunningChanged || fullRedraw) {
         const char* modeNames[] = { "FIX", "CRANK", "SWEEP" };
         _gfx->setTextColor(0x07E0, 0x0841);
         _gfx->setTextSize(3);
@@ -110,7 +113,6 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
             _gfx->setTextSize(2);
             _gfx->drawCenterString("STOPPED", 403, 164);
         }
-        _lastMode = curMode;
     }
 
     if (wheel.totalTeeth != _lastTotalTeeth || wheel.missingTeeth != _lastMissingTeeth || fullRedraw) {
@@ -139,11 +141,15 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         if (!fullRedraw) _canvas.render(wheel, cam, 16, 50);
     }
 
-    if (isEditMode != _lastIsEditMode || editRow != _lastEditRow || state.isRunning != _lastIsRunning) {
+    if (editChanged || isRunningChanged || fullRedraw) {
         _drawEditFrames(isEditMode, editRow, state.isRunning, wheel);
-        _lastIsEditMode = isEditMode;
-        _lastEditRow = editRow;
     }
+
+    _lastRpm = activeRpm;
+    _lastIsRunning = state.isRunning;
+    _lastMode = curMode;
+    _lastIsEditMode = isEditMode;
+    _lastEditRow = editRow;
 }
 
 void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel) {
