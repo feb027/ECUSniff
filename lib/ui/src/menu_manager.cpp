@@ -99,6 +99,11 @@ void MenuManager::onEncoderTurn(int32_t delta,
                                EcuEngine::EngineRuntimeState& state,
                                EcuEngine::ParametricWheel& wheel,
                                EcuEngine::CamEventTable& cam) {
+    if (_uiLevel == UiLevel::MainHub) {
+        _pageHub.onEncoderTurn(delta, _hubIndex);
+        return;
+    }
+
     if (_uiLevel == UiLevel::Generator) {
         if (_genTab == 1) {
             _pageDash.onEncoderTurn(delta, _editRow, state, wheel, cam);
@@ -144,8 +149,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
 
     if (action == EcuHal::JoyAction::Left) {
         if (_uiLevel == UiLevel::MainHub) {
-            _hubIndex = (_hubIndex == 0) ? 1 : 0;
-            _needsFullRedraw = true;
+            _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 2;
         } else {
             if (_genTab > 0) {
                 _genTab--;
@@ -157,8 +161,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
         }
     } else if (action == EcuHal::JoyAction::Right) {
         if (_uiLevel == UiLevel::MainHub) {
-            _hubIndex = (_hubIndex == 0) ? 1 : 0;
-            _needsFullRedraw = true;
+            _hubIndex = (_hubIndex + 1) % 3;
         } else {
             if (_genTab < 3) {
                 _genTab++;
@@ -167,13 +170,17 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
             }
         }
     } else if (action == EcuHal::JoyAction::Up) {
-        if (_uiLevel == UiLevel::Generator) {
+        if (_uiLevel == UiLevel::MainHub) {
+            _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 2;
+        } else if (_uiLevel == UiLevel::Generator) {
             if (_genTab == 1) _editRow = (_editRow > 0) ? (_editRow - 1) : 2;
             else if (_genTab == 2) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
             else if (_genTab == 3) _editRow = (_editRow > 0) ? (_editRow - 1) : 3;
         }
     } else if (action == EcuHal::JoyAction::Down) {
-        if (_uiLevel == UiLevel::Generator) {
+        if (_uiLevel == UiLevel::MainHub) {
+            _hubIndex = (_hubIndex + 1) % 3;
+        } else if (_uiLevel == UiLevel::Generator) {
             if (_genTab == 1) _editRow = (_editRow + 1) % 3;
             else if (_genTab == 2) _editRow = (_editRow + 1) % 5;
             else if (_genTab == 3) _editRow = (_editRow + 1) % 4;
@@ -181,7 +188,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
     } else if (action == EcuHal::JoyAction::Click) {
         if (_uiLevel == UiLevel::MainHub) {
             if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
-            else { _uiLevel = UiLevel::Capture; _genTab = 1; }
+            else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
             _needsFullRedraw = true;
         } else if (_uiLevel == UiLevel::Capture) {
             _pageCapture.onEncoderClick(_genTab);
@@ -194,7 +201,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
 void MenuManager::onEncoderClick() {
     if (_uiLevel == UiLevel::MainHub) {
         if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
-        else { _uiLevel = UiLevel::Capture; _genTab = 1; }
+        else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
         _needsFullRedraw = true;
         return;
     }
