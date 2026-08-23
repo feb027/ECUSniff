@@ -1,18 +1,10 @@
 #include "page_dashboard.h"
+#include "wheel_database.h"
 
 namespace EcuUi {
 
 WheelPresetItem PageDashboard::s_customSlots[PageDashboard::MAX_CUSTOM_PRESETS]{};
 uint8_t PageDashboard::s_customCount = 0;
-
-const WheelPresetItem PageDashboard::BASE_PRESETS[] = {
-    { "Honda / Ford 36-1", 36, 1, 0, 0.50f, false, 4, {120.0f, 180.0f, 420.0f, 470.0f}, {true, false, true, false} },
-    { "Toyota 1NZ/2NZ 36-2", 36, 2, 0, 0.50f, false, 2, {90.0f, 270.0f, 0.0f, 0.0f}, {true, false, false, false} },
-    { "Bosch / VW / BMW 60-2", 60, 2, 0, 0.50f, false, 2, {180.0f, 540.0f, 0.0f, 0.0f}, {true, false, false, false} },
-    { "Mazda Miata 24-2", 24, 2, 0, 0.50f, false, 2, {120.0f, 360.0f, 0.0f, 0.0f}, {true, false, false, false} },
-    { "Suzuki / Daihatsu 12-1", 12, 1, 0, 0.50f, false, 2, {180.0f, 360.0f, 0.0f, 0.0f}, {true, false, false, false} },
-    { "Mitsubishi 4G63 4-0", 4, 0, 0, 0.50f, false, 4, {70.0f, 180.0f, 370.0f, 450.0f}, {true, false, true, false} }
-};
 
 PageDashboard::PageDashboard(LovyanGFX* gfx) : _gfx(gfx), _canvas(gfx) {}
 
@@ -84,7 +76,7 @@ void PageDashboard::setCustomSlot(uint8_t slot, const WheelPresetItem& item) {
 void PageDashboard::_applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam) {
     const WheelPresetItem* p = nullptr;
     if (idx < BASE_PRESET_COUNT) {
-        p = &BASE_PRESETS[idx];
+        p = &OEM_DATABASE_PRESETS[idx];
     } else if (idx < BASE_PRESET_COUNT + s_customCount) {
         p = &s_customSlots[idx - BASE_PRESET_COUNT];
     }
@@ -227,7 +219,7 @@ void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
         if (nextIdx >= (int32_t)count) nextIdx = 0;
         _activePresetIdx = nextIdx;
         _applyPreset(_activePresetIdx, wheel, cam);
-        const char* pName = (_activePresetIdx < (int32_t)BASE_PRESET_COUNT) ? BASE_PRESETS[_activePresetIdx].name : s_customSlots[_activePresetIdx - BASE_PRESET_COUNT].name;
+        const char* pName = (_activePresetIdx < (int32_t)BASE_PRESET_COUNT) ? OEM_DATABASE_PRESETS[_activePresetIdx].name : s_customSlots[_activePresetIdx - BASE_PRESET_COUNT].name;
         strncpy(state.activeWheelName, pName, sizeof(state.activeWheelName));
     }
 }
