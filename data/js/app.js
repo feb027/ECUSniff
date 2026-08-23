@@ -4,6 +4,7 @@ let ws = null;
 let scope = null;
 let lastSyncedLevel = -1;
 let lastSyncedTab = -1;
+let userActionLockUntil = 0;
 
 let engineState = {
     isRunning: false,
@@ -31,7 +32,6 @@ function initApp() {
     });
 }
 
-// 1. Slide-Over Drawer Navigation
 function toggleDrawer(open) {
     const drawer = document.getElementById('navDrawer');
     const backdrop = document.getElementById('drawerBackdrop');
@@ -44,12 +44,18 @@ function selectDrawerModule(mod) {
     switchMainModule(mod, true);
 }
 
-// 2. Module & Sub-Tab Switcher
 function switchMainModule(mod, userTriggered = true) {
+    if (userTriggered) {
+        userActionLockUntil = Date.now() + 2000;
+    }
     const isGen = (mod === 'generator');
-    document.getElementById('moduleGenerator').style.display = isGen ? 'block' : 'none';
-    document.getElementById('moduleCapture').style.display = isGen ? 'none' : 'block';
-    document.getElementById('generatorBottomNav').style.display = isGen ? 'flex' : 'none';
+    const genEl = document.getElementById('moduleGenerator');
+    const capEl = document.getElementById('moduleCapture');
+    const navEl = document.getElementById('generatorBottomNav');
+
+    if (genEl) genEl.style.display = isGen ? 'block' : 'none';
+    if (capEl) capEl.style.display = isGen ? 'none' : 'block';
+    if (navEl) navEl.style.display = isGen ? 'flex' : 'none';
 
     const itemGen = document.getElementById('drawerItemGen');
     const itemCap = document.getElementById('drawerItemCap');
@@ -62,17 +68,23 @@ function switchMainModule(mod, userTriggered = true) {
     }
 
     if (userTriggered) {
+        lastSyncedLevel = isGen ? 1 : 2;
         sendCommand('set_ui_level', isGen ? 1 : 2);
     }
 
-    if (isGen && scope) {
-        setTimeout(() => scope.render(currentPattern), 50);
-    } else if (!isGen && typeof renderCapturePreview === 'function') {
-        setTimeout(() => renderCapturePreview(), 50);
-    }
+    setTimeout(() => {
+        if (isGen && scope) {
+            scope.render(currentPattern);
+        } else if (!isGen && typeof renderCapturePreview === 'function') {
+            renderCapturePreview();
+        }
+    }, 60);
 }
 
 function switchTab(viewId, btn, userTriggered = true) {
+    if (userTriggered) {
+        userActionLockUntil = Date.now() + 2000;
+    }
     document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
 
@@ -100,7 +112,6 @@ function jumpToGap() {
     scope.jumpToGap();
 }
 
-// 3. WebSocket & Master-Master Real-Time Sync
 function connectWebSocket() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${proto}//${location.host}/ws`);
@@ -128,7 +139,6 @@ function connectWebSocket() {
                 engineState.runMode = msg.mode || 0;
                 updateEngineUi();
 
-                // Live Sync Pattern from Physical Wheel & Cam
                 let patternChanged = false;
                 if (msg.ckp) {
                     const c = msg.ckp;
@@ -168,12 +178,10 @@ function connectWebSocket() {
                     if (scope) scope.render(currentPattern);
                 }
 
-                // Update Sniffer Cockpit UI
                 if (typeof updateCaptureTelemetry === 'function') {
                     updateCaptureTelemetry(msg);
                 }
 
-                // Live Physical Screen & Tab Sync
                 if (typeof msg.uiLevel !== 'undefined') {
                     handlePhysicalSync(msg);
                 }
@@ -183,7 +191,8 @@ function connectWebSocket() {
 }
 
 function handlePhysicalSync(msg) {
-    // 1. Module Level Sync
+    if (Date.now() < userActionLockUntil) return;
+
     if (msg.uiLevel === 1 && lastSyncedLevel !== 1) {
         lastSyncedLevel = 1;
         switchMainModule('generator', false);
@@ -194,7 +203,6 @@ function handlePhysicalSync(msg) {
         lastSyncedLevel = 0;
     }
 
-    // 2. Sub-Tab Sync for Generator
     if (msg.uiLevel === 1 && msg.tab && msg.tab !== lastSyncedTab) {
         lastSyncedTab = msg.tab;
         const activeView = document.querySelector('.tab-view.active');
@@ -270,7 +278,6 @@ function updateEngineUi() {
     }
 }
 
-// 4. Signal Capture Trigger & Actions
 function triggerCaptureArm() {
     sendCommand('arm_capture');
     const badge = document.getElementById('capStateBadge');
