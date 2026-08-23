@@ -20,7 +20,9 @@ volatile uint16_t     CaptureDriver::_liveCmpEdgesSec = 0;
 volatile uint32_t     CaptureDriver::_lastRateCheckMs = 0;
 
 static volatile uint32_t s_lastGapTimestampUs = 0;
+static volatile uint32_t s_prevDtUs = 0;
 static volatile uint16_t s_runningToothCount = 0;
+static volatile bool     s_lastWasGap = false;
 CaptureEvent          CaptureDriver::_buffer[CaptureDriver::MAX_CAPTURE_EVENTS];
 
 CaptureDriver::CaptureDriver() {}
@@ -43,9 +45,11 @@ void CaptureDriver::arm(uint16_t targetEvents) {
     _lastCkpUs = 0;
     _lastCmpUs = 0;
     _lastCkpRisingUs = 0;
+    _liveNominalUs = 0;
+    s_prevDtUs = 0;
     s_lastGapTimestampUs = 0;
     s_runningToothCount = 0;
-    _liveNominalUs = 0;
+    s_lastWasGap = false;
     _armTimeMs = millis();
     _state = CaptureState::Armed;
 }
@@ -91,36 +95,41 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
     if (lvl == 1) {
         if (_lastCkpRisingUs != 0) {
             uint32_t dt = now - _lastCkpRisingUs;
-            if (dt > 20 && dt < 1200000) {
-                if (_liveNominalUs == 0) {
-                    _liveNominalUs = dt;
-                    s_runningToothCount = 1;
-                } else {
-                    if (dt >= ((_liveNominalUs * 140) / 100)) {
+            if (dt > 30 && dt < 1200000) {
+                if (s_prevDtUs > 0) {
+                    if (s_lastWasGap) {
+                        _liveNominalUs = dt;
+                        s_runningToothCount = 1;
+                        s_lastWasGap = false;
+                    } else if (dt >= ((s_prevDtUs * 140) / 100)) {
                         _liveLastGapUs = dt;
                         if (s_lastGapTimestampUs != 0) {
-                            _liveRevPeriodUs = now - s_lastGapTimestampUs;
+                            uint32_t revP = now - s_lastGapTimestampUs;
+                            if (revP >= 1000 && revP <= 1200000) {
+                                _liveRevPeriodUs = revP;
+                            }
                         }
                         s_lastGapTimestampUs = now;
-                        uint16_t missingGuess = (dt >= ((_liveNominalUs * 240) / 100)) ? 2 : 1;
+                        uint16_t missingGuess = (dt >= ((s_prevDtUs * 240) / 100)) ? 2 : 1;
                         _liveTeethCount = s_runningToothCount + missingGuess;
                         s_runningToothCount = 0;
+                        s_lastWasGap = true;
 
                         if (_state == CaptureState::Armed) {
                             _state = CaptureState::Recording;
                             _eventCount = 0;
                         }
                     } else {
+                        _liveNominalUs = (_liveNominalUs > 0) ? ((_liveNominalUs * 3 + dt) >> 2) : dt;
                         s_runningToothCount++;
-                        if (dt > (_liveNominalUs >> 1) && dt < (_liveNominalUs << 1)) {
-                            _liveNominalUs = (_liveNominalUs * 7 + dt) >> 3;
-                        }
+                        s_lastWasGap = false;
                         if (s_runningToothCount > 130) {
                             s_runningToothCount = 0;
                             s_lastGapTimestampUs = 0;
                         }
                     }
                 }
+                s_prevDtUs = dt;
             }
         }
         _lastCkpRisingUs = now;

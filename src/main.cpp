@@ -176,6 +176,7 @@ void taskCore0UiWeb(void *pvParameters) {
             lastWeb = now;
             EcuHal::LiveSignalMetrics m{}; captureDriver.getLiveMetrics(m);
             engineState.health = sniffer.evaluateHealth(m.ckpActive, m.cmpActive, m.cmp2Active, m.revPeriodUs, m.nominalPeriodUs, m.lastGapUs);
+            if (m.teethPerRev > 0) engineState.health.liveTeeth = m.teethPerRev;
             engineState.ckpActive = engineState.isRunning; engineState.cmp1Active = engineState.isRunning;
             if (menuMgr) {
                 engineState.uiLevel = menuMgr->getUiLevel(); engineState.activeTab = menuMgr->getActiveTab();
