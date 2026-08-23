@@ -50,6 +50,25 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
 uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
                                             uint32_t gap0Us, uint32_t revUs, uint32_t cycle720Us) {
     if (cycle720Us == 0 || !events || count == 0) return gap0Us;
+    uint32_t widthA = 0, widthB = 0;
+    int32_t lastHighUs = -1;
+
+    for (size_t i = 0; i < count; ++i) {
+        if (events[i].channel == 1 && events[i].timestampUs >= gap0Us) {
+            uint32_t offset = (events[i].timestampUs - gap0Us) % cycle720Us;
+            if (events[i].level == 1) {
+                lastHighUs = (int32_t)offset;
+            } else if (events[i].level == 0 && lastHighUs >= 0) {
+                uint32_t w = (offset > (uint32_t)lastHighUs) ? (offset - lastHighUs) : (cycle720Us - lastHighUs + offset);
+                if (lastHighUs < (int32_t)revUs) { widthA += w; }
+                else { widthB += w; }
+                lastHighUs = -1;
+            }
+        }
+    }
+    if (widthB > widthA && (widthB - widthA) > (revUs / 3)) {
+        return gap0Us + revUs;
+    }
     return gap0Us;
 }
 
@@ -225,7 +244,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         if (events[i].channel == 1) cmpEventCount++;
     }
 
-    if (cmpEventCount >= 2) {
+    if (cmpEventCount >= 1) {
         float pitchDeg = res.wheel.getPitchAngleDeg();
         uint32_t syncRefUs = _calcPhaseLockOffset(events, eventCount, gap0Us, revPeriodUs, cycle720Us);
         _clusterCamEvents(events, eventCount, syncRefUs, cycle720Us, res.cam, 10.0f, pitchDeg);
