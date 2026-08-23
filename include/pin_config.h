@@ -17,7 +17,7 @@ namespace PinConfig {
 // 1. TFT SPI Display (Hardware FSPI Bus on ESP32-S3)
 constexpr int8_t TFT_MOSI = 11;  ///< Hardware FSPI MOSI (Pin 11)
 constexpr int8_t TFT_SCK  = 12;  ///< Hardware FSPI SCK  (Pin 12)
-constexpr int8_t TFT_MISO = 13;  ///< Hardware FSPI MISO (Pin 13)
+constexpr int8_t TFT_MISO = -1;  ///< Hardware FSPI MISO (Pin 13)
 constexpr int8_t TFT_CS   = 10;  ///< Chip Select (Pin 10)
 constexpr int8_t TFT_DC   = 9;   ///< Data / Command (Pin 9)
 constexpr int8_t TFT_RST  = 14;  ///< Hardware Reset (Pin 14)

@@ -72,7 +72,7 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
                          const EcuEngine::ParametricWheel& wheel,
                          const EcuEngine::CamEventTable& cam) {
     if (_uiLevel == UiLevel::MainHub) {
-        _pageHub.render(_hubIndex, _needsFullRedraw);
+        _pageHub.render(_needsFullRedraw, _hubIndex);
         _needsFullRedraw = false;
         return;
     }

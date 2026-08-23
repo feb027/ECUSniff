@@ -6,17 +6,17 @@ namespace EcuHal {
 LGFX_TFT_4_0::LGFX_TFT_4_0() {
     {
         auto cfg = _bus_instance.config();
-        cfg.spi_host    = SPI2_HOST;         // Kompatibel penuh ESP32 & ESP32-S3
+        cfg.spi_host    = SPI2_HOST;         // Universal SPI host
         cfg.spi_mode    = 0;
-        cfg.freq_write  = 40000000;          // 40 MHz ultra-fast SPI untuk ILI9488
+        cfg.freq_write  = 27000000;          // 27 MHz stabil untuk ILI9488
         cfg.freq_read   = 16000000;
         cfg.spi_3wire   = false;
         cfg.use_lock    = true;
         cfg.dma_channel = SPI_DMA_CH_AUTO;
-        cfg.pin_sclk = PinConfig::TFT_SCK;   // GPIO 19
-        cfg.pin_mosi = PinConfig::TFT_MOSI;  // GPIO 13
-        cfg.pin_miso = PinConfig::TFT_MISO;  // -1
-        cfg.pin_dc   = PinConfig::TFT_DC;    // GPIO 33
+        cfg.pin_sclk = PinConfig::TFT_SCK;   // GPIO 12 on S3, GPIO 19 on classic
+        cfg.pin_mosi = PinConfig::TFT_MOSI;  // GPIO 11 on S3, GPIO 13 on classic
+        cfg.pin_miso = -1;                   // MISO tidak dipakai
+        cfg.pin_dc   = PinConfig::TFT_DC;    // GPIO 9 on S3, GPIO 33 on classic
 
         _bus_instance.config(cfg);
         _panel_instance.setBus(&_bus_instance);
@@ -24,8 +24,8 @@ LGFX_TFT_4_0::LGFX_TFT_4_0() {
 
     {
         auto cfg = _panel_instance.config();
-        cfg.pin_cs           = PinConfig::TFT_CS;   // GPIO 32
-        cfg.pin_rst          = PinConfig::TFT_RST;  // GPIO 17
+        cfg.pin_cs           = PinConfig::TFT_CS;   // GPIO 10 on S3, GPIO 32 on classic
+        cfg.pin_rst          = PinConfig::TFT_RST;  // GPIO 14 on S3, GPIO 17 on classic
         cfg.pin_busy         = -1;
         cfg.memory_width     = 320;
         cfg.memory_height    = 480;
@@ -47,7 +47,7 @@ LGFX_TFT_4_0::LGFX_TFT_4_0() {
 
     {
         auto cfg = _light_instance.config();
-        cfg.pin_bl = PinConfig::TFT_LED;  // GPIO 16
+        cfg.pin_bl = PinConfig::TFT_LED;  // GPIO 15 on S3, GPIO 16 on classic
         cfg.invert = false;
         cfg.freq   = 44100;
         cfg.pwm_channel = 7;
@@ -112,7 +112,7 @@ void DisplayDriver::drawStaticLayout() {
     _gfx.drawRoundRect(20, 132, 440, 52, 8, TFT_DARKGRAY);
     _gfx.setTextSize(2);
     _gfx.setTextColor(TFT_WHITE, 0x18E3);
-    _gfx.drawString("CKP: 36-1 Parametric (GPIO 25)", 35, 148);
+    _gfx.drawString("CKP: 36-1 Parametric (GPIO 4)", 35, 148);
 
     // Footer WiFi Status
     _gfx.fillRect(0, 280, 480, 40, 0x0841);
