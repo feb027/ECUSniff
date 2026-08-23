@@ -5,7 +5,7 @@ description: "Kalkulasi pola sinyal otomotif (0-720 deg cycle), formula missing 
 
 # ECU Pattern Designer & Timing Math Guide
 
-Panduan teknis dan formula matematis untuk merancang, memvalidasi, dan mengonversi pola sinyal crankshaft (CKP) dan camshaft (CMP/CMP2) untuk simulator ECU.
+Panduan teknis dan formula matematis untuk merancang, memvalidasi, mengonversi, dan mendekode pola sinyal crankshaft (CKP) dan camshaft (CMP/CMP2) untuk simulator dan sniffer ECU.
 
 ---
 
@@ -92,3 +92,21 @@ Contoh Pola CMP 4-Cylinder Universal:
    - Channel 0 (CKP): 2 Blocks (Blocks 0, 1 = 128 slot).
    - Channel 2 (CMP): 2 Blocks (Blocks 2, 3 = 128 slot).
    - Channel 4 (CMP2): 2 Blocks (Blocks 4, 5 = 128 slot).
+
+---
+
+## 6. Aturan Sniffer Sinyal & Glitch Filtering
+
+1. **CKP Edge Handling (Pure Rising):**
+   - Gunakan `attachInterrupt(..., RISING)` untuk saluran CKP.
+   - Jangan gunakan `CHANGE` pada CKP karena transisi duty-cycle (High $\to$ Low) akan membagi dua waktu delta $(\Delta t / 2)$ dan menyebabkan pembacaan RPM melipat ganda ($2\times$ lipat).
+   - Filter glitch hardware: `(now - lastUs) < 15 us` diabaikan.
+   - Deteksi celah missing tooth menggunakan perbandingan dinamis: $\Delta t \ge 1.65 \times T_{\text{nominal}}$.
+
+2. **CMP Edge & Pulse-Width Ingestion (Dual Edge):**
+   - Gunakan `attachInterrupt(..., CHANGE)` untuk saluran CMP.
+   - Catat status logika riil `digitalRead(PinConfig::CAP_CMP)` pada setiap event untuk merekonstruksi lebar pulsa asli secara presisi tanpa menghasilkan artefak tangga (*Half-Moon*).
+
+3. **720° Phase-Locking Algorithm:**
+   - Identifikasi posisi pulsa CAM pertama terhadap celah missing gap pertama ($t_{\text{gap0}}$).
+   - Jika $\text{offset} < T_{\text{rev}}$, geser basis fasa $\text{syncRefUs} = t_{\text{gap0}} + T_{\text{rev}}$ agar pulsa CAM secara deterministik terkunci pada Putaran Kedua ($360^\circ - 720^\circ$).
