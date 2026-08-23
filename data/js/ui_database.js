@@ -18,7 +18,7 @@ function getAllWheels() {
 }
 
 function initWheelDatabase() {
-    const cats = ['Semua', 'Kustom / Rekaman', 'Populer', 'Toyota', 'Honda', 'Mitsubishi', 'Subaru', 'Motor', 'Universal'];
+    const cats = ['Semua', 'Kustom / Rekaman', 'Universal', 'Toyota', 'Honda', 'Mitsubishi', 'Subaru', 'Ford', 'Mazda'];
     const catContainer = document.getElementById('catScroll');
     if (!catContainer) return;
     catContainer.innerHTML = '';
@@ -54,7 +54,7 @@ function filterWheelDb() {
     });
 
     if (list.length === 0) {
-        grid.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding: 16px;">Tidak ada pola roda yang cocok.</div>';
+        grid.innerHTML = '<div style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding: 16px;">Tidak ada pola mobil yang cocok.</div>';
         return;
     }
 

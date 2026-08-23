@@ -245,7 +245,13 @@ function saveCapturedToDatabase() {
     localStorage.setItem('ecusniff_custom_wheels', JSON.stringify(custom));
     filterWheelDb();
 
-    alert(`Pola "${newWheel.name}" berhasil disimpan ke Database Roda! Anda dapat membukanya kapan saja di tab 'DATABASE RODA'.`);
+    // Auto-save to ESP32 Flash NVS
+    currentPattern.name = newWheel.name;
+    currentPattern.ckp = { ...newWheel.ckp };
+    currentPattern.cmp.events = JSON.parse(JSON.stringify(newWheel.cmp));
+    sendCommand('set_pattern');
+
+    alert(`Pola "${newWheel.name}" berhasil disimpan ke Flash ESP32 & Database Roda!`);
 }
 
 function replayCapturedToGenerator() {
@@ -253,6 +259,7 @@ function replayCapturedToGenerator() {
         alert("Belum ada data capture yang terekam. Silakan tekan 'Mulai Capture' terlebih dahulu.");
         return;
     }
+    currentPattern.name = `Captured: ${lastCapturedData.totalTeeth}-${lastCapturedData.missingTeeth}`;
     currentPattern.ckp.totalTeeth = lastCapturedData.totalTeeth;
     currentPattern.ckp.missingTeeth = lastCapturedData.missingTeeth;
     currentPattern.ckp.dutyCycle = (lastCapturedData.duty || 50) / 100.0;
@@ -268,4 +275,16 @@ function replayCapturedToGenerator() {
     switchMainModule('generator', true);
     const navBtns = document.querySelectorAll('.nav-item');
     if (navBtns[0]) switchTab('viewMonitor', navBtns[0], true);
+}
+
+function exportCapturedJson() {
+    if (!lastCapturedData.hasData || lastCapturedData.totalTeeth === 0) {
+        alert("Belum ada data capture yang terekam.");
+        return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lastCapturedData, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `ecusniff_capture_${lastCapturedData.totalTeeth}_${lastCapturedData.missingTeeth}.json`);
+    dlAnchorElem.click();
 }

@@ -32,6 +32,12 @@ void WebServerManager::init() {
     });
     _server.addHandler(&_ws);
 
+    // Single Source of Truth: Centralized Presets API
+    _server.on("/api/presets", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/js/wheel_db.js", "application/javascript");
+        request->send(response);
+    });
+
     // CSV Diagnostic Log Export Endpoint
     _server.on("/api/export_csv", HTTP_GET, [this](AsyncWebServerRequest *request) {
         if (!_capDriver || !_capDriver->isDone()) {
