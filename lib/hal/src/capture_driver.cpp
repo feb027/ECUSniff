@@ -99,22 +99,31 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
                 s_runningToothCount = 1;
             } else {
                 if (dt >= ((s_avgToothUs * 165) / 100)) {
-                    _liveLastGapUs = dt;
-                    if (s_lastGapTimestampUs != 0) {
-                        uint32_t revP = now - s_lastGapTimestampUs;
-                        if (s_runningToothCount >= 3 && revP >= 1000 && revP <= 1200000) {
-                            _liveRevPeriodUs = revP;
-                            uint16_t missingGuess = (dt >= ((s_avgToothUs * 250) / 100)) ? 2 : 1;
-                            _liveTeethCount = s_runningToothCount + missingGuess;
+                    if (s_runningToothCount >= 3) {
+                        _liveLastGapUs = dt;
+                        if (s_lastGapTimestampUs != 0) {
+                            uint32_t revP = now - s_lastGapTimestampUs;
+                            if (revP >= 1000 && revP <= 1200000) {
+                                _liveRevPeriodUs = revP;
+                                uint16_t missingGuess = (dt >= ((s_avgToothUs * 250) / 100)) ? 2 : 1;
+                                _liveTeethCount = s_runningToothCount + missingGuess;
+                            }
                         }
-                    }
-                    s_lastGapTimestampUs = now;
-                    s_runningToothCount = 0;
-                    s_lastWasGap = true;
+                        s_lastGapTimestampUs = now;
+                        s_runningToothCount = 0;
+                        s_lastWasGap = true;
 
-                    if (_state == CaptureState::Armed) {
-                        _state = CaptureState::Recording;
-                        _eventCount = 0;
+                        if (_state == CaptureState::Armed) {
+                            _state = CaptureState::Recording;
+                            _eventCount = 0;
+                        }
+                    } else {
+                        // Instant Adaptation: Wheel pattern or RPM changed suddenly
+                        s_avgToothUs = dt;
+                        _liveNominalUs = dt;
+                        s_runningToothCount = 1;
+                        s_lastWasGap = false;
+                        s_lastGapTimestampUs = 0;
                     }
                 } else if (s_lastWasGap) {
                     s_avgToothUs = (s_avgToothUs * 3 + dt) >> 2;
