@@ -50,24 +50,22 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
 uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
                                             uint32_t gap0Us, uint32_t revUs, uint32_t cycle720Us) {
     if (cycle720Us == 0 || !events || count == 0) return gap0Us;
-    uint32_t widthA = 0, widthB = 0;
-    int32_t lastHighUs = -1;
+    uint32_t firstRisingOffsetUs = 0xFFFFFFFF;
 
     for (size_t i = 0; i < count; ++i) {
-        if (events[i].channel == 1 && events[i].timestampUs >= gap0Us) {
-            uint32_t offset = (events[i].timestampUs - gap0Us) % cycle720Us;
-            if (events[i].level == 1) {
-                lastHighUs = (int32_t)offset;
-            } else if (events[i].level == 0 && lastHighUs >= 0) {
-                uint32_t w = (offset > (uint32_t)lastHighUs) ? (offset - lastHighUs) : (cycle720Us - lastHighUs + offset);
-                if (lastHighUs < (int32_t)revUs) { widthA += w; }
-                else { widthB += w; }
-                lastHighUs = -1;
-            }
+        if (events[i].channel == 1 && events[i].level == 1 && events[i].timestampUs >= gap0Us) {
+            firstRisingOffsetUs = (events[i].timestampUs - gap0Us) % cycle720Us;
+            break;
         }
     }
-    if (widthB > widthA && (widthB - widthA) > (revUs / 3)) {
-        return gap0Us + revUs;
+
+    if (firstRisingOffsetUs != 0xFFFFFFFF) {
+        // If the cam pulse occurred in the first 360 degrees (0 .. revUs):
+        // That means the recording started at the gap of Rev 2!
+        // Shift phase reference by 1 revolution (revUs) so the pulse always lands in Rev 2 (360 .. 720 deg)
+        if (firstRisingOffsetUs < revUs) {
+            return gap0Us + revUs;
+        }
     }
     return gap0Us;
 }
