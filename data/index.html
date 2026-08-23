@@ -2,19 +2,19 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ECUSniff - Automotive Signal Platform</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ECUSniff — Master Control Cockpit</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <!-- Top Minimalist Header -->
+    <!-- Top Minimalist App Header -->
     <header class="app-header">
         <div class="header-top">
-            <button class="btn-drawer-toggle" onclick="toggleDrawer(true)">&#9776;</button>
-            <span id="headerActiveTitle" class="header-title-text">GENERATOR SINYAL</span>
+            <button class="btn-drawer-toggle" onclick="toggleDrawer(true)" aria-label="Menu">☰</button>
+            <span class="header-title-text" id="headerActiveTitle">GENERATOR SINYAL</span>
             <div id="connStatus" class="status-pill status-offline">
                 <span class="status-dot"></span>
-                <span id="connText">Menghubungkan...</span>
+                <span id="connText">Menghubungkan</span>
             </div>
         </div>
     </header>
@@ -23,30 +23,30 @@
     <div id="drawerBackdrop" class="drawer-backdrop" onclick="toggleDrawer(false)"></div>
     <aside id="navDrawer" class="nav-drawer">
         <div class="drawer-header">
-            <span class="drawer-header-title">INSTRUMEN PLATFORM</span>
+            <span class="drawer-header-title">ECUSniff PLATFORM</span>
             <button class="btn-close-drawer" onclick="toggleDrawer(false)">&times;</button>
         </div>
         <div class="drawer-list">
-            <div id="drawerItemGen" class="drawer-item active" onclick="selectDrawerModule('generator')">
+            <div class="drawer-item active" id="drawerItemGen" onclick="selectDrawerModule('generator')">
                 <div>
-                    <div class="drawer-item-title">1. Generator Sinyal</div>
-                    <div class="drawer-item-sub">CKP, CMP & CMP2 (0-720°)</div>
+                    <div class="drawer-item-title">1. Signal Generator</div>
+                    <div class="drawer-item-sub">CKP, CMP & Mode FIX/CRANK/SWEEP</div>
                 </div>
                 <span class="drawer-badge badge-active">AKTIF</span>
             </div>
-            <div id="drawerItemCap" class="drawer-item" onclick="selectDrawerModule('capture')">
+            <div class="drawer-item" id="drawerItemCap" onclick="selectDrawerModule('capture')">
                 <div>
-                    <div class="drawer-item-title">2. Signal Capture & Sniffer</div>
-                    <div class="drawer-item-sub">Perekam Pulsa & Auto-Decoder</div>
+                    <div class="drawer-item-title">2. Signal Capture / Sniffer</div>
+                    <div class="drawer-item-sub">Perekam Pulsa Sinyal Mobil 720°</div>
                 </div>
                 <span class="drawer-badge badge-active">AKTIF</span>
             </div>
             <div class="drawer-item disabled">
                 <div>
                     <div class="drawer-item-title">3. Sensor Simulator</div>
-                    <div class="drawer-item-sub">TPS, MAP, IAT, ECT, O2 DAC</div>
+                    <div class="drawer-item-sub">VSS, Analog TPS/MAP, Temp</div>
                 </div>
-                <span class="drawer-badge badge-future">TAHAP 5</span>
+                <span class="drawer-badge badge-future">TAHAP 6</span>
             </div>
             <div class="drawer-item disabled">
                 <div>
@@ -123,7 +123,7 @@
             <!-- TAB 2: WHEEL DATABASE -->
             <section id="viewDatabase" class="tab-view">
                 <div class="db-search-box">
-                    <input type="search" id="wheelSearch" placeholder="Cari pola (Toyota, Honda, 60-2, 4G63, NMAX)..." class="input-search" oninput="filterWheelDb()">
+                    <input type="search" id="wheelSearch" placeholder="Cari pola mobil (Toyota, Honda, 60-2, 4G63)..." class="input-search" oninput="filterWheelDb()">
                     <div class="category-strip" id="catScroll"></div>
                 </div>
                 <div id="wheelGrid" class="wheel-list"></div>
@@ -158,7 +158,7 @@
             </section>
         </div>
 
-        <!-- MODULE 2: CAPTURE / SNIFFER (COCKPIT UPGRADE) -->
+        <!-- MODULE 2: CAPTURE / SNIFFER -->
         <div id="moduleCapture" style="display: none;">
             <!-- 1. Captured Oscilloscope Card -->
             <div class="scope-card">
@@ -174,10 +174,33 @@
 
                 <div class="minimap-box"><canvas id="capScopeMinimap"></canvas></div>
                 <div class="main-scope-box"><canvas id="capScopeMain"></canvas></div>
-                <div id="capProbeReadout" class="probe-bar">Pin: GPIO 34 (CKP IN) & GPIO 35 (CMP IN) — Filter Derau 5µs Aktif</div>
+                <div id="capProbeReadout" class="probe-bar">Pin: GPIO 34 (CKP IN) & GPIO 35 (CMP IN) — Live Pre-Flight Aktif</div>
             </div>
 
-            <!-- 2. Auto-Match & Telemetry Card -->
+            <!-- 2. Pre-Flight Real-Time Hardware Diagnostic Cards (4-Box Grid) -->
+            <div class="cockpit-card">
+                <h3 class="card-heading" style="color: #38BDF8; font-size: 0.75rem; letter-spacing: 0.05em;">PRE-FLIGHT DIAGNOSTIK HARDWARE (REAL-TIME)</h3>
+                <div class="form-grid" style="gap: 6px; margin-bottom: 4px;">
+                    <div class="metric-box" style="text-align: left; padding: 6px 8px;">
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">CKP SENSOR (PIN 34):</div>
+                        <div id="diagCkpVal" style="font-size: 0.8rem; font-weight: 800; color: #10B981; margin-top: 2px;">MENUNGGU SINYAL</div>
+                    </div>
+                    <div class="metric-box" style="text-align: left; padding: 6px 8px;">
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">CMP SENSOR 1 (PIN 35):</div>
+                        <div id="diagCmpVal" style="font-size: 0.8rem; font-weight: 800; color: #10B981; margin-top: 2px;">IDLE / STANDBY</div>
+                    </div>
+                    <div class="metric-box" style="text-align: left; padding: 6px 8px;">
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">CMP SENSOR 2 (PIN 39):</div>
+                        <div id="diagCmp2Val" style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); margin-top: 2px;">STANDBY</div>
+                    </div>
+                    <div class="metric-box" style="text-align: left; padding: 6px 8px;">
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">KUALITAS & JITTER:</div>
+                        <div id="diagJitterVal" style="font-size: 0.8rem; font-weight: 800; color: #10B981; margin-top: 2px;">Jitter: 0.2% [BERSIH]</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Auto-Match & Technical Metrics Card -->
             <div class="cockpit-card">
                 <div class="rpm-main-row">
                     <div class="rpm-group">
@@ -189,7 +212,6 @@
 
                 <div class="wheel-name" id="capVehicleName" style="color: #10B981; font-size: 0.95rem; margin-top: 4px;">Menunggu pemicu pulsa sensor mobil...</div>
 
-                <!-- 4-Box Technical Metrics -->
                 <div class="metric-grid-4">
                     <div class="metric-box"><div id="metricTeeth" class="metric-val">--T</div><div class="metric-lbl">Total Gigi</div></div>
                     <div class="metric-box"><div id="metricMissing" class="metric-val">-- Gap</div><div class="metric-lbl">Missing</div></div>
@@ -198,7 +220,7 @@
                 </div>
             </div>
 
-            <!-- 3. Camshaft Pulse Timeline Card -->
+            <!-- 4. Camshaft Pulse Timeline Card -->
             <div class="cockpit-card">
                 <h3 class="card-heading">TIMELINE SUDUT NOKEN AS CMP (0° - 720°)</h3>
                 <div id="capCamTimeline" class="cam-timeline-strip">
@@ -206,7 +228,7 @@
                 </div>
             </div>
 
-            <!-- 4. Action & Trigger Deck -->
+            <!-- 5. Action & Trigger Deck -->
             <div class="cockpit-card">
                 <button id="btnArmCapture" class="btn-power-full btn-start" style="min-height: 44px; margin-bottom: 8px;" onclick="triggerCaptureArm()">Mulai Capture</button>
                 <div class="storage-row" style="margin-bottom: 6px;">

@@ -223,6 +223,18 @@ void setup() {
             if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
             if (menuMgr) menuMgr->markNeedsRedraw();
             saveSettings();
+        } else if (cmd == "set_mode") {
+            if (val <= 2) {
+                engineState.runMode = static_cast<EcuEngine::EngineRunMode>(val);
+                if (engineState.isRunning && engineState.runMode == EcuEngine::EngineRunMode::Cranking) {
+                    rpmController.startCranking(engineState.cranking);
+                }
+                if (menuMgr) menuMgr->markNeedsRedraw();
+            }
+        } else if (cmd == "set_ui_level") {
+            if (menuMgr) menuMgr->setUiLevel(static_cast<EcuUi::UiLevel>(val));
+        } else if (cmd == "set_tab") {
+            if (menuMgr) menuMgr->setGenTab(val);
         } else if (cmd == "arm_capture") {
             captureDriver.arm(512);
         }
