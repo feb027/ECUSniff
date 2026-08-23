@@ -178,11 +178,21 @@ void RmtGenerator::swapBuffer() {
     rmt_item32_t* activeCmp = (nextIdx == 1) ? _cmpBufferB : _cmpBufferA;
     size_t activeCmpSize   = (nextIdx == 1) ? _cmpSizeB   : _cmpSizeA;
 
-    if (activeCkpSize > 0) {
-        rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
-    }
-    if (activeCmpSize > 0) {
-        rmt_fill_tx_items(CH_CMP, activeCmp, activeCmpSize, 0);
+    if (_running) {
+        rmt_tx_stop(CH_CKP);
+        rmt_tx_stop(CH_CMP);
+
+        if (activeCkpSize > 0) {
+            rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
+            rmt_set_tx_loop_mode(CH_CKP, true);
+        }
+        if (activeCmpSize > 0) {
+            rmt_fill_tx_items(CH_CMP, activeCmp, activeCmpSize, 0);
+            rmt_set_tx_loop_mode(CH_CMP, true);
+        }
+
+        if (activeCkpSize > 0) rmt_tx_start(CH_CKP, true);
+        if (activeCmpSize > 0) rmt_tx_start(CH_CMP, true);
     }
 
     _activeBufferIdx = nextIdx;
