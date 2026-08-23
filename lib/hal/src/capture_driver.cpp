@@ -32,8 +32,8 @@ void CaptureDriver::init() {
     pinMode(PinConfig::CAP_CMP, INPUT_PULLDOWN);
     pinMode(PinConfig::CAP_CMP2, INPUT_PULLDOWN);
 
-    attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CKP), isrCkpHandler, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CMP), isrCmpHandler, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CKP), isrCkpHandler, RISING);
+    attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CMP), isrCmpHandler, RISING);
     _state = CaptureState::Idle;
     _eventCount = 0;
 }
@@ -88,57 +88,53 @@ void CaptureDriver::getLiveMetrics(LiveSignalMetrics& outMetrics) {
 
 void IRAM_ATTR CaptureDriver::isrCkpHandler() {
     uint32_t now = micros();
-    if (_lastCkpUs != 0 && (now - _lastCkpUs) < GLITCH_FILTER_US) return;
+    if (_lastCkpRisingUs != 0) {
+        uint32_t dt = now - _lastCkpRisingUs;
+        if (dt < GLITCH_FILTER_US) return;
 
-    uint8_t lvl = static_cast<uint8_t>(digitalRead(PinConfig::CAP_CKP));
-
-    if (lvl == 1) {
-        if (_lastCkpRisingUs != 0) {
-            uint32_t dt = now - _lastCkpRisingUs;
-            if (dt > 30 && dt < 1200000) {
-                if (s_prevDtUs > 0) {
-                    if (s_lastWasGap) {
-                        _liveNominalUs = dt;
-                        s_runningToothCount = 1;
-                        s_lastWasGap = false;
-                    } else if (dt >= ((s_prevDtUs * 140) / 100)) {
-                        _liveLastGapUs = dt;
-                        if (s_lastGapTimestampUs != 0) {
-                            uint32_t revP = now - s_lastGapTimestampUs;
-                            if (revP >= 1000 && revP <= 1200000) {
-                                _liveRevPeriodUs = revP;
-                            }
-                        }
-                        s_lastGapTimestampUs = now;
-                        uint16_t missingGuess = (dt >= ((s_prevDtUs * 240) / 100)) ? 2 : 1;
-                        _liveTeethCount = s_runningToothCount + missingGuess;
-                        s_runningToothCount = 0;
-                        s_lastWasGap = true;
-
-                        if (_state == CaptureState::Armed) {
-                            _state = CaptureState::Recording;
-                            _eventCount = 0;
-                        }
-                    } else {
-                        _liveNominalUs = (_liveNominalUs > 0) ? ((_liveNominalUs * 3 + dt) >> 2) : dt;
-                        s_runningToothCount++;
-                        s_lastWasGap = false;
-                        if (s_runningToothCount > 130) {
-                            s_runningToothCount = 0;
-                            s_lastGapTimestampUs = 0;
+        if (dt > 30 && dt < 1200000) {
+            if (s_prevDtUs > 0) {
+                if (s_lastWasGap) {
+                    _liveNominalUs = dt;
+                    s_runningToothCount = 1;
+                    s_lastWasGap = false;
+                } else if (dt >= ((s_prevDtUs * 140) / 100)) {
+                    _liveLastGapUs = dt;
+                    if (s_lastGapTimestampUs != 0) {
+                        uint32_t revP = now - s_lastGapTimestampUs;
+                        if (revP >= 1000 && revP <= 1200000) {
+                            _liveRevPeriodUs = revP;
                         }
                     }
+                    s_lastGapTimestampUs = now;
+                    uint16_t missingGuess = (dt >= ((s_prevDtUs * 240) / 100)) ? 2 : 1;
+                    _liveTeethCount = s_runningToothCount + missingGuess;
+                    s_runningToothCount = 0;
+                    s_lastWasGap = true;
+
+                    if (_state == CaptureState::Armed) {
+                        _state = CaptureState::Recording;
+                        _eventCount = 0;
+                    }
+                } else {
+                    _liveNominalUs = (_liveNominalUs > 0) ? ((_liveNominalUs * 3 + dt) >> 2) : dt;
+                    s_runningToothCount++;
+                    s_lastWasGap = false;
+                    if (s_runningToothCount > 130) {
+                        s_runningToothCount = 0;
+                        s_lastGapTimestampUs = 0;
+                    }
                 }
-                s_prevDtUs = dt;
             }
+            s_prevDtUs = dt;
         }
-        _lastCkpRisingUs = now;
     }
+    _lastCkpRisingUs = now;
     _lastCkpUs = now;
 
     if (_state == CaptureState::Recording) {
         if (_eventCount < MAX_CAPTURE_EVENTS) {
-            _buffer[_eventCount++] = { now, 0, lvl };
+            _buffer[_eventCount++] = { now, 0, 1 };
             if (_eventCount >= _targetEvents) _state = CaptureState::Done;
         }
     }
@@ -149,11 +145,9 @@ void IRAM_ATTR CaptureDriver::isrCmpHandler() {
     if (_lastCmpUs != 0 && (now - _lastCmpUs) < GLITCH_FILTER_US) return;
     _lastCmpUs = now;
 
-    uint8_t lvl = static_cast<uint8_t>(digitalRead(PinConfig::CAP_CMP));
-
     if (_state == CaptureState::Recording) {
         if (_eventCount < MAX_CAPTURE_EVENTS) {
-            _buffer[_eventCount++] = { now, 1, lvl };
+            _buffer[_eventCount++] = { now, 1, 1 };
             if (_eventCount >= _targetEvents) _state = CaptureState::Done;
         }
     }
