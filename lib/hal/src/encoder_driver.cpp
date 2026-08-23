@@ -44,14 +44,10 @@ void EncoderDriver::read() {
     noInterrupts();
     int32_t ticks = s_encoderTicks;
     
-    // Setiap detent encoder mekanis = minimal 1 atau 2 transisi
-    if (ticks >= 2 || ticks <= -2) {
-        _accumulatedDelta = ticks / 2;
-        s_encoderTicks = ticks % 2;
-    } else if (ticks == 1 || ticks == -1) {
-        // Fallback untuk encoder half-pulse
-        _accumulatedDelta = ticks;
-        s_encoderTicks = 0;
+    // Setiap 1 klik fisik detent mekanis EC11 = 4 transisi logika kuadratur
+    if (ticks >= 4 || ticks <= -4) {
+        _accumulatedDelta = ticks / 4;
+        s_encoderTicks = ticks % 4;
     } else {
         _accumulatedDelta = 0;
     }

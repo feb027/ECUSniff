@@ -53,7 +53,31 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
 
 uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
                                             uint32_t gap0Us, uint32_t revUs, uint32_t cycle720Us) {
-    // Gap-Synchronized Recording starts directly at TDC 0.0 deg of Cycle 720
+    if (cycle720Us == 0 || !events || count == 0) return gap0Us;
+
+    uint32_t firstRisingOffsetUs = 0xFFFFFFFF;
+    uint32_t countInRev1 = 0;
+    uint32_t countInRev2 = 0;
+
+    for (size_t i = 0; i < count; ++i) {
+        if (events[i].channel == 1 && events[i].timestampUs >= gap0Us) {
+            uint32_t offset = (events[i].timestampUs - gap0Us) % cycle720Us;
+            if (events[i].level == 1) {
+                if (offset < firstRisingOffsetUs) firstRisingOffsetUs = offset;
+                if (offset < revUs) countInRev1++;
+                else countInRev2++;
+            }
+        }
+    }
+
+    // Jika seluruh pulsa CMP hanya muncul di putaran kedua (Rev 2: 360-720 deg)
+    if (countInRev1 == 0 && countInRev2 > 0) {
+        return gap0Us + revUs;
+    }
+    if (firstRisingOffsetUs != 0xFFFFFFFF && firstRisingOffsetUs >= revUs && countInRev1 == 0) {
+        return gap0Us + revUs;
+    }
+
     return gap0Us;
 }
 
@@ -246,7 +270,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.wheel.dutyCycle = clampVal(avgHigh / (float)nominalPeriod, 0.10f, 0.90f);
     res.wheel.inverted = false;
 
-    // Exact Zero-Point Alignment: Tooth #1 starts at t=nominalPeriod, so 0.0 deg is (Tooth#1 - nominalPeriod)
+    // Exact Zero-Point Alignment with Deterministic 720° Cam Phase Locking
     uint32_t gap0Us = (_ckpRising[0] >= nominalPeriod) ? (_ckpRising[0] - nominalPeriod) : 0;
     uint32_t cycle720Us = revPeriodUs * 2;
     size_t cmpEventCount = 0;
@@ -259,7 +283,8 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
 
     if (cmpEventCount >= 2) {
         float pitchDeg = res.wheel.getPitchAngleDeg();
-        _clusterCamEvents(events, eventCount, gap0Us, cycle720Us, res.cam, 10.0f, pitchDeg);
+        uint32_t syncRefUs = _calcPhaseLockOffset(events, eventCount, gap0Us, revPeriodUs, cycle720Us);
+        _clusterCamEvents(events, eventCount, syncRefUs, cycle720Us, res.cam, 10.0f, pitchDeg);
         if (res.cam.getEventCount() < 1) res.cam.clear();
     } else {
         res.cam.clear();
