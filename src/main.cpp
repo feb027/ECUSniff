@@ -45,13 +45,24 @@ static void saveSettings() {
         char k1[8], k2[8]; snprintf(k1, sizeof(k1), "ca%u", i); snprintf(k2, sizeof(k2), "ch%u", i);
         pref.putFloat(k1, evs[i].angleDeg); pref.putBool(k2, evs[i].levelHigh);
     }
+    if (EcuUi::PageDashboard::hasCapturedPreset()) {
+        pref.putUShort("cap_teeth", wheelCfg.totalTeeth);
+        pref.putUChar("cap_mteeth", wheelCfg.missingTeeth);
+        pref.putFloat("cap_duty", wheelCfg.dutyCycle);
+        pref.putString("cap_name", engineState.activeWheelName);
+        pref.putUChar("cap_ccnt", c);
+        for (uint8_t i = 0; i < c && i < 4; ++i) {
+            char k1[12], k2[12]; snprintf(k1, sizeof(k1), "cap_ca%u", i); snprintf(k2, sizeof(k2), "cap_ch%u", i);
+            pref.putFloat(k1, evs[i].angleDeg); pref.putBool(k2, evs[i].levelHigh);
+        }
+    }
     pref.end();
 }
 
 static void loadSettings() {
     pref.begin("ecu_conf", true);
     engineState.targetRpm = pref.getUInt("rpm", 850);
-    String wn = pref.getString("wname", "Ford / Honda 36-1");
+    String wn = pref.getString("wname", "Honda / Ford 36-1");
     strncpy(engineState.activeWheelName, wn.c_str(), sizeof(engineState.activeWheelName));
     wheelCfg.totalTeeth = pref.getUShort("teeth", 36);
     wheelCfg.missingTeeth = pref.getUChar("mteeth", 1);
@@ -68,6 +79,22 @@ static void loadSettings() {
     } else {
         camCfg.addEvent(120.0f, true); camCfg.addEvent(180.0f, false);
         camCfg.addEvent(420.0f, true); camCfg.addEvent(470.0f, false);
+    }
+    if (pref.isKey("cap_teeth")) {
+        EcuEngine::ParametricWheel capWheel;
+        capWheel.totalTeeth = pref.getUShort("cap_teeth", 36);
+        capWheel.missingTeeth = pref.getUChar("cap_mteeth", 1);
+        capWheel.missingPosition = 0;
+        capWheel.dutyCycle = pref.getFloat("cap_duty", 0.5f);
+        capWheel.inverted = false;
+        EcuEngine::CamEventTable capCam;
+        uint8_t capC = pref.getUChar("cap_ccnt", 0);
+        for (uint8_t i = 0; i < capC && i < 4; ++i) {
+            char k1[12], k2[12]; snprintf(k1, sizeof(k1), "cap_ca%u", i); snprintf(k2, sizeof(k2), "cap_ch%u", i);
+            capCam.addEvent(pref.getFloat(k1, 0.0f), pref.getBool(k2, true));
+        }
+        String capName = pref.getString("cap_name", "Captured: Pola Mobil");
+        EcuUi::PageDashboard::setCapturedPreset(capName.c_str(), capWheel, capCam);
     }
     pref.end();
 }
@@ -112,7 +139,13 @@ void taskCore0UiWeb(void *pvParameters) {
             if (clickCount == 1 && menuMgr) menuMgr->onEncoderClick();
             else if (clickCount >= 2 && menuMgr) {
                 menuMgr->onEncoderDoubleClick(wheelCfg, camCfg);
-                snprintf(engineState.activeWheelName, sizeof(engineState.activeWheelName), "Captured: %u-%u", wheelCfg.totalTeeth, wheelCfg.missingTeeth);
+                const auto& cr = menuMgr->getPageCapture().getLastResult();
+                if (cr.success) {
+                    snprintf(engineState.activeWheelName, sizeof(engineState.activeWheelName), "Cap: %s", cr.matchedVehicle);
+                } else {
+                    snprintf(engineState.activeWheelName, sizeof(engineState.activeWheelName), "Captured: %u-%u", wheelCfg.totalTeeth, wheelCfg.missingTeeth);
+                }
+                EcuUi::PageDashboard::setCapturedPreset(engineState.activeWheelName, wheelCfg, camCfg);
                 saveSettings();
             }
             clickCount = 0;

@@ -33,8 +33,11 @@ public:
                        EcuEngine::ParametricWheel& wheel,
                        EcuEngine::CamEventTable& cam);
 
+    static void setCapturedPreset(const char* name, const EcuEngine::ParametricWheel& wheel, const EcuEngine::CamEventTable& cam);
+    static bool hasCapturedPreset();
+
     static const WheelPresetItem PRESETS[];
-    static constexpr size_t PRESET_COUNT = 6;
+    static constexpr size_t BASE_PRESET_COUNT = 6;
 
 private:
     LovyanGFX*     _gfx;
@@ -48,6 +51,10 @@ private:
     int8_t   _activePresetIdx{0};
     uint16_t _lastTotalTeeth{0xFFFF};
     uint8_t  _lastMissingTeeth{0xFF};
+
+    static WheelPresetItem s_capturedPreset;
+    static char            s_capturedName[32];
+    static bool            s_hasCaptured;
 
     void _drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel);
     void _applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam);
