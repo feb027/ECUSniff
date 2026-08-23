@@ -50,27 +50,7 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
 uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
                                             uint32_t gap0Us, uint32_t revUs, uint32_t cycle720Us) {
     if (cycle720Us == 0 || !events || count == 0) return gap0Us;
-    uint32_t widthA = 0, widthB = 0, firstA = 0xFFFFFFFF, firstB = 0xFFFFFFFF;
-    int32_t lastHighUs = -1;
-
-    for (size_t i = 0; i < count; ++i) {
-        if (events[i].channel == 1 && events[i].timestampUs >= gap0Us) {
-            uint32_t offset = (events[i].timestampUs - gap0Us) % cycle720Us;
-            if (events[i].level == 1) {
-                lastHighUs = (int32_t)offset;
-                if (offset < revUs) { if (offset < firstA) firstA = offset; }
-                else { uint32_t offB = offset - revUs; if (offB < firstB) firstB = offB; }
-            } else if (events[i].level == 0 && lastHighUs >= 0) {
-                uint32_t w = (offset > (uint32_t)lastHighUs) ? (offset - lastHighUs) : (cycle720Us - lastHighUs + offset);
-                if (lastHighUs < (int32_t)revUs) { if (w > widthA) widthA = w; }
-                else { if (w > widthB) widthB = w; }
-                lastHighUs = -1;
-            }
-        }
-    }
-    if (firstA == 0xFFFFFFFF && firstB != 0xFFFFFFFF) return gap0Us + revUs;
-    if (firstB == 0xFFFFFFFF && firstA != 0xFFFFFFFF) return gap0Us;
-    return (widthB > widthA) ? (gap0Us + revUs) : gap0Us;
+    return gap0Us;
 }
 
 void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
