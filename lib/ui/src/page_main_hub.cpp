@@ -9,26 +9,24 @@ static const char* CARD_TITLES[] = {
 };
 
 static const char* CARD_DESCS[] = {
-    "Pembangkit Sinyal CKP, CMP, CMP2 & Mode FIX/CRANK/SWEEP",
-    "Perekam Sinyal Mobil, Auto-Detect Gigi & Cam Angle",
+    "Pembangkit Sinyal Mobil: CKP & CMP (FIX/CRANK/SWEEP)",
+    "Perekam & Penganalisis Sinyal ECU Mobil 720-deg",
     "Modul Ekspansi: VSS, Analog TPS/MAP & Resistif Temp"
 };
 
 void PageMainHub::render(bool fullRedraw, uint8_t selectedIndex) {
     if (fullRedraw) {
         _gfx->fillScreen(TFT_BLACK);
-        // Header
         _gfx->fillRect(0, 0, 480, 42, 0x0841);
         _gfx->drawFastHLine(0, 42, 480, 0x03E0);
         _gfx->setTextColor(TFT_WHITE, 0x0841);
         _gfx->setTextSize(2);
-        _gfx->drawString("ECUSniff — TEST PLATFORM", 20, 12);
+        _gfx->drawString("ECUSniff — CAR TEST PLATFORM", 20, 12);
 
-        // Footer helper (High Contrast Bright Cyan)
         _gfx->drawFastHLine(0, 285, 480, 0x03E0);
         _gfx->setTextColor(0x07FF, TFT_BLACK);
         _gfx->setTextSize(1);
-        _gfx->drawString("Putar Knob: Pilih Modul  |  Klik Knob: Masuk Modul", 80, 298);
+        _gfx->drawString("Putar Knob / Joystick: Pilih Modul  |  Klik: Masuk Modul", 60, 298);
 
         for (uint8_t i = 0; i < 3; ++i) {
             _drawModuleCard(i, CARD_TITLES[i], CARD_DESCS[i], selectedIndex == i);
@@ -37,7 +35,6 @@ void PageMainHub::render(bool fullRedraw, uint8_t selectedIndex) {
         return;
     }
 
-    // Delta-only update: Only redraw if selection changed
     if (selectedIndex != _lastSelectedIndex) {
         if (_lastSelectedIndex < 3) {
             _drawModuleCard(_lastSelectedIndex, CARD_TITLES[_lastSelectedIndex], CARD_DESCS[_lastSelectedIndex], false);
@@ -49,18 +46,20 @@ void PageMainHub::render(bool fullRedraw, uint8_t selectedIndex) {
 
 void PageMainHub::_drawModuleCard(uint8_t index, const char* title, const char* desc, bool isSelected) {
     int32_t y = 56 + (index * 74);
-    uint32_t bgColor = isSelected ? 0x0965 : 0x10A2;
-    uint32_t borderColor = isSelected ? 0x07E0 : 0x52AA;
-    uint32_t titleColor = TFT_WHITE;
-    uint32_t descColor = isSelected ? 0xFFE0 : 0x07FF; // Bright Yellow when selected, Bright Cyan when idle
+    uint32_t bgColor = isSelected ? 0x1165 : 0x10A2;
+    uint32_t borderColor = isSelected ? 0xFFE0 : 0x52AA;
+    uint32_t descColor = isSelected ? 0xFFE0 : 0x07FF;
 
-    _gfx->fillRoundRect(16, y, 448, 64, 8, bgColor);
-    _gfx->drawRoundRect(16, y, 448, 64, 8, borderColor);
+    // Erase bounding background cleanly
+    _gfx->fillRoundRect(14, y - 2, 452, 68, 8, TFT_BLACK);
+
+    _gfx->fillRoundRect(16, y, 448, 64, 6, bgColor);
+    _gfx->drawRoundRect(16, y, 448, 64, 6, borderColor);
     if (isSelected) {
-        _gfx->drawRoundRect(15, y - 1, 450, 66, 9, 0x07E0);
+        _gfx->drawRoundRect(15, y - 1, 450, 66, 7, 0xFFE0);
     }
 
-    _gfx->setTextColor(titleColor, bgColor);
+    _gfx->setTextColor(TFT_WHITE, bgColor);
     _gfx->setTextSize(2);
     _gfx->drawString(title, 32, y + 12);
 

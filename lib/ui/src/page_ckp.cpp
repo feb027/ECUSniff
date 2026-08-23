@@ -11,6 +11,9 @@ void PageCkp::_renderRow(uint8_t idx, const EcuEngine::ParametricWheel& wheel, b
     uint16_t textCol = isSelected ? TFT_WHITE : 0xCE79;
     uint16_t valCol = isSelected ? 0x07E0 : 0x07FF;
 
+    // Erase bounding background to prevent sticking border
+    _gfx->fillRoundRect(16, y - 6, 448, 44, 6, 0x10A2);
+
     _gfx->fillRoundRect(18, y - 4, 444, 40, 5, bg);
     _gfx->drawRoundRect(18, y - 4, 444, 40, 5, border);
     if (isSelected) {
@@ -73,7 +76,6 @@ void PageCkp::render(const EcuEngine::ParametricWheel& wheel,
         return;
     }
 
-    // Real-Time Value Detection
     bool wheelChanged = (_lastWheel.totalTeeth != wheel.totalTeeth ||
                          _lastWheel.missingTeeth != wheel.missingTeeth ||
                          _lastWheel.missingPosition != wheel.missingPosition ||

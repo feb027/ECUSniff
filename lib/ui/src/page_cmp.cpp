@@ -10,6 +10,9 @@ void PageCmp::_renderRow(uint8_t idx, const char* label, bool isSelected) {
     uint16_t border = isSelected ? 0xFFE0 : 0x52AA;
     uint16_t textCol = isSelected ? TFT_WHITE : 0xCE79;
 
+    // Erase bounding background to prevent sticking border
+    _gfx->fillRoundRect(16, y - 6, 448, 48, 6, 0x10A2);
+
     _gfx->fillRoundRect(18, y - 4, 444, 44, 5, bg);
     _gfx->drawRoundRect(18, y - 4, 444, 44, 5, border);
     if (isSelected) {

@@ -32,7 +32,7 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
         { 36, 1, "Ford / Honda / Universal 36-1", 99.8f },
         { 36, 2, "Toyota 1NZ/2NZ/1ZZ (36-2)",     99.6f },
         { 60, 2, "Bosch / VW / BMW (60-2)",       99.9f },
-        {  4, 1, "Yamaha NMAX / Aerox (4-1)",      99.2f },
+        {  4, 0, "Mitsubishi 4G63 CAS (4-0)",      99.2f },
         { 24, 2, "Mazda Miata / BP (24-2)",        98.9f },
         { 12, 1, "Suzuki / Daihatsu (12-1)",       98.5f },
         {  0, 0, "Standalone Camshaft (CMP)",      97.0f }

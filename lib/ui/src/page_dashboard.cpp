@@ -6,9 +6,9 @@ const WheelPresetItem PageDashboard::PRESETS[] = {
     { "Honda / Ford 36-1", 36, 1, 0, 0.50f, false, 4, {120.0f, 180.0f, 420.0f, 470.0f}, {true, false, true, false} },
     { "Toyota 1NZ/2NZ 36-2", 36, 2, 0, 0.50f, false, 2, {90.0f, 270.0f, 0.0f, 0.0f}, {true, false, false, false} },
     { "Bosch / VW / BMW 60-2", 60, 2, 0, 0.50f, false, 2, {180.0f, 540.0f, 0.0f, 0.0f}, {true, false, false, false} },
-    { "Yamaha NMAX / Aerox 4-1", 4, 1, 0, 0.50f, false, 1, {360.0f, 0.0f, 0.0f, 0.0f}, {true, false, false, false} },
     { "Mazda Miata 24-2", 24, 2, 0, 0.50f, false, 2, {120.0f, 360.0f, 0.0f, 0.0f}, {true, false, false, false} },
-    { "Suzuki / Daihatsu 12-1", 12, 1, 0, 0.50f, false, 2, {180.0f, 360.0f, 0.0f, 0.0f}, {true, false, false, false} }
+    { "Suzuki / Daihatsu 12-1", 12, 1, 0, 0.50f, false, 2, {180.0f, 360.0f, 0.0f, 0.0f}, {true, false, false, false} },
+    { "Mitsubishi 4G63 4-0", 4, 0, 0, 0.50f, false, 4, {70.0f, 180.0f, 370.0f, 450.0f}, {true, false, true, false} }
 };
 
 PageDashboard::PageDashboard(LovyanGFX* gfx) : _gfx(gfx), _canvas(gfx) {}
@@ -146,31 +146,27 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
 }
 
 void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel) {
-    uint32_t cRpm = (isEditMode && editRow == 0) ? 0xF800 : 0x52AA;
-    uint32_t cMode = (isEditMode && editRow == 1) ? 0xF800 : 0x52AA;
-    uint32_t cWheel = (isEditMode && editRow == 2) ? 0xF800 : 0x52AA;
+    uint32_t cRpm   = (editRow == 0) ? 0xFFE0 : 0x52AA;
+    uint32_t cMode  = (editRow == 1) ? 0xFFE0 : 0x52AA;
+    uint32_t cWheel = (editRow == 2) ? 0xFFE0 : 0x52AA;
 
     _gfx->drawRoundRect(16, 138, 220, 66, 6, cRpm);
     _gfx->drawRoundRect(244, 138, 220, 66, 6, cMode);
     _gfx->drawRoundRect(16, 210, 448, 66, 6, cWheel);
 
     _gfx->fillRect(16, 282, 448, 24, 0x0841);
-    _gfx->drawRoundRect(16, 282, 448, 24, 4, isEditMode ? 0xF800 : 0x31A6);
+    _gfx->drawRoundRect(16, 282, 448, 24, 4, 0x31A6);
     _gfx->setTextSize(1);
 
-    if (isEditMode) {
-        _gfx->setTextColor(0xF800, 0x0841);
-        if (editRow == 0) _gfx->drawString(">>> EDIT RPM: Putar Knob (+/-50 RPM) | Dbl-Click: Pindah Baris <<<", 24, 289);
-        else if (editRow == 1) _gfx->drawString(">>> EDIT MODE: Putar (FIX/CRANK/SWEEP) | Dbl-Click: Pindah Baris <<<", 20, 289);
-        else if (editRow == 2) _gfx->drawString(">>> EDIT POLA: Putar (Ganti Pola Mesin) | Dbl-Click: Pindah Baris <<<", 20, 289);
-    } else {
-        if (isRunning) {
-            _gfx->setTextColor(0x07E0, 0x0841);
-            _gfx->drawString("[RUNNING] Tahan Knob 0.6s: STOP  |  Tab < MENU: Keluar", 36, 289);
-        } else {
-            _gfx->setTextColor(0x07FF, 0x0841);
-            _gfx->drawString("[STOPPED] Tahan Knob 0.6s: START  |  Tab < MENU: Keluar", 34, 289);
-        }
+    if (editRow == 0) {
+        _gfx->setTextColor(0xFFE0, 0x0841);
+        _gfx->drawString("[TARGET RPM] Putar: +/-50 RPM | Joystick Bawah: Ganti Baris", 24, 289);
+    } else if (editRow == 1) {
+        _gfx->setTextColor(0xFFE0, 0x0841);
+        _gfx->drawString("[MODE MESIN] Putar: FIX / CRANK / SWEEP | Joystick Bawah: Pola", 16, 289);
+    } else if (editRow == 2) {
+        _gfx->setTextColor(0xFFE0, 0x0841);
+        _gfx->drawString("[PROFIL POLA] Putar: Ganti Preset Mobil OEM | Klik: Run/Stop", 20, 289);
     }
 }
 
