@@ -53,23 +53,8 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
 
 uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
                                             uint32_t gap0Us, uint32_t revUs, uint32_t cycle720Us) {
-    uint32_t widthA = 0, widthB = 0;
-    int32_t lastHighUs = -1;
-
-    for (size_t i = 0; i < count; ++i) {
-        if (events[i].channel == 1 && events[i].timestampUs >= gap0Us) {
-            uint32_t offset = (events[i].timestampUs - gap0Us) % cycle720Us;
-            if (events[i].level == 1) {
-                lastHighUs = (int32_t)offset;
-            } else if (events[i].level == 0 && lastHighUs >= 0) {
-                uint32_t w = (offset > (uint32_t)lastHighUs) ? (offset - lastHighUs) : (cycle720Us - lastHighUs + offset);
-                if (lastHighUs < (int32_t)revUs) { if (w > widthA) widthA = w; }
-                else { if (w > widthB) widthB = w; }
-                lastHighUs = -1;
-            }
-        }
-    }
-    return (widthB > widthA) ? (gap0Us + revUs) : gap0Us;
+    // Gap-Synchronized Recording starts directly at TDC 0.0 deg of Cycle 720
+    return gap0Us;
 }
 
 void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
@@ -176,7 +161,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     for (size_t i = 0; i < eventCount; ++i) {
         if (events[i].channel == 0) {
             if (events[i].level == 1 && lastCkpLvl != 1) {
-                if (risingCount < 384) _ckpRising[risingCount++] = events[i].timestampUs;
+                if (risingCount < 512) _ckpRising[risingCount++] = events[i].timestampUs;
                 lastCkpLvl = 1;
             } else if (events[i].level == 0 && lastCkpLvl != 0) {
                 if (risingCount > 0 && events[i].timestampUs > _ckpRising[risingCount - 1]) {
@@ -194,7 +179,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         for (size_t i = 0; i < eventCount; ++i) {
             if (events[i].channel == 1) {
                 if (events[i].level == 1 && lastLvl != 1) {
-                    if (cmpRising < 384) _ckpRising[cmpRising++] = events[i].timestampUs;
+                    if (cmpRising < 512) _ckpRising[cmpRising++] = events[i].timestampUs;
                     lastLvl = 1;
                 } else if (events[i].level == 0) lastLvl = 0;
             }
@@ -261,26 +246,21 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.wheel.dutyCycle = clampVal(avgHigh / (float)nominalPeriod, 0.10f, 0.90f);
     res.wheel.inverted = false;
 
-    // 720 deg Phase-Locking: Tooth 1 Rising Edge minus 1 Tooth Pitch gives EXACT 0.0 deg!
-    uint32_t gap0Us = (gapCount > 0 && (gapIndices[0] + 1) < risingCount) ? (_ckpRising[gapIndices[0] + 1] - nominalPeriod) : _ckpRising[0];
+    // Exact Zero-Point Alignment: Tooth #1 starts at t=nominalPeriod, so 0.0 deg is (Tooth#1 - nominalPeriod)
+    uint32_t gap0Us = (_ckpRising[0] >= nominalPeriod) ? (_ckpRising[0] - nominalPeriod) : 0;
     uint32_t cycle720Us = revPeriodUs * 2;
-    size_t cmpEventCount = 0; uint64_t cmpMinPulseUs = 0xFFFFFFFF;
+    size_t cmpEventCount = 0;
 
     for (size_t i = 0; i < eventCount; ++i) {
         if (events[i].channel == 1) {
             cmpEventCount++;
-            if (i > 0 && events[i - 1].channel == 1) {
-                uint64_t dt = events[i].timestampUs - events[i - 1].timestampUs;
-                if (dt < cmpMinPulseUs) cmpMinPulseUs = dt;
-            }
         }
     }
 
-    if (cmpEventCount >= 4 && cmpMinPulseUs > 50) {
+    if (cmpEventCount >= 2) {
         float pitchDeg = res.wheel.getPitchAngleDeg();
-        uint32_t syncRefUs = _calcPhaseLockOffset(events, eventCount, gap0Us, revPeriodUs, cycle720Us);
-        _clusterCamEvents(events, eventCount, syncRefUs, cycle720Us, res.cam, 10.0f, pitchDeg);
-        if (res.cam.getEventCount() < 2) res.cam.clear();
+        _clusterCamEvents(events, eventCount, gap0Us, cycle720Us, res.cam, 10.0f, pitchDeg);
+        if (res.cam.getEventCount() < 1) res.cam.clear();
     } else {
         res.cam.clear();
     }

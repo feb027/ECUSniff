@@ -17,8 +17,8 @@ void PageCapture::_processCaptureData() {
     uint16_t count = _driver->getEventCount();
     if (count == 0 || !rawBuf) return;
 
-    static EcuEngine::RawSignalEdge s_edges[384];
-    size_t copyCount = count > 384 ? 384 : count;
+    static EcuEngine::RawSignalEdge s_edges[512];
+    size_t copyCount = count > 512 ? 512 : count;
     for (size_t i = 0; i < copyCount; ++i) {
         s_edges[i] = { rawBuf[i].timestampUs, rawBuf[i].channel, rawBuf[i].level };
     }
@@ -259,7 +259,7 @@ void PageCapture::onEncoderClick(uint8_t subTab) {
         } else {
             _lastResult.success = false;
             _hasProcessedCapture = false;
-            _driver->arm(384);
+            _driver->arm(512);
         }
     }
 }

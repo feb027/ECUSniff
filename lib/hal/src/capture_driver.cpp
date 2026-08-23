@@ -6,7 +6,7 @@ namespace EcuHal {
 
 volatile CaptureState CaptureDriver::_state = CaptureState::Idle;
 volatile uint16_t     CaptureDriver::_eventCount = 0;
-volatile uint16_t     CaptureDriver::_targetEvents = 384;
+volatile uint16_t     CaptureDriver::_targetEvents = 512;
 volatile uint32_t     CaptureDriver::_armTimeMs = 0;
 volatile uint32_t     CaptureDriver::_lastCkpUs = 0;
 volatile uint32_t     CaptureDriver::_lastCmpUs = 0;

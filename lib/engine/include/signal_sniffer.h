@@ -32,9 +32,9 @@ public:
                                       uint32_t revPeriodUs, uint32_t nominalUs, uint32_t lastGapUs);
 
 private:
-    uint32_t _ckpRising[384];
-    uint32_t _intervals[384];
-    uint32_t _sortIntervals[384];
+    uint32_t _ckpRising[512];
+    uint32_t _intervals[512];
+    uint32_t _sortIntervals[512];
 
     uint32_t _findMedian(uint32_t* arr, size_t n);
     void     _matchVehicleProfile(SnifferResult& res);
