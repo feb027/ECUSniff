@@ -25,6 +25,7 @@ CaptureDriver::CaptureDriver() {}
 void CaptureDriver::init() {
     pinMode(PinConfig::CAP_CKP, INPUT);
     pinMode(PinConfig::CAP_CMP, INPUT);
+    pinMode(PinConfig::CAP_CMP2, INPUT);
 
     attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CKP), isrCkpHandler, CHANGE);
     attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CMP), isrCmpHandler, CHANGE);
@@ -83,7 +84,7 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
         return; // ZERO overhead when not recording
     }
 
-    uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CKP - 32)) & 0x01;
+    uint8_t lvl = static_cast<uint8_t>(digitalRead(PinConfig::CAP_CKP));
 
     if (_state == CaptureState::Armed) {
         _state = CaptureState::Recording;
@@ -106,7 +107,7 @@ void IRAM_ATTR CaptureDriver::isrCmpHandler() {
         return; // ZERO overhead when not recording
     }
 
-    uint8_t lvl = (REG_READ(GPIO_IN1_REG) >> (PinConfig::CAP_CMP - 32)) & 0x01;
+    uint8_t lvl = static_cast<uint8_t>(digitalRead(PinConfig::CAP_CMP));
 
     if (_state == CaptureState::Armed) {
         _state = CaptureState::Recording;
