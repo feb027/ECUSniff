@@ -91,6 +91,7 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
     if (_sniffer) {
         health = _sniffer->evaluateHealth(metrics.ckpActive, metrics.cmpActive, metrics.cmp2Active,
                                          metrics.revPeriodUs, metrics.nominalPeriodUs, metrics.lastGapUs);
+        if (metrics.teethPerRev > 0) health.liveTeeth = metrics.teethPerRev;
     }
 
     uint8_t curState = _driver ? static_cast<uint8_t>(_driver->getState()) : 0;

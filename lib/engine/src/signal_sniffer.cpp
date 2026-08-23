@@ -138,7 +138,7 @@ SignalHealthStatus SignalSniffer::evaluateHealth(bool ckpActive, bool cmpActive,
         return h;
     }
     if (ckpActive) {
-        if (revPeriodUs > 1000 && revPeriodUs < 1200000) {
+        if (revPeriodUs >= 1000 && revPeriodUs <= 1200000) {
             h.liveRpm = (uint32_t)(60000000ULL / revPeriodUs);
             if (nominalUs > 0) h.liveTeeth = (uint16_t)roundf((float)revPeriodUs / (float)nominalUs);
             if (h.liveTeeth >= 3 && h.liveTeeth <= 120) {
@@ -146,7 +146,7 @@ SignalHealthStatus SignalSniffer::evaluateHealth(bool ckpActive, bool cmpActive,
                 snprintf(h.diagnosticMsg, sizeof(h.diagnosticMsg), cmpActive ? "720-deg Locked (%u RPM)" : "CKP Locked (%u RPM)", (unsigned)h.liveRpm);
             } else {
                 h.quality = SignalQuality::Noisy;
-                strncpy(h.diagnosticMsg, "Derau CKP / Pola Tidak Dikenal", sizeof(h.diagnosticMsg));
+                strncpy(h.diagnosticMsg, "Menyinkronkan Fasa CKP...", sizeof(h.diagnosticMsg));
             }
         } else {
             h.quality = SignalQuality::Syncing;
@@ -162,32 +162,20 @@ SignalHealthStatus SignalSniffer::evaluateHealth(bool ckpActive, bool cmpActive,
 SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCount) {
     SnifferResult res; res.success = false;
     if (eventCount < 8) return res;
-    size_t risingCount = 0, highPulseCount = 0; uint64_t totalHighUs = 0; int8_t lastCkpLvl = -1;
+    size_t risingCount = 0;
 
     for (size_t i = 0; i < eventCount; ++i) {
-        if (events[i].channel == 0) {
-            if (events[i].level == 1 && lastCkpLvl != 1) {
-                if (risingCount < 512) _ckpRising[risingCount++] = events[i].timestampUs;
-                lastCkpLvl = 1;
-            } else if (events[i].level == 0 && lastCkpLvl != 0) {
-                if (risingCount > 0 && events[i].timestampUs > _ckpRising[risingCount - 1]) {
-                    totalHighUs += (events[i].timestampUs - _ckpRising[risingCount - 1]);
-                    highPulseCount++;
-                }
-                lastCkpLvl = 0;
-            }
+        if (events[i].channel == 0 && events[i].level == 1) {
+            if (risingCount < 512) _ckpRising[risingCount++] = events[i].timestampUs;
         }
     }
 
     // MODE A: STANDALONE CMP
     if (risingCount < 3) {
-        size_t cmpRising = 0; int8_t lastLvl = -1;
+        size_t cmpRising = 0;
         for (size_t i = 0; i < eventCount; ++i) {
-            if (events[i].channel == 1) {
-                if (events[i].level == 1 && lastLvl != 1) {
-                    if (cmpRising < 512) _ckpRising[cmpRising++] = events[i].timestampUs;
-                    lastLvl = 1;
-                } else if (events[i].level == 0) lastLvl = 0;
+            if (events[i].channel == 1 && events[i].level == 1) {
+                if (cmpRising < 512) _ckpRising[cmpRising++] = events[i].timestampUs;
             }
         }
         if (cmpRising < 2) return res;
@@ -211,7 +199,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     if (nominalPeriod < 20) return res;
 
     size_t gapIndices[16], gapCount = 0, normalToothCount = 0; uint64_t totalDeviationUs = 0;
-    uint32_t gapThreshold = (uint32_t)(nominalPeriod * 1.42f);
+    uint32_t gapThreshold = (uint32_t)(nominalPeriod * 1.55f);
 
     for (size_t i = 0; i < intervalCount && gapCount < 16; ++i) {
         if (_intervals[i] >= gapThreshold) {
@@ -242,10 +230,9 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.detectedRpm = (uint32_t)(60000000ULL / revPeriodUs);
     if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
 
-    float avgHigh = (highPulseCount > 0) ? ((float)totalHighUs / (float)highPulseCount) : (nominalPeriod * 0.5f);
     res.wheel.totalTeeth = totalTeeth; res.wheel.missingTeeth = missingTeeth;
     res.wheel.missingPosition = 0;
-    res.wheel.dutyCycle = clampVal(avgHigh / (float)nominalPeriod, 0.10f, 0.90f);
+    res.wheel.dutyCycle = 0.50f;
     res.wheel.inverted = false;
 
     // True Gap-Start 0.0 deg Reference: (Tooth #1 - (M * nominalPeriod))
