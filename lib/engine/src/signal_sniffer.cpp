@@ -180,7 +180,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     }
 
     // MODE A: STANDALONE CMP
-    if (risingCount < 6) {
+    if (risingCount < 3) {
         size_t cmpRising = 0; int8_t lastLvl = -1;
         for (size_t i = 0; i < eventCount; ++i) {
             if (events[i].channel == 1) {
@@ -215,7 +215,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
 
     for (size_t i = 0; i < intervalCount && gapCount < 16; ++i) {
         if (_intervals[i] >= gapThreshold) {
-            if (gapCount == 0 || (i - gapIndices[gapCount - 1]) >= 3) gapIndices[gapCount++] = i;
+            if (gapCount == 0 || (i - gapIndices[gapCount - 1]) >= 2) gapIndices[gapCount++] = i;
         } else {
             totalDeviationUs += (_intervals[i] > nominalPeriod) ? (_intervals[i] - nominalPeriod) : (nominalPeriod - _intervals[i]);
             normalToothCount++;
@@ -232,7 +232,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     } else if (gapCount == 1) {
         missingTeeth = clampVal((uint8_t)roundf((float)_intervals[gapIndices[0]] / (float)nominalPeriod - 1.0f), (uint8_t)1, (uint8_t)4);
         size_t physicalTeeth = gapIndices[0] + 1;
-        totalTeeth = (physicalTeeth >= 3) ? (physicalTeeth + missingTeeth) : ((intervalCount >= 50) ? 60 : 36);
+        totalTeeth = (physicalTeeth >= 2) ? (physicalTeeth + missingTeeth) : ((intervalCount >= 50) ? 60 : 36);
         revPeriodUs = nominalPeriod * totalTeeth;
     } else {
         missingTeeth = 0; totalTeeth = intervalCount; revPeriodUs = nominalPeriod * totalTeeth;

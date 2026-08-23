@@ -150,24 +150,18 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
     if (action == EcuHal::JoyAction::Left) {
         if (_uiLevel == UiLevel::MainHub) {
             _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 2;
-        } else {
-            if (_genTab > 0) {
-                _genTab--;
-                _editRow = 0;
-                _needsFullRedraw = true;
-            } else {
-                returnToMainHub();
-            }
+        } else if (_genTab > 1) {
+            _genTab--;
+            _editRow = 0;
+            _needsFullRedraw = true;
         }
     } else if (action == EcuHal::JoyAction::Right) {
         if (_uiLevel == UiLevel::MainHub) {
             _hubIndex = (_hubIndex + 1) % 3;
-        } else {
-            if (_genTab < 3) {
-                _genTab++;
-                _editRow = 0;
-                _needsFullRedraw = true;
-            }
+        } else if (_genTab < 3) {
+            _genTab++;
+            _editRow = 0;
+            _needsFullRedraw = true;
         }
     } else if (action == EcuHal::JoyAction::Up) {
         if (_uiLevel == UiLevel::MainHub) {
@@ -190,10 +184,8 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
             if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
             else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
             _needsFullRedraw = true;
-        } else if (_uiLevel == UiLevel::Capture) {
-            _pageCapture.onEncoderClick(_genTab);
         } else {
-            _isEditMode = !_isEditMode;
+            returnToMainHub();
         }
     }
 }
@@ -206,17 +198,15 @@ void MenuManager::onEncoderClick() {
         return;
     }
 
-    if (_genTab == 0) {
-        returnToMainHub();
-        return;
-    }
-
     if (_uiLevel == UiLevel::Capture) {
         _pageCapture.onEncoderClick(_genTab);
         return;
     }
 
-    _isEditMode = !_isEditMode;
+    if (_uiLevel == UiLevel::Generator && _genTab == 1) {
+        // Toggle Engine Run / Stop on Dashboard click
+        _isEditMode = !_isEditMode;
+    }
 }
 
 void MenuManager::onEncoderDoubleClick(EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam) {
@@ -224,12 +214,7 @@ void MenuManager::onEncoderDoubleClick(EcuEngine::ParametricWheel& wheel, EcuEng
         _pageCapture.onEncoderDoubleClick(wheel, cam);
         return;
     }
-
-    if (_isEditMode && _uiLevel == UiLevel::Generator) {
-        if (_genTab == 1) _editRow = (_editRow + 1) % 3;
-        else if (_genTab == 2) _editRow = (_editRow + 1) % 5;
-        else if (_genTab == 3) _editRow = (_editRow + 1) % 4;
-    }
+    returnToMainHub();
 }
 
 } // namespace EcuUi

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Preferences.h>
 #include "pin_config.h"
 #include "engine_types.h"
 #include "timing_math.h"
@@ -13,7 +14,6 @@
 #include "web_server_manager.h"
 #include "menu_manager.h"
 
-// Hardware & Controller instances
 static EcuHal::DisplayDriver        display;
 static EcuHal::EncoderDriver        encoder;
 static EcuHal::JoystickDriver       joystick;
@@ -24,139 +24,136 @@ static EcuWebApi::WebServerManager  webManager;
 static EcuEngine::RpmController     rpmController;
 static EcuUi::MenuManager*          menuMgr = nullptr;
 
-// Engine State & Parametric Configuration
 static EcuEngine::EngineRuntimeState engineState;
 static EcuEngine::ParametricWheel    wheelCfg;
 static EcuEngine::CamEventTable      camCfg;
+static Preferences                   pref;
 
-// Task Core 0: Web, Multi-Screen UI Rendering, Joystick, and Encoder Polling
+static void saveSettings() {
+    pref.begin("ecu_conf", false);
+    pref.putUInt("rpm", engineState.targetRpm);
+    pref.putString("wname", engineState.activeWheelName);
+    pref.putUShort("teeth", wheelCfg.totalTeeth);
+    pref.putUChar("mteeth", wheelCfg.missingTeeth);
+    pref.putUChar("mpos", wheelCfg.missingPosition);
+    pref.putFloat("duty", wheelCfg.dutyCycle);
+    pref.putBool("inv", wheelCfg.inverted);
+    uint8_t c = camCfg.getEventCount();
+    pref.putUChar("ccnt", c);
+    const auto* evs = camCfg.getEvents();
+    for (uint8_t i = 0; i < c && i < 8; ++i) {
+        char k1[8], k2[8]; snprintf(k1, sizeof(k1), "ca%u", i); snprintf(k2, sizeof(k2), "ch%u", i);
+        pref.putFloat(k1, evs[i].angleDeg); pref.putBool(k2, evs[i].levelHigh);
+    }
+    pref.end();
+}
+
+static void loadSettings() {
+    pref.begin("ecu_conf", true);
+    engineState.targetRpm = pref.getUInt("rpm", 850);
+    String wn = pref.getString("wname", "Ford / Honda 36-1");
+    strncpy(engineState.activeWheelName, wn.c_str(), sizeof(engineState.activeWheelName));
+    wheelCfg.totalTeeth = pref.getUShort("teeth", 36);
+    wheelCfg.missingTeeth = pref.getUChar("mteeth", 1);
+    wheelCfg.missingPosition = pref.getUChar("mpos", 0);
+    wheelCfg.dutyCycle = pref.getFloat("duty", 0.5f);
+    wheelCfg.inverted = pref.getBool("inv", false);
+    uint8_t c = pref.getUChar("ccnt", 4);
+    camCfg.clear();
+    if (c > 0 && c <= 8 && pref.isKey("ca0")) {
+        for (uint8_t i = 0; i < c; ++i) {
+            char k1[8], k2[8]; snprintf(k1, sizeof(k1), "ca%u", i); snprintf(k2, sizeof(k2), "ch%u", i);
+            camCfg.addEvent(pref.getFloat(k1, 120.0f), pref.getBool(k2, true));
+        }
+    } else {
+        camCfg.addEvent(120.0f, true); camCfg.addEvent(180.0f, false);
+        camCfg.addEvent(420.0f, true); camCfg.addEvent(470.0f, false);
+    }
+    pref.end();
+}
+
 void taskCore0UiWeb(void *pvParameters) {
-    uint32_t lastWebUpdate = 0;
-    uint32_t lastRpmUpdate = 0;
-    uint32_t lastMenuRender = 0;
-    
-    uint32_t btnPressTime = 0;
-    uint32_t lastReleaseTime = 0;
-    uint8_t  clickCount = 0;
-    bool     btnWasDown = false;
-    bool     longPressHandled = false;
+    uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, btnTime = 0, relTime = 0;
+    uint8_t clickCount = 0; bool btnDown = false, longHandled = false;
 
     for (;;) {
         uint32_t now = millis();
-
-        // 0. Polling HW-504 Joystick Navigation & Action
         EcuHal::JoyAction joyAct = joystick.update();
         if (joyAct != EcuHal::JoyAction::None && menuMgr) {
             menuMgr->onJoystickAction(joyAct, engineState, wheelCfg, camCfg);
         }
 
-        // 1. Polling Rotary Encoder Turn (Precision Value Tuning)
         encoder.read();
         int32_t delta = encoder.getDelta();
         if (delta != 0 && menuMgr) {
             menuMgr->onEncoderTurn(delta, engineState, wheelCfg, camCfg);
             signalGen.setPattern(wheelCfg, camCfg);
             signalGen.setRpm(engineState.targetRpm);
-            if (engineState.isRunning) {
-                signalGen.prepareNextCycle();
-                signalGen.swapBuffer();
-            }
+            if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
         }
 
-        // 2. Rotary Switch Long Press: Dedicated Hardware START / STOP Toggle
-        bool btnIsDown = (digitalRead(PinConfig::ENC_SW) == LOW);
-        if (btnIsDown && !btnWasDown) {
-            btnPressTime = now;
-            btnWasDown = true;
-            longPressHandled = false;
-        } else if (btnIsDown && btnWasDown) {
-            uint32_t holdTime = now - btnPressTime;
-            if (!longPressHandled && holdTime >= 600) {
-                longPressHandled = true;
-                clickCount = 0;
+        bool isDown = (digitalRead(PinConfig::ENC_SW) == LOW);
+        if (isDown && !btnDown) { btnTime = now; btnDown = true; longHandled = false; }
+        else if (isDown && btnDown) {
+            if (!longHandled && (now - btnTime) >= 600) {
+                longHandled = true; clickCount = 0;
                 engineState.isRunning = !engineState.isRunning;
                 if (engineState.isRunning) {
-                    if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) {
-                        rpmController.startCranking(engineState.cranking);
-                    }
-                    signalGen.setPattern(wheelCfg, camCfg);
-                    signalGen.prepareNextCycle();
-                    signalGen.swapBuffer();
-                    signalGen.start();
-                } else {
-                    signalGen.stop();
-                }
+                    if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
+                    signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
+                } else { signalGen.stop(); }
             }
-        } else if (!btnIsDown && btnWasDown) {
-            if (!longPressHandled) {
-                clickCount++;
-                lastReleaseTime = now;
-            }
-            btnWasDown = false;
+        } else if (!isDown && btnDown) {
+            if (!longHandled) { clickCount++; relTime = now; }
+            btnDown = false;
         }
 
-        // Single vs Double Click
-        if (clickCount > 0 && !btnIsDown && (now - lastReleaseTime >= 300)) {
-            if (clickCount == 1 && menuMgr) {
-                menuMgr->onEncoderClick();
-            } else if (clickCount >= 2 && menuMgr) {
+        if (clickCount > 0 && !isDown && (now - relTime >= 300)) {
+            if (clickCount == 1 && menuMgr) menuMgr->onEncoderClick();
+            else if (clickCount >= 2 && menuMgr) {
                 menuMgr->onEncoderDoubleClick(wheelCfg, camCfg);
+                snprintf(engineState.activeWheelName, sizeof(engineState.activeWheelName), "Captured: %u-%u", wheelCfg.totalTeeth, wheelCfg.missingTeeth);
+                saveSettings();
             }
             clickCount = 0;
         }
 
-        // 3. Update RPM Controller (Fixed, Cranking, Sweep)
         captureDriver.update();
-        if (now - lastRpmUpdate >= 20) {
-            uint32_t dt = now - lastRpmUpdate;
-            lastRpmUpdate = now;
+        if (now - lastRpm >= 20) {
+            uint32_t dt = now - lastRpm; lastRpm = now;
             if (engineState.isRunning) {
-                uint32_t activeRpm = rpmController.update(engineState, dt);
-                signalGen.setRpm(activeRpm);
-                signalGen.prepareNextCycle();
-                signalGen.swapBuffer();
+                signalGen.setRpm(rpmController.update(engineState, dt));
+                signalGen.prepareNextCycle(); signalGen.swapBuffer();
             }
         }
 
-        // 4. Live Telemetry Web Push (~10 Hz)
-        if (now - lastWebUpdate >= 100) {
-            lastWebUpdate = now;
-            EcuHal::LiveSignalMetrics metrics{};
-            captureDriver.getLiveMetrics(metrics);
-            engineState.health = sniffer.evaluateHealth(metrics.ckpActive, metrics.cmpActive, metrics.cmp2Active,
-                                                        metrics.revPeriodUs, metrics.nominalPeriodUs, metrics.lastGapUs);
-            engineState.ckpActive = engineState.isRunning;
-            engineState.cmp1Active = engineState.isRunning;
+        if (now - lastWeb >= 100) {
+            lastWeb = now;
+            EcuHal::LiveSignalMetrics m{}; captureDriver.getLiveMetrics(m);
+            engineState.health = sniffer.evaluateHealth(m.ckpActive, m.cmpActive, m.cmp2Active, m.revPeriodUs, m.nominalPeriodUs, m.lastGapUs);
+            engineState.ckpActive = engineState.isRunning; engineState.cmp1Active = engineState.isRunning;
             if (menuMgr) {
-                engineState.uiLevel = menuMgr->getUiLevel();
-                engineState.activeTab = menuMgr->getActiveTab();
+                engineState.uiLevel = menuMgr->getUiLevel(); engineState.activeTab = menuMgr->getActiveTab();
                 engineState.captureState = static_cast<uint8_t>(captureDriver.getState());
-                const auto& capRes = menuMgr->getPageCapture().getLastResult();
-                if (capRes.success) {
-                    engineState.captureRpm = capRes.detectedRpm;
-                    strncpy(engineState.matchedVehicle, capRes.matchedVehicle, sizeof(engineState.matchedVehicle));
-                    engineState.capTotalTeeth = capRes.wheel.totalTeeth;
-                    engineState.capMissingTeeth = capRes.wheel.missingTeeth;
-                    engineState.capDutyCycle = capRes.wheel.dutyCycle;
-                    engineState.capCamCount = capRes.cam.getEventCount();
-                    const auto* cev = capRes.cam.getEvents();
-                    if (cev) {
-                        for (uint8_t k = 0; k < engineState.capCamCount && k < 8; ++k) {
-                            engineState.capCamAngles[k] = cev[k].angleDeg;
-                            engineState.capCamHighs[k] = cev[k].levelHigh;
-                        }
+                const auto& cr = menuMgr->getPageCapture().getLastResult();
+                if (cr.success) {
+                    engineState.captureRpm = cr.detectedRpm;
+                    strncpy(engineState.matchedVehicle, cr.matchedVehicle, sizeof(engineState.matchedVehicle));
+                    engineState.capTotalTeeth = cr.wheel.totalTeeth; engineState.capMissingTeeth = cr.wheel.missingTeeth;
+                    engineState.capDutyCycle = cr.wheel.dutyCycle; engineState.capCamCount = cr.cam.getEventCount();
+                    const auto* ev = cr.cam.getEvents();
+                    for (uint8_t k = 0; ev && k < engineState.capCamCount && k < 8; ++k) {
+                        engineState.capCamAngles[k] = ev[k].angleDeg; engineState.capCamHighs[k] = ev[k].levelHigh;
                     }
                 }
             }
             webManager.updateLiveTelemetry(engineState, wheelCfg, camCfg);
         }
 
-        // 5. Multi-Screen Menu Rendering (~20 Hz)
-        if (now - lastMenuRender >= 50 && menuMgr) {
-            lastMenuRender = now;
+        if (now - lastRender >= 50 && menuMgr) {
+            lastRender = now;
             menuMgr->render(engineState, wheelCfg, camCfg);
         }
-
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -164,112 +161,49 @@ void taskCore0UiWeb(void *pvParameters) {
 void setup() {
     Serial.begin(115200);
     delay(800);
-    Serial.println("\n==========================================");
-    Serial.println(" AUTOMOTIVE ECU TEST PLATFORM (Master Sync)");
-    Serial.println("==========================================");
+    loadSettings();
 
     webManager.setCommandCallback([](const JsonDocument& doc) {
-        String cmd = doc["cmd"] | "";
-        uint32_t val = doc["val"] | 0;
-
+        String cmd = doc["cmd"] | ""; uint32_t val = doc["val"] | 0;
         if (cmd == "start") {
             engineState.isRunning = true;
-            if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) {
-                rpmController.startCranking(engineState.cranking);
-            }
-            signalGen.setPattern(wheelCfg, camCfg);
-            signalGen.prepareNextCycle();
-            signalGen.swapBuffer();
-            signalGen.start();
+            if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
+            signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
         } else if (cmd == "stop") {
-            engineState.isRunning = false;
-            signalGen.stop();
-        } else if (cmd == "set_rpm") {
-            if (val >= 100 && val <= 12000) {
-                engineState.targetRpm = val;
-                signalGen.setRpm(val);
-            }
-        } else if (cmd == "set_mode") {
-            if (val <= 2) {
-                engineState.runMode = static_cast<EcuEngine::EngineRunMode>(val);
-            }
-        } else if (cmd == "set_ui_level") {
-            if (menuMgr) menuMgr->setUiLevel(static_cast<EcuUi::UiLevel>(val));
-        } else if (cmd == "set_tab") {
-            if (menuMgr) menuMgr->setGenTab(val);
+            engineState.isRunning = false; signalGen.stop();
+        } else if (cmd == "set_rpm" && val >= 100 && val <= 12000) {
+            engineState.targetRpm = val; signalGen.setRpm(val); saveSettings();
         } else if (cmd == "set_pattern") {
             String name = doc["name"] | doc["wheelName"] | "";
-            if (name.length() > 0) {
-                strncpy(engineState.activeWheelName, name.c_str(), sizeof(engineState.activeWheelName));
-            }
+            if (name.length() > 0) strncpy(engineState.activeWheelName, name.c_str(), sizeof(engineState.activeWheelName));
             if (doc["ckp"].is<JsonObjectConst>()) {
                 JsonObjectConst ckp = doc["ckp"];
-                wheelCfg.totalTeeth = ckp["totalTeeth"] | 36;
-                wheelCfg.missingTeeth = ckp["missingTeeth"] | 1;
-                wheelCfg.missingPosition = ckp["missingPosition"] | 0;
-                wheelCfg.dutyCycle = ckp["dutyCycle"] | 0.5f;
+                wheelCfg.totalTeeth = ckp["totalTeeth"] | 36; wheelCfg.missingTeeth = ckp["missingTeeth"] | 1;
+                wheelCfg.missingPosition = ckp["missingPosition"] | 0; wheelCfg.dutyCycle = ckp["dutyCycle"] | 0.5f;
                 wheelCfg.inverted = ckp["inverted"] | false;
             }
             if (doc["cmp"].is<JsonArrayConst>()) {
                 camCfg.clear();
-                JsonArrayConst cmpArr = doc["cmp"];
-                for (JsonObjectConst ev : cmpArr) {
-                    float angle = ev["angle"] | 0.0f;
-                    bool high = ev["high"] | false;
-                    camCfg.addEvent(angle, high);
-                }
+                for (JsonObjectConst ev : doc["cmp"].as<JsonArrayConst>()) camCfg.addEvent(ev["angle"] | 0.0f, ev["high"] | false);
             }
             signalGen.setPattern(wheelCfg, camCfg);
-            if (engineState.isRunning) {
-                signalGen.prepareNextCycle();
-                signalGen.swapBuffer();
-            }
+            if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
             if (menuMgr) menuMgr->markNeedsRedraw();
+            saveSettings();
         } else if (cmd == "arm_capture") {
-            captureDriver.arm(384);
+            captureDriver.arm(512);
         }
     });
     webManager.setCaptureDriver(&captureDriver);
     webManager.init();
 
-    wheelCfg.totalTeeth = 36;
-    wheelCfg.missingTeeth = 1;
-    wheelCfg.missingPosition = 0;
-    wheelCfg.dutyCycle = 0.5f;
-
-    camCfg.clear();
-    camCfg.addEvent(120.0f, true);
-    camCfg.addEvent(180.0f, false);
-    camCfg.addEvent(420.0f, true);
-    camCfg.addEvent(470.0f, false);
-
-    engineState.targetRpm = 850;
-    engineState.isRunning = false;
-    engineState.runMode = EcuEngine::EngineRunMode::FixedRpm;
-
-    encoder.init();
-    joystick.init();
-    captureDriver.init();
-    signalGen.init();
-    signalGen.setPattern(wheelCfg, camCfg);
-    signalGen.setRpm(850);
-    signalGen.stop();
-
+    encoder.init(); joystick.init(); captureDriver.init(); signalGen.init();
+    signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm); signalGen.stop();
     display.init();
     menuMgr = new EcuUi::MenuManager(&display.getGfx());
     menuMgr->init(&captureDriver, &sniffer);
 
-    xTaskCreatePinnedToCore(
-        taskCore0UiWeb,
-        "UiWebTask",
-        12288,
-        NULL,
-        1,
-        NULL,
-        0
-    );
-
-    Serial.println("[INIT] Full-Duplex Master-Master Sync Ready at http://192.168.4.1");
+    xTaskCreatePinnedToCore(taskCore0UiWeb, "UiWebTask", 12288, NULL, 1, NULL, 0);
 }
 
 void loop() {
