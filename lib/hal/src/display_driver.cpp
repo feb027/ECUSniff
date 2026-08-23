@@ -8,7 +8,7 @@ LGFX_TFT_4_0::LGFX_TFT_4_0() {
         auto cfg = _bus_instance.config();
         cfg.spi_host    = SPI2_HOST;
         cfg.spi_mode    = 0;
-        cfg.freq_write  = 27000000;          // 27 MHz stabil untuk ILI9488
+        cfg.freq_write  = 40000000;          // 40 MHz ultra-fast hardware SPI
         cfg.freq_read   = 16000000;
         cfg.spi_3wire   = false;
         cfg.use_lock    = true;
@@ -85,7 +85,7 @@ bool DisplayDriver::init() {
     digitalWrite(PinConfig::TFT_LED, HIGH);
     setBacklight(255);
 
-    Serial.println("[DISPLAY] ILI9488 Display online.");
+    Serial.println("[DISPLAY] ILI9488 Display online @ 40MHz.");
     return true;
 }
 
