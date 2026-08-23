@@ -47,14 +47,16 @@ private:
 
     uint8_t _activeBufferIdx{0};
 
-#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_USB_CDC_ON_BOOT)
+#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_USB_CDC_ON_BOOT) || defined(ESP32S3)
     static constexpr rmt_channel_t CH_CKP = RMT_CHANNEL_0;
-    static constexpr rmt_channel_t CH_CMP = RMT_CHANNEL_1;
-    static constexpr uint8_t MEM_BLOCKS_PER_CH = 2;
+    static constexpr rmt_channel_t CH_CMP = RMT_CHANNEL_3;
+    static constexpr uint8_t MEM_BLOCKS_CKP = 3;
+    static constexpr uint8_t MEM_BLOCKS_CMP = 1;
 #else
     static constexpr rmt_channel_t CH_CKP = RMT_CHANNEL_0;
     static constexpr rmt_channel_t CH_CMP = RMT_CHANNEL_4;
-    static constexpr uint8_t MEM_BLOCKS_PER_CH = 4;
+    static constexpr uint8_t MEM_BLOCKS_CKP = 4;
+    static constexpr uint8_t MEM_BLOCKS_CMP = 4;
 #endif
 
     static constexpr uint8_t RMT_CLK_DIV = 80; // 1 tick = 1 us

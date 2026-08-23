@@ -20,23 +20,29 @@ RmtGenerator::RmtGenerator() {
 }
 
 bool RmtGenerator::init() {
-    Serial.println("[RMT] Initializing RMT multi-channel hardware...");
+    Serial.println("[RMT] Initializing RMT multi-channel hardware on ESP32-S3...");
 
     rmt_config_t config_ckp{};
     config_ckp.rmt_mode = RMT_MODE_TX;
     config_ckp.channel = CH_CKP;
     config_ckp.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CKP);
-    config_ckp.mem_block_num = MEM_BLOCKS_PER_CH;
+    config_ckp.mem_block_num = MEM_BLOCKS_CKP;
     config_ckp.clk_div = RMT_CLK_DIV;
     config_ckp.tx_config.loop_en = true;
     config_ckp.tx_config.carrier_en = false;
     config_ckp.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
     config_ckp.tx_config.idle_output_en = true;
 
-    rmt_config_t config_cmp = config_ckp;
+    rmt_config_t config_cmp{};
+    config_cmp.rmt_mode = RMT_MODE_TX;
     config_cmp.channel = CH_CMP;
     config_cmp.gpio_num = static_cast<gpio_num_t>(PinConfig::SIG_CMP);
-    config_cmp.mem_block_num = MEM_BLOCKS_PER_CH;
+    config_cmp.mem_block_num = MEM_BLOCKS_CMP;
+    config_cmp.clk_div = RMT_CLK_DIV;
+    config_cmp.tx_config.loop_en = true;
+    config_cmp.tx_config.carrier_en = false;
+    config_cmp.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
+    config_cmp.tx_config.idle_output_en = true;
 
     rmt_config(&config_ckp);
     rmt_driver_install(CH_CKP, 0, 0);
@@ -52,7 +58,7 @@ bool RmtGenerator::init() {
     swapBuffer();
 
     stop();
-    Serial.println("[RMT] Multi-channel RMT Hardware Ready (CKP + CMP).");
+    Serial.println("[RMT] Multi-channel RMT Hardware Ready (CH0 CKP + CH3 CMP).");
     return true;
 }
 
