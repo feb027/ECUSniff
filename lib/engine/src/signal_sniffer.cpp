@@ -141,7 +141,7 @@ SignalHealthStatus SignalSniffer::evaluateHealth(bool ckpActive, bool cmpActive,
         if (revPeriodUs > 1000 && revPeriodUs < 1200000) {
             h.liveRpm = (uint32_t)(60000000ULL / revPeriodUs);
             if (nominalUs > 0) h.liveTeeth = (uint16_t)roundf((float)revPeriodUs / (float)nominalUs);
-            if (h.liveTeeth >= 4 && h.liveTeeth <= 120) {
+            if (h.liveTeeth >= 3 && h.liveTeeth <= 120) {
                 h.quality = SignalQuality::PhaseLocked;
                 snprintf(h.diagnosticMsg, sizeof(h.diagnosticMsg), cmpActive ? "720-deg Locked (%u RPM)" : "CKP Locked (%u RPM)", (unsigned)h.liveRpm);
             } else {

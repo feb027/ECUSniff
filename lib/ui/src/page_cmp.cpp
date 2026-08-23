@@ -6,14 +6,14 @@ PageCmp::PageCmp(LovyanGFX* gfx) : _gfx(gfx) {}
 
 void PageCmp::_renderRow(uint8_t idx, const char* label, bool isSelected) {
     int32_t y = 86 + (idx * 54);
-    uint16_t bg = isSelected ? 0x0965 : 0x0841;
-    uint16_t border = isSelected ? 0x07E0 : 0x52AA;
+    uint16_t bg = isSelected ? 0x1165 : 0x0841;
+    uint16_t border = isSelected ? 0xFFE0 : 0x52AA;
     uint16_t textCol = isSelected ? TFT_WHITE : 0xCE79;
 
     _gfx->fillRoundRect(18, y - 4, 444, 44, 5, bg);
     _gfx->drawRoundRect(18, y - 4, 444, 44, 5, border);
     if (isSelected) {
-        _gfx->drawRoundRect(17, y - 5, 446, 46, 6, 0x07E0);
+        _gfx->drawRoundRect(17, y - 5, 446, 46, 6, 0xFFE0);
     }
 
     _gfx->setTextSize(2);
@@ -45,7 +45,7 @@ void PageCmp::render(const EcuEngine::CamEventTable& cam,
             char buf[48];
             snprintf(buf, sizeof(buf), "Event %u: %5.1f deg -> %s",
                      i + 1, evs[i].angleDeg, evs[i].levelHigh ? "HIGH" : "LOW ");
-            _renderRow(i, buf, isEditMode && (selectedItem == i));
+            _renderRow(i, buf, (selectedItem == i));
         }
         _lastDrawnItem = selectedItem;
         return;
@@ -56,8 +56,7 @@ void PageCmp::render(const EcuEngine::CamEventTable& cam,
             char buf[48];
             snprintf(buf, sizeof(buf), "Event %u: %5.1f deg -> %s",
                      i + 1, evs[i].angleDeg, evs[i].levelHigh ? "HIGH" : "LOW ");
-            bool isSel = isEditMode && (selectedItem == i);
-            _renderRow(i, buf, isSel);
+            _renderRow(i, buf, (selectedItem == i));
         }
         _lastDrawnItem = selectedItem;
     }

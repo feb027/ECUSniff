@@ -150,7 +150,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
     if (action == EcuHal::JoyAction::Left) {
         if (_uiLevel == UiLevel::MainHub) {
             _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 2;
-        } else if (_genTab > 1) {
+        } else if (_genTab > 0) {
             _genTab--;
             _editRow = 0;
             _needsFullRedraw = true;
@@ -184,8 +184,12 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
             if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
             else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
             _needsFullRedraw = true;
-        } else {
+        } else if (_genTab == 0) {
             returnToMainHub();
+        } else if (_uiLevel == UiLevel::Capture) {
+            _pageCapture.onEncoderClick(_genTab);
+        } else if (_uiLevel == UiLevel::Generator && _genTab == 1) {
+            _isEditMode = !_isEditMode;
         }
     }
 }
@@ -198,13 +202,17 @@ void MenuManager::onEncoderClick() {
         return;
     }
 
+    if (_genTab == 0) {
+        returnToMainHub();
+        return;
+    }
+
     if (_uiLevel == UiLevel::Capture) {
         _pageCapture.onEncoderClick(_genTab);
         return;
     }
 
     if (_uiLevel == UiLevel::Generator && _genTab == 1) {
-        // Toggle Engine Run / Stop on Dashboard click
         _isEditMode = !_isEditMode;
     }
 }

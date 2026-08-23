@@ -6,15 +6,15 @@ PageCkp::PageCkp(LovyanGFX* gfx) : _gfx(gfx) {}
 
 void PageCkp::_renderRow(uint8_t idx, const EcuEngine::ParametricWheel& wheel, bool isSelected) {
     int32_t y = 80 + (idx * 45);
-    uint16_t bg = isSelected ? 0x0965 : 0x0841;
-    uint16_t border = isSelected ? 0x07E0 : 0x52AA;
+    uint16_t bg = isSelected ? 0x1165 : 0x0841;
+    uint16_t border = isSelected ? 0xFFE0 : 0x52AA;
     uint16_t textCol = isSelected ? TFT_WHITE : 0xCE79;
-    uint16_t valCol = isSelected ? 0xFFE0 : 0x07FF;
+    uint16_t valCol = isSelected ? 0x07E0 : 0x07FF;
 
     _gfx->fillRoundRect(18, y - 4, 444, 40, 5, bg);
     _gfx->drawRoundRect(18, y - 4, 444, 40, 5, border);
     if (isSelected) {
-        _gfx->drawRoundRect(17, y - 5, 446, 42, 6, 0x07E0);
+        _gfx->drawRoundRect(17, y - 5, 446, 42, 6, 0xFFE0);
     }
 
     _gfx->setTextSize(2);
@@ -65,7 +65,7 @@ void PageCkp::render(const EcuEngine::ParametricWheel& wheel,
         _gfx->drawString("PENGATURAN CRANKSHAFT (CKP)", 24, 54);
 
         for (uint8_t i = 0; i < 5; ++i) {
-            _renderRow(i, wheel, isEditMode && (selectedItem == i));
+            _renderRow(i, wheel, (selectedItem == i));
         }
         _lastDrawnItem = selectedItem;
         _lastEditMode = isEditMode;
@@ -82,8 +82,7 @@ void PageCkp::render(const EcuEngine::ParametricWheel& wheel,
 
     if (_lastEditMode != isEditMode || _lastDrawnItem != selectedItem || wheelChanged) {
         for (uint8_t i = 0; i < 5; ++i) {
-            bool isSel = isEditMode && (selectedItem == i);
-            _renderRow(i, wheel, isSel);
+            _renderRow(i, wheel, (selectedItem == i));
         }
         _lastDrawnItem = selectedItem;
         _lastEditMode = isEditMode;

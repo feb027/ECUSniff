@@ -102,7 +102,7 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
                     }
                     s_lastGapTimestampUs = now;
                     uint16_t missingGuess = ((dt * 10) >= (s_lastDtUs * 24)) ? 2 : 1;
-                    _liveTeethCount = s_runningToothCount + missingGuess;
+                    _liveTeethCount = s_runningToothCount + 1 + missingGuess;
                     s_runningToothCount = 0;
 
                     // Gap-Synchronized Recording Trigger: Start exactly at Tooth #1
