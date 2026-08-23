@@ -6,17 +6,17 @@ namespace EcuHal {
 LGFX_TFT_4_0::LGFX_TFT_4_0() {
     {
         auto cfg = _bus_instance.config();
-        cfg.spi_host    = SPI2_HOST;         // Universal SPI host
+        cfg.spi_host    = SPI2_HOST;
         cfg.spi_mode    = 0;
-        cfg.freq_write  = 27000000;          // 27 MHz stabil untuk ILI9488
+        cfg.freq_write  = 20000000;          // 20 MHz ultra-safe untuk test awal
         cfg.freq_read   = 16000000;
         cfg.spi_3wire   = false;
         cfg.use_lock    = true;
-        cfg.dma_channel = SPI_DMA_CH_AUTO;
-        cfg.pin_sclk = PinConfig::TFT_SCK;   // GPIO 12 on S3, GPIO 19 on classic
-        cfg.pin_mosi = PinConfig::TFT_MOSI;  // GPIO 11 on S3, GPIO 13 on classic
+        cfg.dma_channel = 1;                 // Direct DMA channel 1 for ESP32-S3
+        cfg.pin_sclk = PinConfig::TFT_SCK;   // GPIO 12 on S3
+        cfg.pin_mosi = PinConfig::TFT_MOSI;  // GPIO 11 on S3
         cfg.pin_miso = -1;                   // MISO tidak dipakai
-        cfg.pin_dc   = PinConfig::TFT_DC;    // GPIO 9 on S3, GPIO 33 on classic
+        cfg.pin_dc   = PinConfig::TFT_DC;    // GPIO 9 on S3
 
         _bus_instance.config(cfg);
         _panel_instance.setBus(&_bus_instance);
@@ -24,8 +24,8 @@ LGFX_TFT_4_0::LGFX_TFT_4_0() {
 
     {
         auto cfg = _panel_instance.config();
-        cfg.pin_cs           = PinConfig::TFT_CS;   // GPIO 10 on S3, GPIO 32 on classic
-        cfg.pin_rst          = PinConfig::TFT_RST;  // GPIO 14 on S3, GPIO 17 on classic
+        cfg.pin_cs           = PinConfig::TFT_CS;   // GPIO 10 on S3
+        cfg.pin_rst          = PinConfig::TFT_RST;  // GPIO 14 on S3
         cfg.pin_busy         = -1;
         cfg.memory_width     = 320;
         cfg.memory_height    = 480;
@@ -47,7 +47,7 @@ LGFX_TFT_4_0::LGFX_TFT_4_0() {
 
     {
         auto cfg = _light_instance.config();
-        cfg.pin_bl = PinConfig::TFT_LED;  // GPIO 15 on S3, GPIO 16 on classic
+        cfg.pin_bl = PinConfig::TFT_LED;  // GPIO 15 on S3
         cfg.invert = false;
         cfg.freq   = 44100;
         cfg.pwm_channel = 7;
@@ -62,7 +62,7 @@ LGFX_TFT_4_0::LGFX_TFT_4_0() {
 DisplayDriver::DisplayDriver() {}
 
 bool DisplayDriver::init() {
-    Serial.println("[DISPLAY] Initializing 4.0\" ILI9488 TFT...");
+    Serial.println("[DISPLAY] Initializing 4.0\" ILI9488 TFT on ESP32-S3...");
 
     pinMode(PinConfig::TFT_RST, OUTPUT);
     digitalWrite(PinConfig::TFT_RST, HIGH);
@@ -79,11 +79,20 @@ bool DisplayDriver::init() {
 
     _gfx.setRotation(1); // Landscape 480x320
     _gfx.setColorDepth(16);
-    _gfx.fillScreen(TFT_BLACK);
-
+    
+    // Backlight on
     pinMode(PinConfig::TFT_LED, OUTPUT);
     digitalWrite(PinConfig::TFT_LED, HIGH);
     setBacklight(255);
+
+    // Initial Splash / Self-Test Color Flash to confirm hardware communication
+    _gfx.fillScreen(TFT_BLUE);
+    _gfx.setTextColor(TFT_WHITE, TFT_BLUE);
+    _gfx.setTextSize(3);
+    _gfx.drawString("ECUSniff S3", 140, 100);
+    _gfx.setTextSize(2);
+    _gfx.drawString("Display Online OK", 140, 150);
+    delay(400);
 
     drawStaticLayout();
     Serial.println("[DISPLAY] ILI9488 Display initialized & layout drawn.");
