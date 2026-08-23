@@ -29,31 +29,26 @@ void SignalSniffer::_matchVehicleProfile(SnifferResult& res) {
     uint16_t N = res.wheel.totalTeeth;
     uint8_t  M = res.wheel.missingTeeth;
 
-    if (N == 36 && M == 1) {
-        strncpy(res.matchedVehicle, "Ford / Honda / Universal 36-1", sizeof(res.matchedVehicle));
-        res.matchConfidence = 99.8f;
-    } else if (N == 36 && M == 2) {
-        strncpy(res.matchedVehicle, "Toyota 1NZ/2NZ/1ZZ (36-2)", sizeof(res.matchedVehicle));
-        res.matchConfidence = 99.6f;
-    } else if (N == 60 && M == 2) {
-        strncpy(res.matchedVehicle, "Bosch / VW / BMW (60-2)", sizeof(res.matchedVehicle));
-        res.matchConfidence = 99.9f;
-    } else if (N == 4 && M == 1) {
-        strncpy(res.matchedVehicle, "Yamaha NMAX / Aerox (4-1)", sizeof(res.matchedVehicle));
-        res.matchConfidence = 99.2f;
-    } else if (N == 24 && M == 2) {
-        strncpy(res.matchedVehicle, "Mazda Miata / BP (24-2)", sizeof(res.matchedVehicle));
-        res.matchConfidence = 98.9f;
-    } else if (N == 12 && M == 1) {
-        strncpy(res.matchedVehicle, "Suzuki / Daihatsu (12-1)", sizeof(res.matchedVehicle));
-        res.matchConfidence = 98.5f;
-    } else if (N == 0) {
-        strncpy(res.matchedVehicle, "Standalone Camshaft (CMP)", sizeof(res.matchedVehicle));
-        res.matchConfidence = 97.0f;
-    } else {
-        snprintf(res.matchedVehicle, sizeof(res.matchedVehicle), "Pola Kustom (%u-%u)", N, M);
-        res.matchConfidence = 95.0f;
+    struct Preset { uint16_t n; uint8_t m; const char* name; float conf; };
+    static const Preset PRESETS[] = {
+        { 36, 1, "Ford / Honda / Universal 36-1", 99.8f },
+        { 36, 2, "Toyota 1NZ/2NZ/1ZZ (36-2)",     99.6f },
+        { 60, 2, "Bosch / VW / BMW (60-2)",       99.9f },
+        {  4, 1, "Yamaha NMAX / Aerox (4-1)",      99.2f },
+        { 24, 2, "Mazda Miata / BP (24-2)",        98.9f },
+        { 12, 1, "Suzuki / Daihatsu (12-1)",       98.5f },
+        {  0, 0, "Standalone Camshaft (CMP)",      97.0f }
+    };
+
+    for (const auto& p : PRESETS) {
+        if (N == p.n && (N == 0 || M == p.m)) {
+            strncpy(res.matchedVehicle, p.name, sizeof(res.matchedVehicle));
+            res.matchConfidence = p.conf;
+            return;
+        }
     }
+    snprintf(res.matchedVehicle, sizeof(res.matchedVehicle), "Pola Kustom (%u-%u)", N, M);
+    res.matchConfidence = 95.0f;
 }
 
 uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
@@ -79,7 +74,8 @@ uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t
 
 void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
                                      uint32_t syncRefUs, uint32_t cycle720Us,
-                                     CamEventTable& outCam, float tolDeg) {
+                                     CamEventTable& outCam, float tolDeg,
+                                     float toothPitchDeg) {
     if (cycle720Us == 0 || !events) return;
     CamCluster clusters[16];
     size_t clusterCount = 0;
@@ -112,8 +108,16 @@ void SignalSniffer::_clusterCamEvents(const RawSignalEdge* events, size_t count,
     size_t tempCount = clusterCount;
     for (size_t i = 0; i < tempCount; ++i) {
         float avgA = clusters[i].sumAngle / (float)clusters[i].count;
-        float cleanA = roundf(avgA * 2.0f) / 2.0f;
-        if (fabsf(cleanA - roundf(cleanA)) < 0.25f) cleanA = roundf(cleanA);
+        float cleanA = avgA;
+        if (toothPitchDeg > 0.1f) {
+            float toothIdx = roundf(avgA / toothPitchDeg);
+            float snapped = toothIdx * toothPitchDeg;
+            float halfIdx = roundf(avgA / (toothPitchDeg * 0.5f));
+            float halfSnapped = halfIdx * toothPitchDeg * 0.5f;
+            cleanA = (fabsf(avgA - halfSnapped) < (toothPitchDeg * 0.25f)) ? halfSnapped : snapped;
+        } else {
+            cleanA = roundf(avgA * 2.0f) / 2.0f;
+        }
         while (cleanA >= 720.0f) cleanA -= 720.0f;
         while (cleanA < 0.0f) cleanA += 720.0f;
         tempEvs[i] = { cleanA, clusters[i].isHigh };
@@ -196,18 +200,14 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
             }
         }
         if (cmpRising < 2) return res;
-
         uint32_t camPeriodUs = (_ckpRising[cmpRising - 1] - _ckpRising[0]) / (cmpRising - 1);
         if (camPeriodUs < 1000) return res;
-
         res.detectedRpm = (uint32_t)(120000000ULL / camPeriodUs);
         if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
-
         res.wheel.totalTeeth = 0; res.wheel.missingTeeth = 0; res.wheel.dutyCycle = 0.5f;
-        _clusterCamEvents(events, eventCount, _ckpRising[0], camPeriodUs, res.cam, 15.0f);
+        _clusterCamEvents(events, eventCount, _ckpRising[0], camPeriodUs, res.cam, 15.0f, 0.0f);
         _matchVehicleProfile(res);
-        snprintf(res.summary, sizeof(res.summary), "CMP Standalone: %u Pulsa @ %u RPM",
-                 (unsigned)res.cam.getEventCount(), (unsigned)res.detectedRpm);
+        snprintf(res.summary, sizeof(res.summary), "CMP Standalone: %u Pulsa @ %u RPM", (unsigned)res.cam.getEventCount(), (unsigned)res.detectedRpm);
         res.success = true;
         return res;
     }
@@ -234,9 +234,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
         }
     }
 
-    res.jitterPercent = (normalToothCount > 0) 
-        ? ((float)totalDeviationUs / (float)normalToothCount / (float)nominalPeriod) * 100.0f : 0.0f;
-
+    res.jitterPercent = (normalToothCount > 0) ? ((float)totalDeviationUs / (float)normalToothCount / (float)nominalPeriod) * 100.0f : 0.0f;
     uint16_t totalTeeth = 36; uint8_t missingTeeth = 1; uint32_t revPeriodUs = 0;
     if (gapCount >= 2) {
         size_t physicalTeeth = gapIndices[1] - gapIndices[0];
@@ -263,9 +261,7 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.wheel.inverted = false;
 
     // 720 deg Phase-Locking: Tooth 1 Rising Edge minus 1 Tooth Pitch gives EXACT 0.0 deg!
-    uint32_t gap0Us = (gapCount > 0 && (gapIndices[0] + 1) < risingCount) 
-        ? (_ckpRising[gapIndices[0] + 1] - nominalPeriod) 
-        : _ckpRising[0];
+    uint32_t gap0Us = (gapCount > 0 && (gapIndices[0] + 1) < risingCount) ? (_ckpRising[gapIndices[0] + 1] - nominalPeriod) : _ckpRising[0];
     uint32_t cycle720Us = revPeriodUs * 2;
     size_t cmpEventCount = 0; uint64_t cmpMinPulseUs = 0xFFFFFFFF;
 
@@ -280,17 +276,16 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     }
 
     if (cmpEventCount >= 4 && cmpMinPulseUs > 50) {
+        float pitchDeg = res.wheel.getPitchAngleDeg();
         uint32_t syncRefUs = _calcPhaseLockOffset(events, eventCount, gap0Us, revPeriodUs, cycle720Us);
-        _clusterCamEvents(events, eventCount, syncRefUs, cycle720Us, res.cam, 10.0f);
+        _clusterCamEvents(events, eventCount, syncRefUs, cycle720Us, res.cam, 10.0f, pitchDeg);
         if (res.cam.getEventCount() < 2) res.cam.clear();
     } else {
         res.cam.clear();
     }
 
     _matchVehicleProfile(res);
-    snprintf(res.summary, sizeof(res.summary), "%u-%u CKP @ %u RPM (%u Pulsa Cam)",
-             res.wheel.totalTeeth, res.wheel.missingTeeth, (unsigned)res.detectedRpm,
-             (unsigned)res.cam.getEventCount());
+    snprintf(res.summary, sizeof(res.summary), "%u-%u CKP @ %u RPM (%u Pulsa Cam)", res.wheel.totalTeeth, res.wheel.missingTeeth, (unsigned)res.detectedRpm, (unsigned)res.cam.getEventCount());
     res.success = true;
     return res;
 }

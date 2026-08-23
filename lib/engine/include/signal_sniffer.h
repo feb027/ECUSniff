@@ -40,7 +40,8 @@ private:
     void     _matchVehicleProfile(SnifferResult& res);
     void     _clusterCamEvents(const RawSignalEdge* events, size_t count,
                                uint32_t syncRefUs, uint32_t cycle720Us,
-                               CamEventTable& outCam, float tolDeg);
+                               CamEventTable& outCam, float tolDeg,
+                               float toothPitchDeg = 0.0f);
     uint32_t _calcPhaseLockOffset(const RawSignalEdge* events, size_t count,
                                   uint32_t gap0Us, uint32_t revUs, uint32_t cycle720Us);
 };
