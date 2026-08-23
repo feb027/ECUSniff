@@ -33,7 +33,7 @@ void CaptureDriver::init() {
     pinMode(PinConfig::CAP_CMP2, INPUT_PULLDOWN);
 
     attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CKP), isrCkpHandler, RISING);
-    attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CMP), isrCmpHandler, RISING);
+    attachInterrupt(digitalPinToInterrupt(PinConfig::CAP_CMP), isrCmpHandler, CHANGE);
     _state = CaptureState::Idle;
     _eventCount = 0;
 }
@@ -152,9 +152,11 @@ void IRAM_ATTR CaptureDriver::isrCmpHandler() {
     if (_lastCmpUs != 0 && (now - _lastCmpUs) < GLITCH_FILTER_US) return;
     _lastCmpUs = now;
 
+    uint8_t lvl = static_cast<uint8_t>(digitalRead(PinConfig::CAP_CMP));
+
     if (_state == CaptureState::Recording) {
         if (_eventCount < MAX_CAPTURE_EVENTS) {
-            _buffer[_eventCount++] = { now, 1, 1 };
+            _buffer[_eventCount++] = { now, 1, lvl };
             if (_eventCount >= _targetEvents) _state = CaptureState::Done;
         }
     }
