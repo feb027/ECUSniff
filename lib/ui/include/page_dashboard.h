@@ -7,7 +7,7 @@
 namespace EcuUi {
 
 struct WheelPresetItem {
-    const char* name;
+    char     name[32];
     uint16_t totalTeeth;
     uint8_t  missingTeeth;
     uint8_t  missingPosition;
@@ -33,11 +33,17 @@ public:
                        EcuEngine::ParametricWheel& wheel,
                        EcuEngine::CamEventTable& cam);
 
-    static void setCapturedPreset(const char* name, const EcuEngine::ParametricWheel& wheel, const EcuEngine::CamEventTable& cam);
-    static bool hasCapturedPreset();
+    static uint8_t addCapturedPreset(const char* name, const EcuEngine::ParametricWheel& wheel, const EcuEngine::CamEventTable& cam);
+    static bool renameCustomPreset(uint8_t slot, const char* newName);
+    static bool deleteCustomPreset(uint8_t slot);
+    static uint8_t getCustomCount();
+    static const WheelPresetItem* getCustomPreset(uint8_t slot);
+    static void clearAllCustom();
+    static void setCustomSlot(uint8_t slot, const WheelPresetItem& item);
 
-    static const WheelPresetItem PRESETS[];
+    static const WheelPresetItem BASE_PRESETS[];
     static constexpr size_t BASE_PRESET_COUNT = 6;
+    static constexpr size_t MAX_CUSTOM_PRESETS = 16;
 
 private:
     LovyanGFX*     _gfx;
@@ -52,9 +58,8 @@ private:
     uint16_t _lastTotalTeeth{0xFFFF};
     uint8_t  _lastMissingTeeth{0xFF};
 
-    static WheelPresetItem s_capturedPreset;
-    static char            s_capturedName[32];
-    static bool            s_hasCaptured;
+    static WheelPresetItem s_customSlots[MAX_CUSTOM_PRESETS];
+    static uint8_t         s_customCount;
 
     void _drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel);
     void _applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam);

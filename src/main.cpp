@@ -45,15 +45,21 @@ static void saveSettings() {
         char k1[8], k2[8]; snprintf(k1, sizeof(k1), "ca%u", i); snprintf(k2, sizeof(k2), "ch%u", i);
         pref.putFloat(k1, evs[i].angleDeg); pref.putBool(k2, evs[i].levelHigh);
     }
-    if (EcuUi::PageDashboard::hasCapturedPreset()) {
-        pref.putUShort("cap_teeth", wheelCfg.totalTeeth);
-        pref.putUChar("cap_mteeth", wheelCfg.missingTeeth);
-        pref.putFloat("cap_duty", wheelCfg.dutyCycle);
-        pref.putString("cap_name", engineState.activeWheelName);
-        pref.putUChar("cap_ccnt", c);
-        for (uint8_t i = 0; i < c && i < 4; ++i) {
-            char k1[12], k2[12]; snprintf(k1, sizeof(k1), "cap_ca%u", i); snprintf(k2, sizeof(k2), "cap_ch%u", i);
-            pref.putFloat(k1, evs[i].angleDeg); pref.putBool(k2, evs[i].levelHigh);
+    uint8_t cCnt = EcuUi::PageDashboard::getCustomCount();
+    pref.putUChar("c_cnt", cCnt);
+    for (uint8_t s = 0; s < cCnt && s < EcuUi::PageDashboard::MAX_CUSTOM_PRESETS; ++s) {
+        const auto* p = EcuUi::PageDashboard::getCustomPreset(s);
+        if (!p) continue;
+        char k[16];
+        snprintf(k, sizeof(k), "s%u_nm", s); pref.putString(k, p->name);
+        snprintf(k, sizeof(k), "s%u_t", s);  pref.putUShort(k, p->totalTeeth);
+        snprintf(k, sizeof(k), "s%u_m", s);  pref.putUChar(k, p->missingTeeth);
+        snprintf(k, sizeof(k), "s%u_d", s);  pref.putFloat(k, p->dutyCycle);
+        snprintf(k, sizeof(k), "s%u_c", s);  pref.putUChar(k, p->camCount);
+        for (uint8_t i = 0; i < p->camCount && i < 4; ++i) {
+            char ka[16], kh[16];
+            snprintf(ka, sizeof(ka), "s%u_ca%u", s, i); snprintf(kh, sizeof(kh), "s%u_ch%u", s, i);
+            pref.putFloat(ka, p->camAngles[i]); pref.putBool(kh, p->camHighs[i]);
         }
     }
     pref.end();
@@ -80,21 +86,24 @@ static void loadSettings() {
         camCfg.addEvent(120.0f, true); camCfg.addEvent(180.0f, false);
         camCfg.addEvent(420.0f, true); camCfg.addEvent(470.0f, false);
     }
-    if (pref.isKey("cap_teeth")) {
-        EcuEngine::ParametricWheel capWheel;
-        capWheel.totalTeeth = pref.getUShort("cap_teeth", 36);
-        capWheel.missingTeeth = pref.getUChar("cap_mteeth", 1);
-        capWheel.missingPosition = 0;
-        capWheel.dutyCycle = pref.getFloat("cap_duty", 0.5f);
-        capWheel.inverted = false;
-        EcuEngine::CamEventTable capCam;
-        uint8_t capC = pref.getUChar("cap_ccnt", 0);
-        for (uint8_t i = 0; i < capC && i < 4; ++i) {
-            char k1[12], k2[12]; snprintf(k1, sizeof(k1), "cap_ca%u", i); snprintf(k2, sizeof(k2), "cap_ch%u", i);
-            capCam.addEvent(pref.getFloat(k1, 0.0f), pref.getBool(k2, true));
+    uint8_t cCnt = pref.getUChar("c_cnt", 0);
+    EcuUi::PageDashboard::clearAllCustom();
+    for (uint8_t s = 0; s < cCnt && s < EcuUi::PageDashboard::MAX_CUSTOM_PRESETS; ++s) {
+        char k[16]; snprintf(k, sizeof(k), "s%u_nm", s);
+        if (!pref.isKey(k)) continue;
+        EcuUi::WheelPresetItem item{};
+        String nm = pref.getString(k, "Capture");
+        strncpy(item.name, nm.c_str(), sizeof(item.name) - 1);
+        snprintf(k, sizeof(k), "s%u_t", s);  item.totalTeeth = pref.getUShort(k, 36);
+        snprintf(k, sizeof(k), "s%u_m", s);  item.missingTeeth = pref.getUChar(k, 1);
+        snprintf(k, sizeof(k), "s%u_d", s);  item.dutyCycle = pref.getFloat(k, 0.5f);
+        snprintf(k, sizeof(k), "s%u_c", s);  item.camCount = pref.getUChar(k, 0);
+        for (uint8_t i = 0; i < item.camCount && i < 4; ++i) {
+            char ka[16], kh[16];
+            snprintf(ka, sizeof(ka), "s%u_ca%u", s, i); snprintf(kh, sizeof(kh), "s%u_ch%u", s, i);
+            item.camAngles[i] = pref.getFloat(ka, 0.0f); item.camHighs[i] = pref.getBool(kh, true);
         }
-        String capName = pref.getString("cap_name", "Captured: Pola Mobil");
-        EcuUi::PageDashboard::setCapturedPreset(capName.c_str(), capWheel, capCam);
+        EcuUi::PageDashboard::setCustomSlot(s, item);
     }
     pref.end();
 }
@@ -114,8 +123,7 @@ void taskCore0UiWeb(void *pvParameters) {
         int32_t delta = encoder.getDelta();
         if (delta != 0 && menuMgr) {
             menuMgr->onEncoderTurn(delta, engineState, wheelCfg, camCfg);
-            signalGen.setPattern(wheelCfg, camCfg);
-            signalGen.setRpm(engineState.targetRpm);
+            signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm);
             if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
         }
 
@@ -140,12 +148,16 @@ void taskCore0UiWeb(void *pvParameters) {
             else if (clickCount >= 2 && menuMgr) {
                 menuMgr->onEncoderDoubleClick(wheelCfg, camCfg);
                 const auto& cr = menuMgr->getPageCapture().getLastResult();
-                if (cr.success) {
-                    snprintf(engineState.activeWheelName, sizeof(engineState.activeWheelName), "Cap: %s", cr.matchedVehicle);
+                char slotName[32];
+                uint8_t nextNum = EcuUi::PageDashboard::getCustomCount() + 1;
+                if (cr.success && strstr(cr.matchedVehicle, "Belum Terdeteksi") == nullptr) {
+                    snprintf(slotName, sizeof(slotName), "Cap %u: %s", (unsigned)nextNum, cr.matchedVehicle);
                 } else {
-                    snprintf(engineState.activeWheelName, sizeof(engineState.activeWheelName), "Captured: %u-%u", wheelCfg.totalTeeth, wheelCfg.missingTeeth);
+                    snprintf(slotName, sizeof(slotName), "Capture %u (%u-%u)", (unsigned)nextNum, (unsigned)wheelCfg.totalTeeth, (unsigned)wheelCfg.missingTeeth);
                 }
-                EcuUi::PageDashboard::setCapturedPreset(engineState.activeWheelName, wheelCfg, camCfg);
+                uint8_t slot = EcuUi::PageDashboard::addCapturedPreset(slotName, wheelCfg, camCfg);
+                const auto* saved = EcuUi::PageDashboard::getCustomPreset(slot);
+                if (saved) strncpy(engineState.activeWheelName, saved->name, sizeof(engineState.activeWheelName));
                 saveSettings();
             }
             clickCount = 0;
@@ -223,12 +235,20 @@ void setup() {
             if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
             if (menuMgr) menuMgr->markNeedsRedraw();
             saveSettings();
+        } else if (cmd == "rename_preset") {
+            uint8_t slot = doc["slot"] | 0; String newName = doc["name"] | "";
+            if (newName.length() > 0 && EcuUi::PageDashboard::renameCustomPreset(slot, newName.c_str())) {
+                saveSettings(); if (menuMgr) menuMgr->markNeedsRedraw();
+            }
+        } else if (cmd == "delete_preset") {
+            uint8_t slot = doc["slot"] | 0;
+            if (EcuUi::PageDashboard::deleteCustomPreset(slot)) {
+                saveSettings(); if (menuMgr) menuMgr->markNeedsRedraw();
+            }
         } else if (cmd == "set_mode") {
             if (val <= 2) {
                 engineState.runMode = static_cast<EcuEngine::EngineRunMode>(val);
-                if (engineState.isRunning && engineState.runMode == EcuEngine::EngineRunMode::Cranking) {
-                    rpmController.startCranking(engineState.cranking);
-                }
+                if (engineState.isRunning && engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
                 if (menuMgr) menuMgr->markNeedsRedraw();
             }
         } else if (cmd == "set_ui_level") {

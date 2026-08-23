@@ -1,6 +1,7 @@
 #include "web_server_manager.h"
 #include <LittleFS.h>
 #include <WiFi.h>
+#include "page_dashboard.h"
 
 namespace EcuWebApi {
 
@@ -32,13 +33,11 @@ void WebServerManager::init() {
     });
     _server.addHandler(&_ws);
 
-    // Single Source of Truth: Centralized Presets API
     _server.on("/api/presets", HTTP_GET, [](AsyncWebServerRequest *request) {
         AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/js/wheel_db.js", "application/javascript");
         request->send(response);
     });
 
-    // CSV Diagnostic Log Export Endpoint
     _server.on("/api/export_csv", HTTP_GET, [this](AsyncWebServerRequest *request) {
         if (!_capDriver || !_capDriver->isDone()) {
             request->send(400, "text/plain", "Tidak ada rekaman capture");
@@ -139,6 +138,19 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
     hl["liveTeeth"] = state.health.liveTeeth;
     hl["jitter"] = state.health.jitterPercent;
     hl["msg"] = state.health.diagnosticMsg;
+
+    JsonArray custArr = doc["customSlots"].to<JsonArray>();
+    uint8_t cCnt = EcuUi::PageDashboard::getCustomCount();
+    for (uint8_t s = 0; s < cCnt && s < EcuUi::PageDashboard::MAX_CUSTOM_PRESETS; ++s) {
+        const auto* p = EcuUi::PageDashboard::getCustomPreset(s);
+        if (!p) continue;
+        JsonObject sObj = custArr.add<JsonObject>();
+        sObj["slot"] = s;
+        sObj["name"] = p->name;
+        sObj["teeth"] = p->totalTeeth;
+        sObj["mteeth"] = p->missingTeeth;
+        sObj["duty"] = p->dutyCycle;
+    }
 
     String out;
     serializeJson(doc, out);

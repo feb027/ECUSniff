@@ -2,11 +2,10 @@
 
 namespace EcuUi {
 
-WheelPresetItem PageDashboard::s_capturedPreset{};
-char PageDashboard::s_capturedName[32] = "Captured: Kustom";
-bool PageDashboard::s_hasCaptured = false;
+WheelPresetItem PageDashboard::s_customSlots[PageDashboard::MAX_CUSTOM_PRESETS]{};
+uint8_t PageDashboard::s_customCount = 0;
 
-const WheelPresetItem PageDashboard::PRESETS[] = {
+const WheelPresetItem PageDashboard::BASE_PRESETS[] = {
     { "Honda / Ford 36-1", 36, 1, 0, 0.50f, false, 4, {120.0f, 180.0f, 420.0f, 470.0f}, {true, false, true, false} },
     { "Toyota 1NZ/2NZ 36-2", 36, 2, 0, 0.50f, false, 2, {90.0f, 270.0f, 0.0f, 0.0f}, {true, false, false, false} },
     { "Bosch / VW / BMW 60-2", 60, 2, 0, 0.50f, false, 2, {180.0f, 540.0f, 0.0f, 0.0f}, {true, false, false, false} },
@@ -21,41 +20,73 @@ void PageDashboard::init() {
     _canvas.init(448, 82);
 }
 
-void PageDashboard::setCapturedPreset(const char* name, const EcuEngine::ParametricWheel& wheel, const EcuEngine::CamEventTable& cam) {
-    s_hasCaptured = true;
+uint8_t PageDashboard::addCapturedPreset(const char* name, const EcuEngine::ParametricWheel& wheel, const EcuEngine::CamEventTable& cam) {
+    uint8_t slot = (s_customCount < MAX_CUSTOM_PRESETS) ? s_customCount : (MAX_CUSTOM_PRESETS - 1);
+    WheelPresetItem& item = s_customSlots[slot];
+
     if (name && name[0] != '\0') {
-        strncpy(s_capturedName, name, sizeof(s_capturedName) - 1);
-        s_capturedName[sizeof(s_capturedName) - 1] = '\0';
+        strncpy(item.name, name, sizeof(item.name) - 1);
+    } else {
+        snprintf(item.name, sizeof(item.name), "Capture %u", (unsigned)(slot + 1));
     }
-    s_capturedPreset.name = s_capturedName;
-    s_capturedPreset.totalTeeth = wheel.totalTeeth;
-    s_capturedPreset.missingTeeth = wheel.missingTeeth;
-    s_capturedPreset.missingPosition = wheel.missingPosition;
-    s_capturedPreset.dutyCycle = wheel.dutyCycle;
-    s_capturedPreset.inverted = wheel.inverted;
-    s_capturedPreset.camCount = cam.getEventCount();
+    item.name[sizeof(item.name) - 1] = '\0';
+    item.totalTeeth = wheel.totalTeeth;
+    item.missingTeeth = wheel.missingTeeth;
+    item.missingPosition = wheel.missingPosition;
+    item.dutyCycle = wheel.dutyCycle;
+    item.inverted = wheel.inverted;
+    item.camCount = cam.getEventCount();
     const auto* evs = cam.getEvents();
     for (uint8_t i = 0; i < 4; ++i) {
-        if (evs && i < s_capturedPreset.camCount) {
-            s_capturedPreset.camAngles[i] = evs[i].angleDeg;
-            s_capturedPreset.camHighs[i] = evs[i].levelHigh;
+        if (evs && i < item.camCount) {
+            item.camAngles[i] = evs[i].angleDeg;
+            item.camHighs[i] = evs[i].levelHigh;
         } else {
-            s_capturedPreset.camAngles[i] = 0.0f;
-            s_capturedPreset.camHighs[i] = false;
+            item.camAngles[i] = 0.0f;
+            item.camHighs[i] = false;
         }
     }
+    if (s_customCount < MAX_CUSTOM_PRESETS) s_customCount++;
+    return slot;
 }
 
-bool PageDashboard::hasCapturedPreset() {
-    return s_hasCaptured;
+bool PageDashboard::renameCustomPreset(uint8_t slot, const char* newName) {
+    if (slot >= s_customCount || !newName) return false;
+    strncpy(s_customSlots[slot].name, newName, sizeof(s_customSlots[slot].name) - 1);
+    s_customSlots[slot].name[sizeof(s_customSlots[slot].name) - 1] = '\0';
+    return true;
+}
+
+bool PageDashboard::deleteCustomPreset(uint8_t slot) {
+    if (slot >= s_customCount) return false;
+    for (uint8_t i = slot; i + 1 < s_customCount; ++i) {
+        s_customSlots[i] = s_customSlots[i + 1];
+    }
+    s_customCount--;
+    return true;
+}
+
+uint8_t PageDashboard::getCustomCount() { return s_customCount; }
+
+const WheelPresetItem* PageDashboard::getCustomPreset(uint8_t slot) {
+    return (slot < s_customCount) ? &s_customSlots[slot] : nullptr;
+}
+
+void PageDashboard::clearAllCustom() { s_customCount = 0; }
+
+void PageDashboard::setCustomSlot(uint8_t slot, const WheelPresetItem& item) {
+    if (slot < MAX_CUSTOM_PRESETS) {
+        s_customSlots[slot] = item;
+        if (slot >= s_customCount) s_customCount = slot + 1;
+    }
 }
 
 void PageDashboard::_applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam) {
     const WheelPresetItem* p = nullptr;
     if (idx < BASE_PRESET_COUNT) {
-        p = &PRESETS[idx];
-    } else if (idx == BASE_PRESET_COUNT && s_hasCaptured) {
-        p = &s_capturedPreset;
+        p = &BASE_PRESETS[idx];
+    } else if (idx < BASE_PRESET_COUNT + s_customCount) {
+        p = &s_customSlots[idx - BASE_PRESET_COUNT];
     }
     if (!p) return;
 
@@ -81,33 +112,26 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     if (fullRedraw) {
         _gfx->fillRect(8, 44, 464, 268, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
-
         _canvas.render(wheel, cam, 16, 50);
 
         _gfx->fillRoundRect(16, 138, 220, 66, 6, 0x0841);
         _gfx->drawRoundRect(16, 138, 220, 66, 6, 0x52AA);
-        _gfx->setTextColor(TFT_WHITE, 0x0841);
-        _gfx->setTextSize(1);
+        _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
         _gfx->drawString("TARGET RPM MESIN:", 26, 146);
 
         _gfx->fillRoundRect(244, 138, 220, 66, 6, 0x0841);
         _gfx->drawRoundRect(244, 138, 220, 66, 6, 0x52AA);
-        _gfx->setTextColor(TFT_WHITE, 0x0841);
-        _gfx->setTextSize(1);
+        _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
         _gfx->drawString("SIMULATION MODE:", 254, 146);
 
         _gfx->fillRoundRect(16, 210, 448, 66, 6, 0x0841);
         _gfx->drawRoundRect(16, 210, 448, 66, 6, 0x52AA);
-        _gfx->setTextColor(TFT_WHITE, 0x0841);
-        _gfx->setTextSize(1);
+        _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
         _gfx->drawString("POLA RODA & PROFIL MESIN AKTIF:", 26, 218);
 
-        _lastRpm = 0xFFFFFFFF;
-        _lastMode = 0xFF;
-        _lastIsRunning = !state.isRunning;
-        _lastIsEditMode = !isEditMode;
-        _lastEditRow = 0xFF;
-        _lastTotalTeeth = 0xFFFF;
+        _lastRpm = 0xFFFFFFFF; _lastMode = 0xFF;
+        _lastIsRunning = !state.isRunning; _lastIsEditMode = !isEditMode;
+        _lastEditRow = 0xFF; _lastTotalTeeth = 0xFFFF;
     }
 
     bool isRunningChanged = (state.isRunning != _lastIsRunning);
@@ -138,12 +162,14 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     if (wheel.totalTeeth != _lastTotalTeeth || wheel.missingTeeth != _lastMissingTeeth || fullRedraw) {
         const char* name = (state.activeWheelName[0] != '\0') ? state.activeWheelName : "Pola Kustom";
         _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
-        _gfx->drawString("                             ", 26, 234); _gfx->drawString(name, 26, 234);
+        _gfx->drawString("                             ", 26, 234);
+        _gfx->drawString(name, 26, 234);
 
         char detailBuf[48];
         snprintf(detailBuf, sizeof(detailBuf), "(%u-%u CKP | %u Pulsa Cam)          ",
                  (unsigned)wheel.totalTeeth, (unsigned)wheel.missingTeeth, (unsigned)cam.getEventCount());
-        _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1); _gfx->drawString(detailBuf, 26, 256);
+        _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+        _gfx->drawString(detailBuf, 26, 256);
 
         _lastTotalTeeth = wheel.totalTeeth; _lastMissingTeeth = wheel.missingTeeth;
         if (!fullRedraw) _canvas.render(wheel, cam, 16, 50);
@@ -178,7 +204,7 @@ void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRun
         _gfx->drawString("[MODE MESIN] Putar: FIX / CRANK / SWEEP | Joystick Bawah: Pola", 16, 289);
     } else if (editRow == 2) {
         _gfx->setTextColor(0xFFE0, 0x0841);
-        _gfx->drawString("[PROFIL POLA] Putar: Ganti Preset Mobil / Rekaman | Klik: Run/Stop", 16, 289);
+        _gfx->drawString("[PROFIL POLA] Putar: Ganti Preset OEM / Rekaman | Klik: Run/Stop", 16, 289);
     }
 }
 
@@ -195,13 +221,13 @@ void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
         if (m > 2) m = 0;
         state.runMode = static_cast<EcuEngine::EngineRunMode>(m);
     } else if (editRow == 2) {
-        size_t count = s_hasCaptured ? (BASE_PRESET_COUNT + 1) : BASE_PRESET_COUNT;
+        size_t count = BASE_PRESET_COUNT + s_customCount;
         int32_t nextIdx = _activePresetIdx + (delta > 0 ? 1 : -1);
         if (nextIdx < 0) nextIdx = count - 1;
         if (nextIdx >= (int32_t)count) nextIdx = 0;
         _activePresetIdx = nextIdx;
         _applyPreset(_activePresetIdx, wheel, cam);
-        const char* pName = (_activePresetIdx < (int32_t)BASE_PRESET_COUNT) ? PRESETS[_activePresetIdx].name : s_capturedPreset.name;
+        const char* pName = (_activePresetIdx < (int32_t)BASE_PRESET_COUNT) ? BASE_PRESETS[_activePresetIdx].name : s_customSlots[_activePresetIdx - BASE_PRESET_COUNT].name;
         strncpy(state.activeWheelName, pName, sizeof(state.activeWheelName));
     }
 }

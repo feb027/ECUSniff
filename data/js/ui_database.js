@@ -1,6 +1,13 @@
 // Wheel Database Controller & Instant Search
 
 let activeCategory = 'Semua';
+let serverCustomSlots = [];
+
+function setServerCustomSlots(slots) {
+    if (!Array.isArray(slots)) return;
+    serverCustomSlots = slots;
+    filterWheelDb();
+}
 
 function getCustomWheels() {
     try {
@@ -13,8 +20,18 @@ function getCustomWheels() {
 
 function getAllWheels() {
     const builtin = window.WHEEL_DATABASE || [];
-    const custom = getCustomWheels();
-    return [...custom, ...builtin];
+    const localCustom = getCustomWheels();
+    const serverCustom = serverCustomSlots.map(s => ({
+        id: `slot_${s.slot}`,
+        slotIdx: s.slot,
+        name: s.name || `Capture ${s.slot + 1}`,
+        category: 'Kustom / Rekaman',
+        desc: `Pola tersimpan di Flash NVS (Slot #${s.slot + 1}) — ${s.teeth}-${s.mteeth} CKP`,
+        isNvsSlot: true,
+        ckp: { totalTeeth: s.teeth, missingTeeth: s.mteeth, missingPosition: 0, dutyCycle: s.duty || 0.5, inverted: false },
+        cmp: []
+    }));
+    return [...serverCustom, ...localCustom, ...builtin];
 }
 
 function initWheelDatabase() {
@@ -59,26 +76,44 @@ function filterWheelDb() {
     }
 
     list.forEach(w => {
-        const isCustom = w.id && String(w.id).startsWith('custom_');
+        const isLocal = w.id && String(w.id).startsWith('custom_');
+        const isNvs = !!w.isNvsSlot;
         const card = document.createElement('div');
         card.className = 'wheel-card';
         card.innerHTML = `
             <div class="wheel-card-top">
-                <span class="wheel-name">${w.name}</span>
+                <span class="wheel-name" style="${isNvs ? 'color: #38BDF8;' : ''}">${w.name}</span>
                 <div style="display: flex; gap: 4px; align-items: center;">
                     <span class="wheel-badge">${w.ckp.totalTeeth}-${w.ckp.missingTeeth} CKP</span>
-                    ${isCustom ? `<button class="btn-del-event" style="font-size: 0.85rem;" onclick="deleteCustomWheel('${w.id}')" title="Hapus Pola Ini">&times;</button>` : ''}
+                    ${isNvs ? `<button class="btn-action-sm" style="padding: 2px 6px; font-size: 0.65rem;" onclick="renameNvsSlot(${w.slotIdx}, '${w.name}')" title="Ubah Nama">✏️</button>` : ''}
+                    ${isNvs ? `<button class="btn-del-event" style="font-size: 0.85rem;" onclick="deleteNvsSlot(${w.slotIdx})" title="Hapus Slot">&times;</button>` : ''}
+                    ${isLocal ? `<button class="btn-del-event" style="font-size: 0.85rem;" onclick="deleteCustomWheel('${w.id}')" title="Hapus">&times;</button>` : ''}
                 </div>
             </div>
-            <p class="wheel-desc">${w.desc || 'Pola rekaman kustom'}</p>
+            <p class="wheel-desc">${w.desc || 'Pola rekaman'}</p>
             <button class="btn-select-wheel" onclick="applyWheelFromDb('${w.id}')">Gunakan Pola Ini</button>
         `;
         grid.appendChild(card);
     });
 }
 
+function renameNvsSlot(slot, curName) {
+    const newName = prompt("Beri nama baru untuk slot rekaman ini:", curName);
+    if (!newName || newName.trim() === '') return;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ cmd: 'rename_preset', slot: parseInt(slot), name: newName.trim() }));
+    }
+}
+
+function deleteNvsSlot(slot) {
+    if (!confirm("Hapus slot rekaman ini dari Flash ESP32?")) return;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ cmd: 'delete_preset', slot: parseInt(slot) }));
+    }
+}
+
 function deleteCustomWheel(id) {
-    if (!confirm("Hapus pola rekaman kustom ini dari database?")) return;
+    if (!confirm("Hapus pola rekaman kustom ini dari browser?")) return;
     let custom = getCustomWheels().filter(w => w.id !== id);
     localStorage.setItem('ecusniff_custom_wheels', JSON.stringify(custom));
     filterWheelDb();
@@ -91,7 +126,7 @@ function applyWheelFromDb(wheelId) {
 
     currentPattern.name = w.name;
     currentPattern.ckp = { ...w.ckp };
-    currentPattern.cmp.events = JSON.parse(JSON.stringify(w.cmp));
+    if (w.cmp && w.cmp.length > 0) currentPattern.cmp.events = JSON.parse(JSON.stringify(w.cmp));
 
     updateTunerInputsFromState();
     renderCamEvents();
