@@ -18,16 +18,19 @@ public:
     JoystickDriver();
     void init();
     JoyAction update();
+    bool isConnected() const { return _isEnabled; }
 
 private:
     uint32_t _lastActionTimeMs{0};
+    int32_t  _centerX{2048};
+    int32_t  _centerY{2048};
     bool     _btnWasDown{false};
     bool     _dirHeld{false};
+    bool     _isEnabled{false};
 
-    static constexpr int32_t ADC_CENTER = 2048;
-    static constexpr int32_t ADC_THRESHOLD = 900;
-    static constexpr uint32_t REPEAT_DELAY_MS = 350;
-    static constexpr uint32_t REPEAT_RATE_MS  = 180;
+    static constexpr int32_t ADC_THRESHOLD   = 1000;
+    static constexpr uint32_t REPEAT_DELAY_MS = 400;
+    static constexpr uint32_t REPEAT_RATE_MS  = 200;
 };
 
 } // namespace EcuHal
