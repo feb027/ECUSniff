@@ -20,7 +20,7 @@ volatile uint16_t     CaptureDriver::_liveCmpEdgesSec = 0;
 volatile uint32_t     CaptureDriver::_lastRateCheckMs = 0;
 
 static volatile uint32_t s_lastGapTimestampUs = 0;
-static volatile uint32_t s_prevDtUs = 0;
+static volatile uint32_t s_avgToothUs = 0;
 static volatile uint16_t s_runningToothCount = 0;
 static volatile bool     s_lastWasGap = false;
 CaptureEvent          CaptureDriver::_buffer[CaptureDriver::MAX_CAPTURE_EVENTS];
@@ -46,7 +46,7 @@ void CaptureDriver::arm(uint16_t targetEvents) {
     _lastCmpUs = 0;
     _lastCkpRisingUs = 0;
     _liveNominalUs = 0;
-    s_prevDtUs = 0;
+    s_avgToothUs = 0;
     s_lastGapTimestampUs = 0;
     s_runningToothCount = 0;
     s_lastWasGap = false;
@@ -93,22 +93,22 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
         if (dt < GLITCH_FILTER_US) return;
 
         if (dt > 30 && dt < 1200000) {
-            if (s_prevDtUs > 0) {
-                if (s_lastWasGap) {
-                    _liveNominalUs = dt;
-                    s_runningToothCount = 1;
-                    s_lastWasGap = false;
-                } else if (dt >= ((s_prevDtUs * 140) / 100)) {
+            if (s_avgToothUs == 0) {
+                s_avgToothUs = dt;
+                _liveNominalUs = dt;
+                s_runningToothCount = 1;
+            } else {
+                if (dt >= ((s_avgToothUs * 165) / 100)) {
                     _liveLastGapUs = dt;
                     if (s_lastGapTimestampUs != 0) {
                         uint32_t revP = now - s_lastGapTimestampUs;
-                        if (revP >= 1000 && revP <= 1200000) {
+                        if (s_runningToothCount >= 3 && revP >= 1000 && revP <= 1200000) {
                             _liveRevPeriodUs = revP;
+                            uint16_t missingGuess = (dt >= ((s_avgToothUs * 250) / 100)) ? 2 : 1;
+                            _liveTeethCount = s_runningToothCount + missingGuess;
                         }
                     }
                     s_lastGapTimestampUs = now;
-                    uint16_t missingGuess = (dt >= ((s_prevDtUs * 240) / 100)) ? 2 : 1;
-                    _liveTeethCount = s_runningToothCount + missingGuess;
                     s_runningToothCount = 0;
                     s_lastWasGap = true;
 
@@ -116,8 +116,16 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
                         _state = CaptureState::Recording;
                         _eventCount = 0;
                     }
+                } else if (s_lastWasGap) {
+                    s_avgToothUs = (s_avgToothUs * 3 + dt) >> 2;
+                    _liveNominalUs = s_avgToothUs;
+                    s_runningToothCount = 1;
+                    s_lastWasGap = false;
                 } else {
-                    _liveNominalUs = (_liveNominalUs > 0) ? ((_liveNominalUs * 3 + dt) >> 2) : dt;
+                    if (dt > (s_avgToothUs >> 1) && dt < (s_avgToothUs + (s_avgToothUs >> 1))) {
+                        s_avgToothUs = (s_avgToothUs * 7 + dt) >> 3;
+                        _liveNominalUs = s_avgToothUs;
+                    }
                     s_runningToothCount++;
                     s_lastWasGap = false;
                     if (s_runningToothCount > 130) {
@@ -126,7 +134,6 @@ void IRAM_ATTR CaptureDriver::isrCkpHandler() {
                     }
                 }
             }
-            s_prevDtUs = dt;
         }
     }
     _lastCkpRisingUs = now;
