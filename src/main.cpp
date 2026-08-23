@@ -34,6 +34,7 @@ void taskCore0UiWeb(void *pvParameters) {
     uint32_t lastWebUpdate = 0;
     uint32_t lastRpmUpdate = 0;
     uint32_t lastMenuRender = 0;
+    uint32_t lastDbg = 0;
     
     uint32_t btnPressTime = 0;
     uint32_t lastReleaseTime = 0;
@@ -155,6 +156,19 @@ void taskCore0UiWeb(void *pvParameters) {
         if (now - lastMenuRender >= 50 && menuMgr) {
             lastMenuRender = now;
             menuMgr->render(engineState, wheelCfg, camCfg);
+        }
+
+        // 6. Live Input Diagnostic Serial Output (Every 800ms)
+        if (now - lastDbg >= 800) {
+            lastDbg = now;
+            int vrx = analogRead(PinConfig::JOY_VRX);
+            int vry = analogRead(PinConfig::JOY_VRY);
+            int jsw = digitalRead(PinConfig::JOY_SW);
+            int clk = digitalRead(PinConfig::ENC_CLK);
+            int dt  = digitalRead(PinConfig::ENC_DT);
+            int esw = digitalRead(PinConfig::ENC_SW);
+            Serial.printf("[INPUT] Enc(CLK:%d, DT:%d, SW:%d) | Joy(VRX:%d, VRY:%d, SW:%d) | JoyAct:%d\n",
+                          clk, dt, esw, vrx, vry, jsw, static_cast<int>(joyAct));
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
