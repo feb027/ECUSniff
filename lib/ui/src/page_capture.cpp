@@ -74,8 +74,13 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
         // 4. Helper footer
         _gfx->fillRect(16, 282, 448, 24, 0x0841);
         _gfx->drawRoundRect(16, 282, 448, 24, 4, 0x31A6);
+        _gfx->setTextSize(1);
         _gfx->setTextColor(0x07FF, 0x0841);
-        _gfx->drawString("KLIK: REKAM SINYAL  |  DOUBLE-CLICK: MUAT KE GENERATOR", 40, 289);
+        _gfx->drawString("KLIK: Rekam / Stop", 36, 289);
+        _gfx->setTextColor(0x52AA, 0x0841);
+        _gfx->drawString("|", 175, 289);
+        _gfx->setTextColor(0x07E0, 0x0841);
+        _gfx->drawString("DBL-KLIK: Muat & Simpan Flash", 195, 289);
         _lastDrawnState = 0xFF;
     }
 
@@ -120,7 +125,6 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
     // Card 1: CKP
     _gfx->setTextColor(0xCE79, 0x0841);
     _gfx->drawString("CKP SENSOR (PIN 34):", 24, 180);
-    _gfx->setTextSize(1);
     if (metrics.ckpActive) {
         _gfx->setTextColor(0x07E0, 0x0841);
         snprintf(buf, sizeof(buf), "OK (%04u RPM / %u gigi)", (unsigned)health.liveRpm, (unsigned)health.liveTeeth);
@@ -268,10 +272,10 @@ void PageCapture::onEncoderDoubleClick(EcuEngine::ParametricWheel& wheel, EcuEng
     if (_lastResult.success) {
         wheel = _lastResult.wheel;
         cam = _lastResult.cam;
-        _gfx->fillRect(18, 280, 444, 24, 0x07E0);
+        _gfx->fillRect(16, 282, 448, 24, 0x07E0);
         _gfx->setTextColor(TFT_BLACK, 0x07E0);
         _gfx->setTextSize(1);
-        _gfx->drawString(">>> POLA CAPTURE BERHASIL DIMUAT KE GENERATOR! <<<", 60, 287);
+        _gfx->drawCenterString("POLA BERHASIL DIMUAT KE GENERATOR & FLASH NVS!", 240, 289);
     }
 }
 
