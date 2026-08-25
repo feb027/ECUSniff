@@ -116,11 +116,18 @@ Pastikan seluruh konfigurasi HAL mengacu pada pin berikut:
 - Dekoder sinyal wajib mengintegrasikan modul Auto-Match Database OEM (Toyota, Honda, Bosch, Yamaha, Mazda, Suzuki) beserta persentase kecocokan (*confidence %*).
 - Modul web wajib menyediakan endpoint ekspor log rekaman mikrodetik (`/api/export_csv`) untuk analisis spreadsheet dan logic analyzer (Saleae / Sigrok PulseView).
 
-## 18. Continuous Git Milestone Commit & Push Standard
+## 18. Local Single-Branch Git Milestone Standard
 - Setiap kali sebuah milestone, fitur baru, refaktorisasi arsitektur, atau perbaikan bug selesai dikerjakan dan diverifikasi:
-  1. Pastikan audit kepatuhan baris (`check_lines.py`) lulus 100%.
-  2. Lakukan git staging dan commit dengan format pesan konvensional (`feat:`, `fix:`, `refactor:`, `docs:`).
-  3. Lakukan push langsung ke remote repositori GitHub (`git push origin main`).
-- Dilarang membiarkan perubahan besar menumpuk tanpa commit/push untuk mencegah kehilangan riwayat progres kerja.
+  1. Lakukan git staging dan commit dengan format pesan konvensional (`feat:`, `fix:`, `refactor:`, `docs:`) di branch lokal yang aktif (`dev`).
+  2. **DILARANG melakukan `git push`** ke remote origin/GitHub tanpa instruksi eksplisit dari user.
+
+## 19. Physical Hardware Auto-Upload & Unplugged Notification Standard
+- Setiap selesai melakukan perubahan kode C++ (firmware) atau web assets (`data/`):
+  1. Jalankan upload langsung ke MCU fisik menggunakan PlatformIO:
+     - Firmware: `pio run -t upload`
+     - Web Assets: `pio run -t uploadfs`
+  2. Jika proses upload gagal (serial COM port tidak terdeteksi, timeout, atau perangkat belum tercolok):
+     - Segera beri tahu user secara eksplisit bahwa **perangkat ESP32 belum tercolok / port USB belum terhubung**.
+
 
 
