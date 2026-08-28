@@ -271,9 +271,9 @@ void setup() {
         } else if (cmd == "eps_toggle") {
             epsController.toggleRunning();
         } else if (cmd == "eps_set") {
-            if (doc.containsKey("speed")) epsController.setSpeed(doc["speed"].as<float>());
-            if (doc.containsKey("rpm")) epsController.setRpm(doc["rpm"].as<uint32_t>());
-            if (doc.containsKey("steer")) epsController.setSteerTorque(doc["steer"].as<float>());
+            if (doc["speed"].is<float>()) epsController.setSpeed(doc["speed"].as<float>());
+            if (doc["rpm"].is<uint32_t>()) epsController.setRpm(doc["rpm"].as<uint32_t>());
+            if (doc["steer"].is<float>()) epsController.setSteerTorque(doc["steer"].as<float>());
         } else if (cmd == "eps_preset") {
             epsController.setPreset(static_cast<EcuEngine::EpsOemPreset>(val));
         } else if (cmd == "eps_sweep") {
