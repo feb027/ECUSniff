@@ -11,6 +11,8 @@
 #include "rmt_generator.h"
 #include "capture_driver.h"
 #include "signal_sniffer.h"
+#include "eps_controller.h"
+#include "eps_driver.h"
 #include "web_server_manager.h"
 #include "menu_manager.h"
 
@@ -20,6 +22,8 @@ static EcuHal::JoystickDriver       joystick;
 static EcuHal::RmtGenerator         signalGen;
 static EcuHal::CaptureDriver        captureDriver;
 static EcuEngine::SignalSniffer     sniffer;
+static EcuEngine::EpsController     epsController;
+static EcuHal::EpsDriver            epsDriver;
 static EcuWebApi::WebServerManager  webManager;
 static EcuEngine::RpmController     rpmController;
 static EcuUi::MenuManager*          menuMgr = nullptr;
@@ -109,7 +113,7 @@ static void loadSettings() {
 }
 
 void taskCore0UiWeb(void *pvParameters) {
-    uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, btnTime = 0, relTime = 0;
+    uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, lastEps = 0, btnTime = 0, relTime = 0;
     uint8_t clickCount = 0; bool btnDown = false, longHandled = false;
 
     for (;;) {
@@ -170,6 +174,12 @@ void taskCore0UiWeb(void *pvParameters) {
                 signalGen.setRpm(rpmController.update(engineState, dt));
                 signalGen.prepareNextCycle(); signalGen.swapBuffer();
             }
+        }
+
+        if (now - lastEps >= 20) {
+            float dtSec = (now - lastEps) / 1000.0f; lastEps = now;
+            epsController.update(dtSec);
+            epsDriver.updateOutputs(epsController.getState());
         }
 
         if (now - lastWeb >= 100) {
@@ -258,16 +268,27 @@ void setup() {
             if (menuMgr) menuMgr->setGenTab(val);
         } else if (cmd == "arm_capture") {
             captureDriver.arm(512);
+        } else if (cmd == "eps_toggle") {
+            epsController.toggleRunning();
+        } else if (cmd == "eps_set") {
+            if (doc.containsKey("speed")) epsController.setSpeed(doc["speed"].as<float>());
+            if (doc.containsKey("rpm")) epsController.setRpm(doc["rpm"].as<uint32_t>());
+            if (doc.containsKey("steer")) epsController.setSteerTorque(doc["steer"].as<float>());
+        } else if (cmd == "eps_preset") {
+            epsController.setPreset(static_cast<EcuEngine::EpsOemPreset>(val));
+        } else if (cmd == "eps_sweep") {
+            epsController.setAutoSweep(val != 0);
         }
     });
     webManager.setCaptureDriver(&captureDriver);
+    webManager.setEpsController(&epsController);
     webManager.init();
 
-    encoder.init(); joystick.init(); captureDriver.init(); signalGen.init();
+    encoder.init(); joystick.init(); captureDriver.init(); signalGen.init(); epsDriver.init();
     signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm); signalGen.stop();
     display.init();
     menuMgr = new EcuUi::MenuManager(&display.getGfx());
-    menuMgr->init(&captureDriver, &sniffer);
+    menuMgr->init(&captureDriver, &sniffer, &epsController);
 
     xTaskCreatePinnedToCore(taskCore0UiWeb, "UiWebTask", 12288, NULL, 1, NULL, 0);
 }

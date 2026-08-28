@@ -43,6 +43,12 @@ constexpr int8_t CAP_CKP  = 7;   ///< Crankshaft Capture IN (Interrupt Pin 7)
 constexpr int8_t CAP_CMP  = 8;   ///< Camshaft Capture 1 IN (Interrupt Pin 8)
 constexpr int8_t CAP_CMP2 = 21;  ///< Camshaft Capture 2 IN (Interrupt Pin 21)
 
+// 6. Dedicated EPS / VSS Tester Outputs
+constexpr int8_t EPS_VSS  = 38;  ///< Vehicle Speed Sensor (VSS) Pulse OUT
+constexpr int8_t EPS_RPM  = 39;  ///< Engine Speed Tachometer Pulse OUT
+constexpr int8_t EPS_TRQ1 = 40;  ///< Steering Torque Sensor 1 / PWM OUT
+constexpr int8_t EPS_TRQ2 = 41;  ///< Steering Torque Sensor 2 / PWM OUT
+
 #else
 
 // ============================================================================
@@ -77,6 +83,12 @@ constexpr int8_t SIG_CMP2 = 18;  ///< Camshaft Position Signal 2
 constexpr int8_t CAP_CKP  = 34;  ///< Crankshaft Capture Input
 constexpr int8_t CAP_CMP  = 35;  ///< Camshaft Capture Input 1
 constexpr int8_t CAP_CMP2 = 21;  ///< Camshaft Capture Input 2
+
+// 6. Dedicated EPS / VSS Tester Outputs
+constexpr int8_t EPS_VSS  = 4;   ///< Vehicle Speed Sensor (VSS) Pulse OUT
+constexpr int8_t EPS_RPM  = 2;   ///< Engine Speed Tachometer Pulse OUT
+constexpr int8_t EPS_TRQ1 = 15;  ///< Steering Torque Sensor 1 / PWM OUT
+constexpr int8_t EPS_TRQ2 = 5;   ///< Steering Torque Sensor 2 / PWM OUT
 
 #endif
 

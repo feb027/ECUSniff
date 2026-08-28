@@ -35,27 +35,39 @@ function selectDrawerModule(mod) {
 
 function switchMainModule(mod, userTriggered = true) {
     if (userTriggered) userActionLockUntil = Date.now() + 2000;
-    const isGen = (mod === 'generator');
-    const genEl = document.getElementById('moduleGenerator'), capEl = document.getElementById('moduleCapture'), navEl = document.getElementById('generatorBottomNav');
+    const isGen = (mod === 'generator'), isCap = (mod === 'capture'), isEps = (mod === 'eps');
+    const genEl = document.getElementById('moduleGenerator');
+    const capEl = document.getElementById('moduleCapture');
+    const epsEl = document.getElementById('moduleEps');
+    const navEl = document.getElementById('generatorBottomNav');
     if (genEl) genEl.style.display = isGen ? 'block' : 'none';
-    if (capEl) capEl.style.display = isGen ? 'none' : 'block';
+    if (capEl) capEl.style.display = isCap ? 'block' : 'none';
+    if (epsEl) epsEl.style.display = isEps ? 'block' : 'none';
     if (navEl) navEl.style.display = isGen ? 'flex' : 'none';
 
-    const itemGen = document.getElementById('drawerItemGen'), itemCap = document.getElementById('drawerItemCap');
+    const itemGen = document.getElementById('drawerItemGen');
+    const itemCap = document.getElementById('drawerItemCap');
+    const itemEps = document.getElementById('drawerItemEps');
     if (itemGen) itemGen.classList.toggle('active', isGen);
-    if (itemCap) itemCap.classList.toggle('active', !isGen);
+    if (itemCap) itemCap.classList.toggle('active', isCap);
+    if (itemEps) itemEps.classList.toggle('active', isEps);
 
     const titleEl = document.getElementById('headerActiveTitle');
-    if (titleEl) titleEl.innerText = isGen ? 'GENERATOR SINYAL' : 'SIGNAL CAPTURE / SNIFFER';
+    if (titleEl) {
+        if (isGen) titleEl.innerText = 'GENERATOR SINYAL';
+        else if (isCap) titleEl.innerText = 'SIGNAL CAPTURE / SNIFFER';
+        else if (isEps) titleEl.innerText = 'EPS & VSS BENCH TESTER';
+    }
 
     if (userTriggered) {
-        lastSyncedLevel = isGen ? 1 : 2;
-        sendCommand('set_ui_level', isGen ? 1 : 2);
+        const lvl = isGen ? 1 : (isCap ? 2 : 3);
+        lastSyncedLevel = lvl;
+        sendCommand('set_ui_level', lvl);
     }
 
     setTimeout(() => {
         if (isGen && scope) scope.render(currentPattern);
-        else if (!isGen && typeof renderCapturePreview === 'function') renderCapturePreview();
+        else if (isCap && typeof renderCapturePreview === 'function') renderCapturePreview();
     }, 60);
 }
 
@@ -128,6 +140,7 @@ function connectWebSocket() {
                     setServerCustomSlots(msg.customSlots);
                 }
                 if (typeof updateCaptureTelemetry === 'function') updateCaptureTelemetry(msg);
+                if (msg.eps && typeof updateEpsUi === 'function') updateEpsUi(msg.eps);
                 if (typeof msg.uiLevel !== 'undefined') handlePhysicalSync(msg);
             }
         } catch (err) {}
@@ -138,6 +151,7 @@ function handlePhysicalSync(msg) {
     if (Date.now() < userActionLockUntil) return;
     if (msg.uiLevel === 1 && lastSyncedLevel !== 1) { lastSyncedLevel = 1; switchMainModule('generator', false); }
     else if (msg.uiLevel === 2 && lastSyncedLevel !== 2) { lastSyncedLevel = 2; switchMainModule('capture', false); }
+    else if (msg.uiLevel === 3 && lastSyncedLevel !== 3) { lastSyncedLevel = 3; switchMainModule('eps', false); }
     else if (msg.uiLevel === 0) { lastSyncedLevel = 0; }
 
     if (msg.uiLevel === 1 && msg.tab && msg.tab !== lastSyncedTab) {

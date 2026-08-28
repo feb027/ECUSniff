@@ -3,11 +3,13 @@
 namespace EcuUi {
 
 MenuManager::MenuManager(LovyanGFX* gfx)
-    : _gfx(gfx), _pageHub(gfx), _pageDash(gfx), _pageCkp(gfx), _pageCmp(gfx), _pageCapture(gfx) {}
+    : _gfx(gfx), _pageHub(gfx), _pageDash(gfx), _pageCkp(gfx), _pageCmp(gfx), _pageCapture(gfx), _pageEps(gfx) {}
 
-void MenuManager::init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffer* sniffer) {
+void MenuManager::init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffer* sniffer, EcuEngine::EpsController* eps) {
+    _epsController = eps;
     _pageDash.init();
     _pageCapture.init(capDriver, sniffer);
+    _pageEps.init();
     _uiLevel = UiLevel::MainHub;
     _hubIndex = 0;
     _genTab = 1;
@@ -19,12 +21,15 @@ void MenuManager::returnToMainHub() {
     _needsFullRedraw = true;
     _lastTab = 0xFF;
     _lastDrawnTab = 0xFF;
+    _isEditMode = false;
 }
 
 void MenuManager::setUiLevel(UiLevel level) {
     if (_uiLevel != level) {
         _uiLevel = level;
         _genTab = 1;
+        _editRow = 0;
+        _isEditMode = false;
         _needsFullRedraw = true;
     }
 }
@@ -77,6 +82,14 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
         return;
     }
 
+    if (_uiLevel == UiLevel::EpsTester) {
+        if (_epsController) {
+            _pageEps.render(_needsFullRedraw, _isEditMode, _editRow, *_epsController);
+        }
+        _needsFullRedraw = false;
+        return;
+    }
+
     bool isRedraw = _needsFullRedraw || (_genTab != _lastTab);
     _drawGeneratorTabBar(isRedraw);
 
@@ -101,6 +114,19 @@ void MenuManager::onEncoderTurn(int32_t delta,
                                EcuEngine::CamEventTable& cam) {
     if (_uiLevel == UiLevel::MainHub) {
         _pageHub.onEncoderTurn(delta, _hubIndex);
+        return;
+    }
+
+    if (_uiLevel == UiLevel::EpsTester) {
+        if (!_epsController) return;
+        if (_isEditMode) {
+            _pageEps.onEncoderTurn(delta, _editRow, *_epsController);
+        } else {
+            int32_t r = static_cast<int32_t>(_editRow) + (delta > 0 ? 1 : -1);
+            if (r < 0) r = 4;
+            if (r > 4) r = 0;
+            _editRow = static_cast<uint8_t>(r);
+        }
         return;
     }
 
@@ -147,6 +173,23 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
                                   EcuEngine::CamEventTable& cam) {
     if (action == EcuHal::JoyAction::None) return;
 
+    if (_uiLevel == UiLevel::EpsTester) {
+        if (action == EcuHal::JoyAction::Up) {
+            _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
+        } else if (action == EcuHal::JoyAction::Down) {
+            _editRow = (_editRow + 1) % 5;
+        } else if (action == EcuHal::JoyAction::Left || action == EcuHal::JoyAction::Right) {
+            if (_epsController) _pageEps.onJoystickAction(action, *_epsController);
+        } else if (action == EcuHal::JoyAction::Click) {
+            if (_editRow == 4 && _epsController) {
+                _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
+            } else {
+                _isEditMode = !_isEditMode;
+            }
+        }
+        return;
+    }
+
     if (action == EcuHal::JoyAction::Left) {
         if (_uiLevel == UiLevel::MainHub) {
             _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 2;
@@ -183,6 +226,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
         if (_uiLevel == UiLevel::MainHub) {
             if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
             else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
+            else if (_hubIndex == 2) { _uiLevel = UiLevel::EpsTester; _editRow = 0; _isEditMode = false; }
             _needsFullRedraw = true;
         } else if (_genTab == 0) {
             returnToMainHub();
@@ -198,7 +242,17 @@ void MenuManager::onEncoderClick() {
     if (_uiLevel == UiLevel::MainHub) {
         if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
         else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
+        else if (_hubIndex == 2) { _uiLevel = UiLevel::EpsTester; _editRow = 0; _isEditMode = false; }
         _needsFullRedraw = true;
+        return;
+    }
+
+    if (_uiLevel == UiLevel::EpsTester) {
+        if (_editRow == 4 && _epsController) {
+            _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
+        } else {
+            _isEditMode = !_isEditMode;
+        }
         return;
     }
 
@@ -220,6 +274,10 @@ void MenuManager::onEncoderClick() {
 void MenuManager::onEncoderDoubleClick(EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam) {
     if (_uiLevel == UiLevel::Capture) {
         _pageCapture.onEncoderDoubleClick(wheel, cam);
+        return;
+    }
+    if (_uiLevel == UiLevel::EpsTester) {
+        if (_epsController) _epsController->toggleRunning();
         return;
     }
     returnToMainHub();

@@ -5,13 +5,13 @@ namespace EcuUi {
 static const char* CARD_TITLES[] = {
     "1. ENGINE SIGNAL GENERATOR",
     "2. SIGNAL CAPTURE / SNIFFER",
-    "3. SENSOR SIMULATOR (EXPANSION)"
+    "3. EPS & VSS BENCH TESTER"
 };
 
 static const char* CARD_DESCS[] = {
     "Pembangkit Sinyal Mobil: CKP & CMP (FIX/CRANK/SWEEP)",
     "Perekam & Penganalisis Sinyal ECU Mobil 720-deg",
-    "Modul Ekspansi: VSS, Analog TPS/MAP & Resistif Temp"
+    "Simulasi EPS: VSS Speed, RPM Tach, Steer TRQ & Sweep"
 };
 
 void PageMainHub::render(bool fullRedraw, uint8_t selectedIndex) {

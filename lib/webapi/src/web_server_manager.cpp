@@ -152,6 +152,25 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
         sObj["duty"] = p->dutyCycle;
     }
 
+    if (_epsController) {
+        JsonObject eps = doc["eps"].to<JsonObject>();
+        const auto& epsCfg = _epsController->getConfig();
+        const auto& epsSt = _epsController->getState();
+        eps["running"] = epsSt.isRunning;
+        eps["preset"] = static_cast<uint8_t>(epsCfg.preset);
+        eps["presetName"] = _epsController->getPresetName(epsCfg.preset);
+        eps["speed"] = epsSt.currentSpeedKmh;
+        eps["targetSpeed"] = epsCfg.speedKmh;
+        eps["rpm"] = epsSt.currentRpm;
+        eps["targetRpm"] = epsCfg.targetRpm;
+        eps["vssFreq"] = epsSt.vssFreqHz;
+        eps["rpmFreq"] = epsSt.rpmFreqHz;
+        eps["steer"] = epsCfg.steerTorque;
+        eps["trq1"] = epsSt.trq1Voltage;
+        eps["trq2"] = epsSt.trq2Voltage;
+        eps["sweep"] = epsCfg.autoSweep;
+    }
+
     String out;
     serializeJson(doc, out);
     _ws.textAll(out);

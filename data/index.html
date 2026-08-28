@@ -41,12 +41,12 @@
                 </div>
                 <span class="drawer-badge badge-active">AKTIF</span>
             </div>
-            <div class="drawer-item disabled">
+            <div class="drawer-item" id="drawerItemEps" onclick="selectDrawerModule('eps')">
                 <div>
-                    <div class="drawer-item-title">3. Sensor Simulator</div>
-                    <div class="drawer-item-sub">VSS, Analog TPS/MAP, Temp</div>
+                    <div class="drawer-item-title">3. EPS & VSS Tester</div>
+                    <div class="drawer-item-sub">Speed, RPM, Torque & Sweep Assist</div>
                 </div>
-                <span class="drawer-badge badge-future">TAHAP 6</span>
+                <span class="drawer-badge badge-active">AKTIF</span>
             </div>
             <div class="drawer-item disabled">
                 <div>
@@ -241,6 +241,75 @@
                 </div>
             </div>
         </div>
+
+        <!-- MODULE 3: EPS & VSS BENCH TESTER -->
+        <div id="moduleEps" style="display: none;">
+            <div class="cockpit-card">
+                <div class="rpm-main-row">
+                    <div class="rpm-group">
+                        <span id="epsSpeedDisplay" class="rpm-value">30</span>
+                        <span class="rpm-unit">KM/H</span>
+                    </div>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <div id="epsStatusBadge" class="mode-badge state-standby">STOPPED</div>
+                        <div id="epsSweepBadge" class="mode-badge state-standby">SWEEP: OFF</div>
+                    </div>
+                </div>
+
+                <div class="metric-grid-4" style="margin-top: 10px;">
+                    <div class="metric-box"><div id="epsVssFreq" class="metric-val">21.2 Hz</div><div class="metric-lbl">VSS Freq</div></div>
+                    <div class="metric-box"><div id="epsRpmDisplay" class="metric-val">1000</div><div class="metric-lbl">Engine RPM</div></div>
+                    <div class="metric-box"><div id="epsRpmFreq" class="metric-val">33.3 Hz</div><div class="metric-lbl">Tach Freq</div></div>
+                    <div class="metric-box"><div id="epsSteerText" class="metric-val">Lurus</div><div class="metric-lbl">Kemudi / TRQ</div></div>
+                </div>
+            </div>
+
+            <div class="cockpit-card">
+                <h3 class="card-heading">PARAMETER EPS</h3>
+                <div class="tuner-row" style="margin-bottom: 10px;">
+                    <label>Preset Mobil OEM</label>
+                    <select id="epsPresetSelect" class="input-dark" style="width: 100%; height: 36px; font-weight: 700; color: #F59E0B;" onchange="setEpsPreset(this.value)">
+                        <option value="0">Toyota / Daihatsu (Avanza, Xenia, Rush, Vios)</option>
+                        <option value="1">Suzuki Karimun (Wagon R, Estilo, Kotak)</option>
+                        <option value="2">Suzuki Ertiga (Ertiga, Swift, Splash)</option>
+                        <option value="3">Honda Jazz (Jazz GD3/GE8, Brio, Mobilio)</option>
+                        <option value="4">Custom Parametric (Manual Tuning)</option>
+                    </select>
+                </div>
+
+                <div class="tuner-row">
+                    <label>Kecepatan (VSS km/h)</label>
+                    <input type="range" id="epsSpeedSlider" min="0" max="200" step="1" value="30" class="slider-full" oninput="onEpsSpeedChange(this.value)">
+                </div>
+                <div class="step-buttons-grid" style="margin-bottom: 10px;">
+                    <button class="btn-step" onclick="setQuickSpeed(0)">0</button>
+                    <button class="btn-step" onclick="setQuickSpeed(30)">30</button>
+                    <button class="btn-step" onclick="setQuickSpeed(60)">60</button>
+                    <button class="btn-step" onclick="setQuickSpeed(100)">100</button>
+                </div>
+
+                <div class="tuner-row">
+                    <label>Engine RPM</label>
+                    <input type="range" id="epsRpmSlider" min="500" max="6000" step="50" value="1000" class="slider-full" oninput="onEpsRpmChange(this.value)">
+                </div>
+
+                <div class="tuner-row" style="margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label>Steer Assist / Torque</label>
+                        <button class="btn-tool" style="padding: 2px 8px; font-size: 0.75rem;" onclick="centerSteer()">Center 0%</button>
+                    </div>
+                    <input type="range" id="epsSteerSlider" min="-100" max="100" step="5" value="0" class="slider-full" oninput="onEpsSteerChange(this.value)">
+                </div>
+
+                <div class="metric-grid-4" style="margin-top: 8px; margin-bottom: 10px;">
+                    <div class="metric-box"><div id="epsTrq1Volt" class="metric-val" style="color: #38BDF8;">2.50 V</div><div class="metric-lbl">TRQ1 Volt</div></div>
+                    <div class="metric-box"><div id="epsTrq2Volt" class="metric-val" style="color: #38BDF8;">2.50 V</div><div class="metric-lbl">TRQ2 Volt</div></div>
+                    <div class="metric-box" style="grid-column: span 2;"><button class="btn-tool" style="width: 100%; height: 36px;" onclick="toggleEpsSweep()">Toggle Auto-Sweep</button></div>
+                </div>
+
+                <button id="btnEpsPower" class="btn-power-full btn-start" style="min-height: 44px;" onclick="toggleEpsPower()">JALANKAN EPS</button>
+            </div>
+        </div>
     </main>
 
     <!-- Bottom Navigation Bar for Generator -->
@@ -255,6 +324,7 @@
     <script src="/js/ui_database.js"></script>
     <script src="/js/ui_tuner.js"></script>
     <script src="/js/ui_capture.js"></script>
+    <script src="/js/ui_eps.js"></script>
     <script src="/js/scope.js"></script>
     <script src="/js/app.js"></script>
 </body>
