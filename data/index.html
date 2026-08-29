@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <!-- Top Minimalist App Header -->
     <header class="app-header">
         <div class="header-top">
             <button class="btn-drawer-toggle" onclick="toggleDrawer(true)" aria-label="Menu">☰</button>
@@ -19,7 +18,6 @@
         </div>
     </header>
 
-    <!-- Slide-Over Drawer Navigation -->
     <div id="drawerBackdrop" class="drawer-backdrop" onclick="toggleDrawer(false)"></div>
     <aside id="navDrawer" class="nav-drawer">
         <div class="drawer-header">
@@ -55,21 +53,12 @@
                 </div>
                 <span class="drawer-badge badge-active">AKTIF</span>
             </div>
-            <div class="drawer-item disabled">
-                <div>
-                    <div class="drawer-item-title">5. Bus Communication</div>
-                    <div class="drawer-item-sub">CAN-Bus, LIN, K-Line Protocol</div>
-                </div>
-                <span class="drawer-badge badge-future">TAHAP 7</span>
-            </div>
         </div>
     </aside>
 
-    <!-- Main View Area -->
     <main class="main-content">
         <!-- MODULE 1: GENERATOR -->
         <div id="moduleGenerator">
-            <!-- TAB 1: MONITOR & PRECISION SCOPE -->
             <section id="viewMonitor" class="tab-view active">
                 <div class="scope-card">
                     <div class="scope-header-row">
@@ -81,7 +70,6 @@
                             <button class="btn-tool btn-gap" onclick="jumpToGap()">Lompat ke Gap</button>
                         </div>
                     </div>
-
                     <div class="minimap-box"><canvas id="scopeMinimap"></canvas></div>
                     <div class="main-scope-box"><canvas id="scopeMain"></canvas></div>
                     <div id="probeReadout" class="probe-bar">Geser layar (swipe) dengan jari untuk menelusuri 0° - 720°</div>
@@ -98,29 +86,24 @@
                             <div class="mode-badge" id="activeModeBadge">MODE: FIX</div>
                         </div>
                     </div>
-
                     <div class="slider-wrap">
                         <input type="range" id="rpmSlider" min="100" max="9000" step="50" value="850" oninput="onRpmSlider(this.value)">
                     </div>
-
                     <div class="quick-rpm-grid">
                         <button class="btn-step" onclick="setRpm(200)">200 Crank</button>
                         <button class="btn-step active" onclick="setRpm(850)">850 Idle</button>
                         <button class="btn-step" onclick="setRpm(3000)">3000 Cruise</button>
                         <button class="btn-step" onclick="setRpm(6500)">6500 Redline</button>
                     </div>
-
                     <div class="sim-mode-grid">
                         <label class="mode-item"><input type="radio" name="modeRadio" value="0" checked onchange="onModeSelect(0)"><span>FIX</span></label>
                         <label class="mode-item"><input type="radio" name="modeRadio" value="1" onchange="onModeSelect(1)"><span>CRANK</span></label>
                         <label class="mode-item"><input type="radio" name="modeRadio" value="2" onchange="onModeSelect(2)"><span>SWEEP</span></label>
                     </div>
                 </div>
-
                 <button id="btnPower" class="btn-power-full btn-start" onclick="toggleEngine()">START GENERATOR</button>
             </section>
 
-            <!-- TAB 2: WHEEL DATABASE -->
             <section id="viewDatabase" class="tab-view">
                 <div class="db-search-box">
                     <input type="search" id="wheelSearch" placeholder="Cari pola mobil (Toyota, Honda, 60-2, 4G63)..." class="input-search" oninput="filterWheelDb()">
@@ -129,7 +112,6 @@
                 <div id="wheelGrid" class="wheel-list"></div>
             </section>
 
-            <!-- TAB 3: TUNER -->
             <section id="viewTuner" class="tab-view">
                 <div class="cockpit-card">
                     <h3 class="card-heading">Parameter Roda Crank (CKP)</h3>
@@ -160,7 +142,6 @@
 
         <!-- MODULE 2: CAPTURE / SNIFFER -->
         <div id="moduleCapture" style="display: none;">
-            <!-- 1. Captured Oscilloscope Card -->
             <div class="scope-card">
                 <div class="scope-header-row">
                     <span class="scope-title">OSILOSKOP SINYAL CAPTURE (720°)</span>
@@ -171,13 +152,11 @@
                         <button class="btn-cap-tool btn-gap" onclick="jumpCapToGap()">Lompat ke Gap</button>
                     </div>
                 </div>
-
                 <div class="minimap-box"><canvas id="capScopeMinimap"></canvas></div>
                 <div class="main-scope-box"><canvas id="capScopeMain"></canvas></div>
                 <div id="capProbeReadout" class="probe-bar">Pin: GPIO 34 (CKP IN) & GPIO 35 (CMP IN) — Live Pre-Flight Aktif</div>
             </div>
 
-            <!-- 2. Pre-Flight Real-Time Hardware Diagnostic Cards (4-Box Grid) -->
             <div class="cockpit-card">
                 <h3 class="card-heading" style="color: #38BDF8; font-size: 0.75rem; letter-spacing: 0.05em;">PRE-FLIGHT DIAGNOSTIK HARDWARE (REAL-TIME)</h3>
                 <div class="form-grid" style="gap: 6px; margin-bottom: 4px;">
@@ -200,7 +179,6 @@
                 </div>
             </div>
 
-            <!-- 3. Auto-Match & Technical Metrics Card -->
             <div class="cockpit-card">
                 <div class="rpm-main-row">
                     <div class="rpm-group">
@@ -209,9 +187,7 @@
                     </div>
                     <div id="capStateBadge" class="mode-badge state-standby">STANDBY</div>
                 </div>
-
                 <div class="wheel-name" id="capVehicleName" style="color: #10B981; font-size: 0.95rem; margin-top: 4px;">Menunggu pemicu pulsa sensor mobil...</div>
-
                 <div class="metric-grid-4">
                     <div class="metric-box"><div id="metricTeeth" class="metric-val">--T</div><div class="metric-lbl">Total Gigi</div></div>
                     <div class="metric-box"><div id="metricMissing" class="metric-val">-- Gap</div><div class="metric-lbl">Missing</div></div>
@@ -220,15 +196,11 @@
                 </div>
             </div>
 
-            <!-- 4. Camshaft Pulse Timeline Card -->
             <div class="cockpit-card">
                 <h3 class="card-heading">TIMELINE SUDUT NOKEN AS CMP (0° - 720°)</h3>
-                <div id="capCamTimeline" class="cam-timeline-strip">
-                    <span class="timeline-empty">Belum ada pulsa cam yang direkam</span>
-                </div>
+                <div id="capCamTimeline" class="cam-timeline-strip"><span class="timeline-empty">Belum ada pulsa cam yang direkam</span></div>
             </div>
 
-            <!-- 5. Action & Trigger Deck -->
             <div class="cockpit-card">
                 <button id="btnArmCapture" class="btn-power-full btn-start" style="min-height: 44px; margin-bottom: 8px;" onclick="triggerCaptureArm()">Mulai Capture</button>
                 <div class="storage-row" style="margin-bottom: 6px;">
@@ -255,7 +227,6 @@
                         <div id="epsSweepBadge" class="mode-badge state-standby">SWEEP: OFF</div>
                     </div>
                 </div>
-
                 <div class="metric-grid-4" style="margin-top: 10px;">
                     <div class="metric-box"><div id="epsVssFreq" class="metric-val">21.2 Hz</div><div class="metric-lbl">VSS Freq</div></div>
                     <div class="metric-box"><div id="epsRpmDisplay" class="metric-val">1000</div><div class="metric-lbl">Engine RPM</div></div>
@@ -276,7 +247,6 @@
                         <option value="4">Custom Parametric (Manual Tuning)</option>
                     </select>
                 </div>
-
                 <div class="tuner-row">
                     <label>Kecepatan (VSS km/h)</label>
                     <input type="range" id="epsSpeedSlider" min="0" max="200" step="1" value="30" class="slider-full" oninput="onEpsSpeedChange(this.value)">
@@ -287,12 +257,10 @@
                     <button class="btn-step" onclick="setQuickSpeed(60)">60</button>
                     <button class="btn-step" onclick="setQuickSpeed(100)">100</button>
                 </div>
-
                 <div class="tuner-row">
                     <label>Engine RPM</label>
                     <input type="range" id="epsRpmSlider" min="500" max="6000" step="50" value="1000" class="slider-full" oninput="onEpsRpmChange(this.value)">
                 </div>
-
                 <div class="tuner-row" style="margin-top: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <label>Steer Assist / Torque</label>
@@ -300,13 +268,11 @@
                     </div>
                     <input type="range" id="epsSteerSlider" min="-100" max="100" step="5" value="0" class="slider-full" oninput="onEpsSteerChange(this.value)">
                 </div>
-
                 <div class="metric-grid-4" style="margin-top: 8px; margin-bottom: 10px;">
                     <div class="metric-box"><div id="epsTrq1Volt" class="metric-val" style="color: #38BDF8;">2.50 V</div><div class="metric-lbl">TRQ1 Volt</div></div>
                     <div class="metric-box"><div id="epsTrq2Volt" class="metric-val" style="color: #38BDF8;">2.50 V</div><div class="metric-lbl">TRQ2 Volt</div></div>
                     <div class="metric-box" style="grid-column: span 2;"><button class="btn-tool" style="width: 100%; height: 36px;" onclick="toggleEpsSweep()">Toggle Auto-Sweep</button></div>
                 </div>
-
                 <button id="btnEpsPower" class="btn-power-full btn-start" style="min-height: 44px;" onclick="toggleEpsPower()">JALANKAN EPS</button>
             </div>
         </div>
@@ -317,14 +283,12 @@
         </div>
     </main>
 
-    <!-- Bottom Navigation Bar for Generator -->
     <nav id="generatorBottomNav" class="bottom-nav">
         <button class="nav-item active" onclick="switchTab('viewMonitor', this)"><span class="nav-label">MONITOR</span></button>
         <button class="nav-item" onclick="switchTab('viewDatabase', this)"><span class="nav-label">DATABASE RODA</span></button>
         <button class="nav-item" onclick="switchTab('viewTuner', this)"><span class="nav-label">TUNER / EDIT</span></button>
     </nav>
 
-    <!-- Modular Scripts -->
     <script src="/js/wheel_db.js"></script>
     <script src="/js/ui_database.js"></script>
     <script src="/js/ui_tuner.js"></script>

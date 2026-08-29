@@ -127,26 +127,20 @@ void MenuManager::onEncoderTurn(int32_t delta,
 
     if (_uiLevel == UiLevel::EpsTester) {
         if (!_epsController) return;
-        if (_isEditMode) {
-            _pageEps.onEncoderTurn(delta, _editRow, *_epsController);
-        } else {
+        if (_isEditMode) _pageEps.onEncoderTurn(delta, _editRow, *_epsController);
+        else {
             int32_t r = static_cast<int32_t>(_editRow) + (delta > 0 ? 1 : -1);
-            if (r < 0) r = 4;
-            if (r > 4) r = 0;
-            _editRow = static_cast<uint8_t>(r);
+            _editRow = static_cast<uint8_t>(r < 0 ? 4 : (r > 4 ? 0 : r));
         }
         return;
     }
 
     if (_uiLevel == UiLevel::SpeedoTester) {
         if (!_speedoController) return;
-        if (_isEditMode) {
-            _pageSpeedo.onEncoderTurn(delta, _editRow, *_speedoController);
-        } else {
+        if (_isEditMode) _pageSpeedo.onEncoderTurn(delta, _editRow, *_speedoController);
+        else {
             int32_t r = static_cast<int32_t>(_editRow) + (delta > 0 ? 1 : -1);
-            if (r < 0) r = 4;
-            if (r > 4) r = 0;
-            _editRow = static_cast<uint8_t>(r);
+            _editRow = static_cast<uint8_t>(r < 0 ? 4 : (r > 4 ? 0 : r));
         }
         return;
     }
@@ -155,21 +149,11 @@ void MenuManager::onEncoderTurn(int32_t delta,
         if (_genTab == 1) {
             _pageDash.onEncoderTurn(delta, _editRow, state, wheel, cam);
         } else if (_genTab == 2) {
-            if (_editRow == 0) {
-                int32_t t = (int32_t)wheel.totalTeeth + delta;
-                wheel.totalTeeth = constrain(t, 4, 120);
-            } else if (_editRow == 1) {
-                int32_t m = (int32_t)wheel.missingTeeth + delta;
-                wheel.missingTeeth = constrain(m, 0, 4);
-            } else if (_editRow == 2) {
-                int32_t p = (int32_t)wheel.missingPosition + delta;
-                wheel.missingPosition = constrain(p, 0, (int)wheel.totalTeeth);
-            } else if (_editRow == 3) {
-                float d = wheel.dutyCycle + (delta * 0.05f);
-                wheel.dutyCycle = constrain(d, 0.10f, 0.90f);
-            } else if (_editRow == 4) {
-                if (delta != 0) wheel.inverted = !wheel.inverted;
-            }
+            if (_editRow == 0) wheel.totalTeeth = constrain((int32_t)wheel.totalTeeth + delta, 4, 120);
+            else if (_editRow == 1) wheel.missingTeeth = constrain((int32_t)wheel.missingTeeth + delta, 0, 4);
+            else if (_editRow == 2) wheel.missingPosition = constrain((int32_t)wheel.missingPosition + delta, 0, (int)wheel.totalTeeth);
+            else if (_editRow == 3) wheel.dutyCycle = constrain(wheel.dutyCycle + (delta * 0.05f), 0.10f, 0.90f);
+            else if (_editRow == 4 && delta != 0) wheel.inverted = !wheel.inverted;
         } else if (_genTab == 3) {
             uint8_t count = cam.getEventCount();
             if (_editRow < count && count > 0) {
@@ -177,10 +161,7 @@ void MenuManager::onEncoderTurn(int32_t delta,
                 const auto* evs = cam.getEvents();
                 for (uint8_t i = 0; i < count; ++i) tempEvents[i] = evs[i];
                 float newAngle = tempEvents[_editRow].angleDeg + (delta * 5.0f);
-                if (newAngle < 0.0f) newAngle = 0.0f;
-                if (newAngle > 720.0f) newAngle = 720.0f;
-                tempEvents[_editRow].angleDeg = newAngle;
-
+                tempEvents[_editRow].angleDeg = constrain(newAngle, 0.0f, 720.0f);
                 cam.clear();
                 for (uint8_t i = 0; i < count; ++i) cam.addEvent(tempEvents[i].angleDeg, tempEvents[i].levelHigh);
             }
@@ -194,15 +175,23 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
                                   EcuEngine::CamEventTable& cam) {
     if (action == EcuHal::JoyAction::None) return;
 
+    if (_uiLevel == UiLevel::MainHub) {
+        if (action == EcuHal::JoyAction::Up || action == EcuHal::JoyAction::Left) {
+            _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 3;
+        } else if (action == EcuHal::JoyAction::Down || action == EcuHal::JoyAction::Right) {
+            _hubIndex = (_hubIndex + 1) % 4;
+        } else if (action == EcuHal::JoyAction::Click) {
+            onEncoderClick();
+        }
+        return;
+    }
+
     if (_uiLevel == UiLevel::EpsTester) {
         if (action == EcuHal::JoyAction::Up) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
         else if (action == EcuHal::JoyAction::Down) _editRow = (_editRow + 1) % 5;
         else if (action == EcuHal::JoyAction::Left || action == EcuHal::JoyAction::Right) {
             if (_epsController) _pageEps.onJoystickAction(action, *_epsController);
-        } else if (action == EcuHal::JoyAction::Click) {
-            if (_editRow == 4 && _epsController) _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
-            else _isEditMode = !_isEditMode;
-        }
+        } else if (action == EcuHal::JoyAction::Click) onEncoderClick();
         return;
     }
 
@@ -211,47 +200,24 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
         else if (action == EcuHal::JoyAction::Down) _editRow = (_editRow + 1) % 5;
         else if (action == EcuHal::JoyAction::Left || action == EcuHal::JoyAction::Right) {
             if (_speedoController) _pageSpeedo.onJoystickAction(action, *_speedoController);
-        } else if (action == EcuHal::JoyAction::Click) {
-            if (_editRow == 4 && _speedoController) _speedoController->setAutoSweep(!_speedoController->getConfig().autoSweep);
-            else _isEditMode = !_isEditMode;
-        }
+        } else if (action == EcuHal::JoyAction::Click) onEncoderClick();
         return;
     }
 
     if (action == EcuHal::JoyAction::Left) {
-        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 3;
-        else if (_genTab > 0) { _genTab--; _editRow = 0; _needsFullRedraw = true; }
+        if (_genTab > 0) { _genTab--; _editRow = 0; _needsFullRedraw = true; }
     } else if (action == EcuHal::JoyAction::Right) {
-        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex + 1) % 4;
-        else if (_genTab < 3) { _genTab++; _editRow = 0; _needsFullRedraw = true; }
+        if (_genTab < 3) { _genTab++; _editRow = 0; _needsFullRedraw = true; }
     } else if (action == EcuHal::JoyAction::Up) {
-        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 3;
-        else if (_uiLevel == UiLevel::Generator) {
-            if (_genTab == 1) _editRow = (_editRow > 0) ? (_editRow - 1) : 2;
-            else if (_genTab == 2) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
-            else if (_genTab == 3) _editRow = (_editRow > 0) ? (_editRow - 1) : 3;
-        }
+        if (_genTab == 1) _editRow = (_editRow > 0) ? (_editRow - 1) : 2;
+        else if (_genTab == 2) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
+        else if (_genTab == 3) _editRow = (_editRow > 0) ? (_editRow - 1) : 3;
     } else if (action == EcuHal::JoyAction::Down) {
-        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex + 1) % 4;
-        else if (_uiLevel == UiLevel::Generator) {
-            if (_genTab == 1) _editRow = (_editRow + 1) % 3;
-            else if (_genTab == 2) _editRow = (_editRow + 1) % 5;
-            else if (_genTab == 3) _editRow = (_editRow + 1) % 4;
-        }
+        if (_genTab == 1) _editRow = (_editRow + 1) % 3;
+        else if (_genTab == 2) _editRow = (_editRow + 1) % 5;
+        else if (_genTab == 3) _editRow = (_editRow + 1) % 4;
     } else if (action == EcuHal::JoyAction::Click) {
-        if (_uiLevel == UiLevel::MainHub) {
-            if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
-            else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
-            else if (_hubIndex == 2) { _uiLevel = UiLevel::EpsTester; _editRow = 0; _isEditMode = false; }
-            else if (_hubIndex == 3) { _uiLevel = UiLevel::SpeedoTester; _editRow = 0; _isEditMode = false; }
-            _needsFullRedraw = true;
-        } else if (_genTab == 0) {
-            returnToMainHub();
-        } else if (_uiLevel == UiLevel::Capture) {
-            _pageCapture.onEncoderClick(_genTab);
-        } else if (_uiLevel == UiLevel::Generator && _genTab == 1) {
-            _isEditMode = !_isEditMode;
-        }
+        onEncoderClick();
     }
 }
 

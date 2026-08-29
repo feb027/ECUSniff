@@ -1,6 +1,6 @@
 #include <Arduino.h>
-#include <Preferences.h>
 #include "pin_config.h"
+#include "app_settings.h"
 #include "engine_types.h"
 #include "timing_math.h"
 #include "parametric_pattern.h"
@@ -35,86 +35,6 @@ static EcuUi::MenuManager*          menuMgr = nullptr;
 static EcuEngine::EngineRuntimeState engineState;
 static EcuEngine::ParametricWheel    wheelCfg;
 static EcuEngine::CamEventTable      camCfg;
-static Preferences                   pref;
-
-static void saveSettings() {
-    pref.begin("ecu_conf", false);
-    pref.putUInt("rpm", engineState.targetRpm);
-    pref.putString("wname", engineState.activeWheelName);
-    pref.putUShort("teeth", wheelCfg.totalTeeth);
-    pref.putUChar("mteeth", wheelCfg.missingTeeth);
-    pref.putUChar("mpos", wheelCfg.missingPosition);
-    pref.putFloat("duty", wheelCfg.dutyCycle);
-    pref.putBool("inv", wheelCfg.inverted);
-    uint8_t c = camCfg.getEventCount();
-    pref.putUChar("ccnt", c);
-    const auto* evs = camCfg.getEvents();
-    for (uint8_t i = 0; i < c && i < 8; ++i) {
-        char k1[8], k2[8]; snprintf(k1, sizeof(k1), "ca%u", i); snprintf(k2, sizeof(k2), "ch%u", i);
-        pref.putFloat(k1, evs[i].angleDeg); pref.putBool(k2, evs[i].levelHigh);
-    }
-    uint8_t cCnt = EcuUi::PageDashboard::getCustomCount();
-    pref.putUChar("c_cnt", cCnt);
-    for (uint8_t s = 0; s < cCnt && s < EcuUi::PageDashboard::MAX_CUSTOM_PRESETS; ++s) {
-        const auto* p = EcuUi::PageDashboard::getCustomPreset(s);
-        if (!p) continue;
-        char k[16];
-        snprintf(k, sizeof(k), "s%u_nm", s); pref.putString(k, p->name);
-        snprintf(k, sizeof(k), "s%u_t", s);  pref.putUShort(k, p->totalTeeth);
-        snprintf(k, sizeof(k), "s%u_m", s);  pref.putUChar(k, p->missingTeeth);
-        snprintf(k, sizeof(k), "s%u_d", s);  pref.putFloat(k, p->dutyCycle);
-        snprintf(k, sizeof(k), "s%u_c", s);  pref.putUChar(k, p->camCount);
-        for (uint8_t i = 0; i < p->camCount && i < 4; ++i) {
-            char ka[16], kh[16];
-            snprintf(ka, sizeof(ka), "s%u_ca%u", s, i); snprintf(kh, sizeof(kh), "s%u_ch%u", s, i);
-            pref.putFloat(ka, p->camAngles[i]); pref.putBool(kh, p->camHighs[i]);
-        }
-    }
-    pref.end();
-}
-
-static void loadSettings() {
-    pref.begin("ecu_conf", true);
-    engineState.targetRpm = pref.getUInt("rpm", 850);
-    String wn = pref.getString("wname", "Honda / Ford 36-1");
-    strncpy(engineState.activeWheelName, wn.c_str(), sizeof(engineState.activeWheelName));
-    wheelCfg.totalTeeth = pref.getUShort("teeth", 36);
-    wheelCfg.missingTeeth = pref.getUChar("mteeth", 1);
-    wheelCfg.missingPosition = pref.getUChar("mpos", 0);
-    wheelCfg.dutyCycle = pref.getFloat("duty", 0.5f);
-    wheelCfg.inverted = pref.getBool("inv", false);
-    uint8_t c = pref.getUChar("ccnt", 4);
-    camCfg.clear();
-    if (c > 0 && c <= 8 && pref.isKey("ca0")) {
-        for (uint8_t i = 0; i < c; ++i) {
-            char k1[8], k2[8]; snprintf(k1, sizeof(k1), "ca%u", i); snprintf(k2, sizeof(k2), "ch%u", i);
-            camCfg.addEvent(pref.getFloat(k1, 120.0f), pref.getBool(k2, true));
-        }
-    } else {
-        camCfg.addEvent(120.0f, true); camCfg.addEvent(180.0f, false);
-        camCfg.addEvent(420.0f, true); camCfg.addEvent(470.0f, false);
-    }
-    uint8_t cCnt = pref.getUChar("c_cnt", 0);
-    EcuUi::PageDashboard::clearAllCustom();
-    for (uint8_t s = 0; s < cCnt && s < EcuUi::PageDashboard::MAX_CUSTOM_PRESETS; ++s) {
-        char k[16]; snprintf(k, sizeof(k), "s%u_nm", s);
-        if (!pref.isKey(k)) continue;
-        EcuUi::WheelPresetItem item{};
-        String nm = pref.getString(k, "Capture");
-        strncpy(item.name, nm.c_str(), sizeof(item.name) - 1);
-        snprintf(k, sizeof(k), "s%u_t", s);  item.totalTeeth = pref.getUShort(k, 36);
-        snprintf(k, sizeof(k), "s%u_m", s);  item.missingTeeth = pref.getUChar(k, 1);
-        snprintf(k, sizeof(k), "s%u_d", s);  item.dutyCycle = pref.getFloat(k, 0.5f);
-        snprintf(k, sizeof(k), "s%u_c", s);  item.camCount = pref.getUChar(k, 0);
-        for (uint8_t i = 0; i < item.camCount && i < 4; ++i) {
-            char ka[16], kh[16];
-            snprintf(ka, sizeof(ka), "s%u_ca%u", s, i); snprintf(kh, sizeof(kh), "s%u_ch%u", s, i);
-            item.camAngles[i] = pref.getFloat(ka, 0.0f); item.camHighs[i] = pref.getBool(kh, true);
-        }
-        EcuUi::PageDashboard::setCustomSlot(s, item);
-    }
-    pref.end();
-}
 
 void taskCore0UiWeb(void *pvParameters) {
     uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, lastEps = 0, lastSpeedo = 0;
@@ -152,7 +72,7 @@ void taskCore0UiWeb(void *pvParameters) {
             btnDown = false;
         }
 
-        if (clickCount > 0 && !isDown && (now - relTime >= 300)) {
+        if (clickCount > 0 && !isDown && (now - relTime >= 180)) {
             if (clickCount == 1 && menuMgr) menuMgr->onEncoderClick();
             else if (clickCount >= 2 && menuMgr) {
                 menuMgr->onEncoderDoubleClick(wheelCfg, camCfg);
@@ -167,7 +87,7 @@ void taskCore0UiWeb(void *pvParameters) {
                 uint8_t slot = EcuUi::PageDashboard::addCapturedPreset(slotName, wheelCfg, camCfg);
                 const auto* saved = EcuUi::PageDashboard::getCustomPreset(slot);
                 if (saved) strncpy(engineState.activeWheelName, saved->name, sizeof(engineState.activeWheelName));
-                saveSettings();
+                EcuApp::saveSettings(engineState, wheelCfg, camCfg);
             }
             clickCount = 0;
         }
@@ -225,103 +145,104 @@ void taskCore0UiWeb(void *pvParameters) {
     }
 }
 
+static void handleWebCommand(const JsonDocument& doc) {
+    String cmd = doc["cmd"] | ""; uint32_t val = doc["val"] | 0;
+    if (cmd == "start") {
+        engineState.isRunning = true;
+        if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
+        signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
+    } else if (cmd == "stop") {
+        engineState.isRunning = false; signalGen.stop();
+    } else if (cmd == "set_rpm" && val >= 100 && val <= 12000) {
+        engineState.targetRpm = val; signalGen.setRpm(val);
+        EcuApp::saveSettings(engineState, wheelCfg, camCfg);
+    } else if (cmd == "set_pattern") {
+        String name = doc["name"] | doc["wheelName"] | "";
+        if (name.length() > 0) strncpy(engineState.activeWheelName, name.c_str(), sizeof(engineState.activeWheelName));
+        if (doc["ckp"].is<JsonObjectConst>()) {
+            JsonObjectConst ckp = doc["ckp"];
+            wheelCfg.totalTeeth = ckp["totalTeeth"] | 36; wheelCfg.missingTeeth = ckp["missingTeeth"] | 1;
+            wheelCfg.missingPosition = ckp["missingPosition"] | 0; wheelCfg.dutyCycle = ckp["dutyCycle"] | 0.5f;
+            wheelCfg.inverted = ckp["inverted"] | false;
+        }
+        if (doc["cmp"].is<JsonArrayConst>()) {
+            camCfg.clear();
+            for (JsonObjectConst ev : doc["cmp"].as<JsonArrayConst>()) camCfg.addEvent(ev["angle"] | 0.0f, ev["high"] | false);
+        }
+        signalGen.setPattern(wheelCfg, camCfg);
+        if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
+        if (menuMgr) menuMgr->markNeedsRedraw();
+        EcuApp::saveSettings(engineState, wheelCfg, camCfg);
+    } else if (cmd == "rename_preset") {
+        uint8_t slot = doc["slot"] | 0; String newName = doc["name"] | "";
+        if (newName.length() > 0 && EcuUi::PageDashboard::renameCustomPreset(slot, newName.c_str())) {
+            EcuApp::saveSettings(engineState, wheelCfg, camCfg); if (menuMgr) menuMgr->markNeedsRedraw();
+        }
+    } else if (cmd == "delete_preset") {
+        uint8_t slot = doc["slot"] | 0;
+        if (EcuUi::PageDashboard::deleteCustomPreset(slot)) {
+            EcuApp::saveSettings(engineState, wheelCfg, camCfg); if (menuMgr) menuMgr->markNeedsRedraw();
+        }
+    } else if (cmd == "set_mode" && val <= 2) {
+        engineState.runMode = static_cast<EcuEngine::EngineRunMode>(val);
+        if (engineState.isRunning && engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
+        if (menuMgr) menuMgr->markNeedsRedraw();
+    } else if (cmd == "set_ui_level") {
+        if (menuMgr) menuMgr->setUiLevel(static_cast<EcuUi::UiLevel>(val));
+    } else if (cmd == "set_tab") {
+        if (menuMgr) menuMgr->setGenTab(val);
+    } else if (cmd == "arm_capture") {
+        captureDriver.arm(512);
+    } else if (cmd == "eps_toggle") {
+        epsController.toggleRunning();
+    } else if (cmd == "eps_set") {
+        if (doc["speed"].is<float>()) epsController.setSpeed(doc["speed"].as<float>());
+        if (doc["rpm"].is<uint32_t>()) epsController.setRpm(doc["rpm"].as<uint32_t>());
+        if (doc["steer"].is<float>()) epsController.setSteerTorque(doc["steer"].as<float>());
+    } else if (cmd == "eps_preset") {
+        epsController.setPreset(static_cast<EcuEngine::EpsOemPreset>(val));
+    } else if (cmd == "eps_sweep") {
+        epsController.setAutoSweep(val != 0);
+    } else if (cmd == "speedo_toggle") {
+        speedoController.toggleRunning();
+    } else if (cmd == "speedo_set") {
+        if (doc["kmh"].is<int32_t>()) speedoController.setKmh(doc["kmh"].as<int32_t>());
+        if (doc["rpm"].is<int32_t>()) speedoController.setRpm(doc["rpm"].as<int32_t>());
+        if (doc["temp"].is<int32_t>()) speedoController.setTemp(doc["temp"].as<int32_t>());
+        if (doc["fuel"].is<int32_t>()) speedoController.setFuel(doc["fuel"].as<int32_t>());
+    } else if (cmd == "speedo_set_ch") {
+        String ch = doc["ch"] | ""; bool en = doc["en"] | true;
+        if (ch == "kmh") speedoController.setChannelEnable(0, en);
+        else if (ch == "rpm") speedoController.setChannelEnable(1, en);
+        else if (ch == "temp") speedoController.setChannelEnable(2, en);
+        else if (ch == "fuel") speedoController.setChannelEnable(3, en);
+    } else if (cmd == "speedo_set_ppk" && doc["val"].is<float>()) {
+        speedoController.setPulsePerKm(doc["val"].as<float>());
+    } else if (cmd == "speedo_set_ppr" && doc["val"].is<float>()) {
+        speedoController.setTachoPpr(doc["val"].as<float>());
+    } else if (cmd == "speedo_set_max_rpm" && doc["val"].is<int32_t>()) {
+        speedoController.setMaxRpm(doc["val"].as<int32_t>());
+    } else if (cmd == "speedo_set_temp_cal") {
+        speedoController.setTempCal(doc["min"] | 0, doc["mid"] | 50, doc["max"] | 100);
+    } else if (cmd == "speedo_set_fuel_cal") {
+        speedoController.setFuelCal(doc["min"] | 0, doc["mid"] | 50, doc["max"] | 100);
+    } else if (cmd == "speedo_set_curve") {
+        speedoController.setGaugeCurve(static_cast<EcuEngine::SpeedoGaugeCurve>(val));
+    } else if (cmd == "speedo_set_dac_routing") {
+        speedoController.setDacRouting(static_cast<EcuEngine::SpeedoDacRouting>(val));
+    } else if (cmd == "speedo_set_sweep") {
+        speedoController.setAutoSweep(val != 0);
+    } else if (cmd == "speedo_set_sweep_time" && doc["val"].is<float>()) {
+        speedoController.setSweepTimeSec(doc["val"].as<float>());
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     delay(800);
-    loadSettings();
+    EcuApp::loadSettings(engineState, wheelCfg, camCfg);
 
-    webManager.setCommandCallback([](const JsonDocument& doc) {
-        String cmd = doc["cmd"] | ""; uint32_t val = doc["val"] | 0;
-        if (cmd == "start") {
-            engineState.isRunning = true;
-            if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
-            signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
-        } else if (cmd == "stop") {
-            engineState.isRunning = false; signalGen.stop();
-        } else if (cmd == "set_rpm" && val >= 100 && val <= 12000) {
-            engineState.targetRpm = val; signalGen.setRpm(val); saveSettings();
-        } else if (cmd == "set_pattern") {
-            String name = doc["name"] | doc["wheelName"] | "";
-            if (name.length() > 0) strncpy(engineState.activeWheelName, name.c_str(), sizeof(engineState.activeWheelName));
-            if (doc["ckp"].is<JsonObjectConst>()) {
-                JsonObjectConst ckp = doc["ckp"];
-                wheelCfg.totalTeeth = ckp["totalTeeth"] | 36; wheelCfg.missingTeeth = ckp["missingTeeth"] | 1;
-                wheelCfg.missingPosition = ckp["missingPosition"] | 0; wheelCfg.dutyCycle = ckp["dutyCycle"] | 0.5f;
-                wheelCfg.inverted = ckp["inverted"] | false;
-            }
-            if (doc["cmp"].is<JsonArrayConst>()) {
-                camCfg.clear();
-                for (JsonObjectConst ev : doc["cmp"].as<JsonArrayConst>()) camCfg.addEvent(ev["angle"] | 0.0f, ev["high"] | false);
-            }
-            signalGen.setPattern(wheelCfg, camCfg);
-            if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
-            if (menuMgr) menuMgr->markNeedsRedraw();
-            saveSettings();
-        } else if (cmd == "rename_preset") {
-            uint8_t slot = doc["slot"] | 0; String newName = doc["name"] | "";
-            if (newName.length() > 0 && EcuUi::PageDashboard::renameCustomPreset(slot, newName.c_str())) {
-                saveSettings(); if (menuMgr) menuMgr->markNeedsRedraw();
-            }
-        } else if (cmd == "delete_preset") {
-            uint8_t slot = doc["slot"] | 0;
-            if (EcuUi::PageDashboard::deleteCustomPreset(slot)) {
-                saveSettings(); if (menuMgr) menuMgr->markNeedsRedraw();
-            }
-        } else if (cmd == "set_mode") {
-            if (val <= 2) {
-                engineState.runMode = static_cast<EcuEngine::EngineRunMode>(val);
-                if (engineState.isRunning && engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
-                if (menuMgr) menuMgr->markNeedsRedraw();
-            }
-        } else if (cmd == "set_ui_level") {
-            if (menuMgr) menuMgr->setUiLevel(static_cast<EcuUi::UiLevel>(val));
-        } else if (cmd == "set_tab") {
-            if (menuMgr) menuMgr->setGenTab(val);
-        } else if (cmd == "arm_capture") {
-            captureDriver.arm(512);
-        } else if (cmd == "eps_toggle") {
-            epsController.toggleRunning();
-        } else if (cmd == "eps_set") {
-            if (doc["speed"].is<float>()) epsController.setSpeed(doc["speed"].as<float>());
-            if (doc["rpm"].is<uint32_t>()) epsController.setRpm(doc["rpm"].as<uint32_t>());
-            if (doc["steer"].is<float>()) epsController.setSteerTorque(doc["steer"].as<float>());
-        } else if (cmd == "eps_preset") {
-            epsController.setPreset(static_cast<EcuEngine::EpsOemPreset>(val));
-        } else if (cmd == "eps_sweep") {
-            epsController.setAutoSweep(val != 0);
-        } else if (cmd == "speedo_toggle") {
-            speedoController.toggleRunning();
-        } else if (cmd == "speedo_set") {
-            if (doc["kmh"].is<int32_t>()) speedoController.setKmh(doc["kmh"].as<int32_t>());
-            if (doc["rpm"].is<int32_t>()) speedoController.setRpm(doc["rpm"].as<int32_t>());
-            if (doc["temp"].is<int32_t>()) speedoController.setTemp(doc["temp"].as<int32_t>());
-            if (doc["fuel"].is<int32_t>()) speedoController.setFuel(doc["fuel"].as<int32_t>());
-        } else if (cmd == "speedo_set_ch") {
-            String ch = doc["ch"] | ""; bool en = doc["en"] | true;
-            if (ch == "kmh") speedoController.setChannelEnable(0, en);
-            else if (ch == "rpm") speedoController.setChannelEnable(1, en);
-            else if (ch == "temp") speedoController.setChannelEnable(2, en);
-            else if (ch == "fuel") speedoController.setChannelEnable(3, en);
-        } else if (cmd == "speedo_set_ppk") {
-            if (doc["val"].is<float>()) speedoController.setPulsePerKm(doc["val"].as<float>());
-        } else if (cmd == "speedo_set_ppr") {
-            if (doc["val"].is<float>()) speedoController.setTachoPpr(doc["val"].as<float>());
-        } else if (cmd == "speedo_set_max_rpm") {
-            if (doc["val"].is<int32_t>()) speedoController.setMaxRpm(doc["val"].as<int32_t>());
-        } else if (cmd == "speedo_set_temp_cal") {
-            speedoController.setTempCal(doc["min"] | 0, doc["mid"] | 50, doc["max"] | 100);
-        } else if (cmd == "speedo_set_fuel_cal") {
-            speedoController.setFuelCal(doc["min"] | 0, doc["mid"] | 50, doc["max"] | 100);
-        } else if (cmd == "speedo_set_curve") {
-            speedoController.setGaugeCurve(static_cast<EcuEngine::SpeedoGaugeCurve>(val));
-        } else if (cmd == "speedo_set_dac_routing") {
-            speedoController.setDacRouting(static_cast<EcuEngine::SpeedoDacRouting>(val));
-        } else if (cmd == "speedo_set_sweep") {
-            speedoController.setAutoSweep(val != 0);
-        } else if (cmd == "speedo_set_sweep_time") {
-            if (doc["val"].is<float>()) speedoController.setSweepTimeSec(doc["val"].as<float>());
-        }
-    });
+    webManager.setCommandCallback(handleWebCommand);
     webManager.setCaptureDriver(&captureDriver);
     webManager.setEpsController(&epsController);
     webManager.setSpeedoController(&speedoController);
