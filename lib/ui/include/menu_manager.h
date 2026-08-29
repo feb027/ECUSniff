@@ -11,6 +11,7 @@
 #include "page_capture.h"
 #include "page_eps_tester.h"
 #include "page_speedo_tester.h"
+#include "page_wheel_browser.h"
 #include "eps_controller.h"
 #include "speedo_controller.h"
 
@@ -44,7 +45,9 @@ public:
                           EcuEngine::ParametricWheel& wheel,
                           EcuEngine::CamEventTable& cam);
 
-    void onEncoderClick();
+    void onEncoderClick(EcuEngine::EngineRuntimeState& state,
+                        EcuEngine::ParametricWheel& wheel,
+                        EcuEngine::CamEventTable& cam);
     void onEncoderDoubleClick(EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam);
     void returnToMainHub();
 
@@ -63,7 +66,7 @@ private:
     UiLevel _uiLevel{UiLevel::MainHub};
     uint8_t _hubIndex{0};
 
-    uint8_t _genTab{1};       // 0: < MENU, 1: DASH/COCKPIT, 2: CKP/CAL, 3: CMP/HW
+    uint8_t _genTab{1};
     uint8_t _lastTab{0xFF};
     bool    _isEditMode{false};
     uint8_t _editRow{0};
@@ -74,13 +77,14 @@ private:
     bool    _lastDrawnEditMode{false};
     bool    _lastDrawnFocusTabBar{false};
 
-    PageMainHub      _pageHub;
-    PageDashboard    _pageDash;
-    PageCkp          _pageCkp;
-    PageCmp          _pageCmp;
-    PageCapture      _pageCapture;
-    PageEpsTester    _pageEps;
-    PageSpeedoTester _pageSpeedo;
+    PageMainHub        _pageHub;
+    PageDashboard      _pageDash;
+    PageCkp            _pageCkp;
+    PageCmp            _pageCmp;
+    PageCapture        _pageCapture;
+    PageEpsTester      _pageEps;
+    PageSpeedoTester   _pageSpeedo;
+    PageWheelBrowser   _pageBrowser;
 
     EcuEngine::EpsController*    _epsController{nullptr};
     EcuEngine::SpeedoController* _speedoController{nullptr};

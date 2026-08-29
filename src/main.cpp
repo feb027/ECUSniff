@@ -46,6 +46,8 @@ void taskCore0UiWeb(void *pvParameters) {
         EcuHal::JoyAction joyAct = joystick.update();
         if (joyAct != EcuHal::JoyAction::None && menuMgr) {
             menuMgr->onJoystickAction(joyAct, engineState, wheelCfg, camCfg);
+            signalGen.setPattern(wheelCfg, camCfg);
+            if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
         }
 
         encoder.read();
@@ -73,8 +75,12 @@ void taskCore0UiWeb(void *pvParameters) {
         }
 
         if (clickCount > 0 && !isDown && (now - relTime >= 180)) {
-            if (clickCount == 1 && menuMgr) menuMgr->onEncoderClick();
-            else if (clickCount >= 2 && menuMgr) {
+            if (clickCount == 1 && menuMgr) {
+                menuMgr->onEncoderClick(engineState, wheelCfg, camCfg);
+                signalGen.setPattern(wheelCfg, camCfg);
+                if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
+                EcuApp::saveSettings(engineState, wheelCfg, camCfg);
+            } else if (clickCount >= 2 && menuMgr) {
                 menuMgr->onEncoderDoubleClick(wheelCfg, camCfg);
                 const auto& cr = menuMgr->getPageCapture().getLastResult();
                 char slotName[32];

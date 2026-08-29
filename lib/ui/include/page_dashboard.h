@@ -41,6 +41,9 @@ public:
     static void clearAllCustom();
     static void setCustomSlot(uint8_t slot, const WheelPresetItem& item);
 
+    uint8_t getActivePresetIdx() const { return _activePresetIdx; }
+    void setActivePresetIdx(uint8_t idx) { _activePresetIdx = idx; }
+
     static constexpr size_t BASE_PRESET_COUNT = 64;
     static constexpr size_t MAX_CUSTOM_PRESETS = 16;
 

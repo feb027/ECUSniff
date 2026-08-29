@@ -146,8 +146,8 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
             _gfx->fillRoundRect(354, 152, 98, 40, 4, 0x03E0); _gfx->drawRoundRect(354, 152, 98, 40, 4, 0x07E0);
             _gfx->setTextColor(0x07E0, 0x03E0); _gfx->setTextSize(2); _gfx->drawCenterString("RUNNING", 403, 164);
         } else {
-            _gfx->fillRoundRect(354, 152, 98, 40, 4, 0x3800); _gfx->drawRoundRect(354, 152, 98, 40, 4, 0xF800);
-            _gfx->setTextColor(0xF800, 0x3800); _gfx->setTextSize(2); _gfx->drawCenterString("STOPPED", 403, 164);
+            _gfx->fillRoundRect(354, 152, 98, 40, 4, 0xF800); _gfx->drawRoundRect(354, 152, 98, 40, 4, 0xF800);
+            _gfx->setTextColor(TFT_WHITE, 0xF800); _gfx->setTextSize(2); _gfx->drawCenterString("STOPPED", 403, 164);
         }
     }
 
@@ -190,13 +190,13 @@ void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRun
 
     if (editRow == 0) {
         _gfx->setTextColor(0xFFE0, 0x0841);
-        _gfx->drawString("[TARGET RPM] Putar: +/-50 RPM | Joystick Bawah: Ganti Baris", 24, 289);
+        _gfx->drawString("[TARGET RPM] Putar: +/-50 RPM | Joystick: Pindah Baris", 24, 289);
     } else if (editRow == 1) {
         _gfx->setTextColor(0xFFE0, 0x0841);
-        _gfx->drawString("[MODE MESIN] Putar: FIX / CRANK / SWEEP | Joystick Bawah: Pola", 16, 289);
+        _gfx->drawString("[MODE MESIN] Putar: FIX / CRANK / SWEEP | Joystick: Pindah Baris", 16, 289);
     } else if (editRow == 2) {
         _gfx->setTextColor(0xFFE0, 0x0841);
-        _gfx->drawString("[PROFIL POLA] Putar: Ganti Preset OEM / Rekaman | Klik: Run/Stop", 16, 289);
+        _gfx->drawString("[PROFIL POLA] KLIK KNOB: Buka Library Pola Lengkap | Putar: Ganti", 16, 289);
     }
 }
 
