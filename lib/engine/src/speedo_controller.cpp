@@ -1,5 +1,6 @@
 #include "speedo_controller.h"
 #include <cmath>
+#include <algorithm>
 
 namespace EcuEngine {
 
@@ -22,6 +23,7 @@ void SpeedoController::init() {
     _config.speedoPwmFreqHz = 5000;
     _config.gaugeCurve = SpeedoGaugeCurve::SqrtThermal;
     _config.dacRouting = SpeedoDacRouting::DualMcp4725;
+    _config.runMode = SpeedoRunMode::ManualFix;
     _config.tempCalMin = 0;
     _config.tempCalMid = 50;
     _config.tempCalMax = 100;
@@ -32,12 +34,16 @@ void SpeedoController::init() {
     _config.sweepTimeSec = 5.0f;
 
     _state.isRunning = false;
+    _state.activeMode = SpeedoRunMode::ManualFix;
     _state.currentKmh = 120.0f;
     _state.currentRpm = 4000.0f;
     _state.currentTemp = 50.0f;
     _state.currentFuel = 50.0f;
     _state.sweepUp = true;
     _state.sweepProgress = 0.0f;
+    _state.stepIndex = 0;
+    _state.stepTimerSec = 0.0f;
+    _state.totalDistanceKm = 0.0f;
     _state.dacFuelFound = false;
     _state.dacTempFound = false;
 
@@ -53,11 +59,20 @@ void SpeedoController::toggleRunning() {
     setRunning(!_state.isRunning);
 }
 
+void SpeedoController::setRunMode(SpeedoRunMode mode) {
+    _config.runMode = mode;
+    _state.activeMode = mode;
+    _config.autoSweep = (mode == SpeedoRunMode::AutoSweep);
+    _state.stepIndex = 0;
+    _state.stepTimerSec = 0.0f;
+    _recalculate();
+}
+
 void SpeedoController::setKmh(int32_t kmh) {
     if (kmh < 0) kmh = 0;
     if (kmh > 350) kmh = 350;
     _config.speedoKmh = kmh;
-    if (!_config.autoSweep || !_state.isRunning) {
+    if (_config.runMode == SpeedoRunMode::ManualFix || !_state.isRunning) {
         _state.currentKmh = static_cast<float>(kmh);
     }
     _recalculate();
@@ -67,7 +82,7 @@ void SpeedoController::setRpm(int32_t rpm) {
     if (rpm < 0) rpm = 0;
     if (rpm > 20000) rpm = 20000;
     _config.speedoRpm = rpm;
-    if (!_config.autoSweep || !_state.isRunning) {
+    if (_config.runMode == SpeedoRunMode::ManualFix || !_state.isRunning) {
         _state.currentRpm = static_cast<float>(rpm);
     }
     _recalculate();
@@ -77,7 +92,7 @@ void SpeedoController::setTemp(int32_t tempPercent) {
     if (tempPercent < 0) tempPercent = 0;
     if (tempPercent > 100) tempPercent = 100;
     _config.speedoTempPercent = tempPercent;
-    if (!_config.autoSweep || !_state.isRunning) {
+    if (_config.runMode == SpeedoRunMode::ManualFix || !_state.isRunning) {
         _state.currentTemp = static_cast<float>(tempPercent);
     }
     _recalculate();
@@ -87,7 +102,7 @@ void SpeedoController::setFuel(int32_t fuelPercent) {
     if (fuelPercent < 0) fuelPercent = 0;
     if (fuelPercent > 100) fuelPercent = 100;
     _config.speedoFuelPercent = fuelPercent;
-    if (!_config.autoSweep || !_state.isRunning) {
+    if (_config.runMode == SpeedoRunMode::ManualFix || !_state.isRunning) {
         _state.currentFuel = static_cast<float>(fuelPercent);
     }
     _recalculate();
@@ -130,14 +145,7 @@ void SpeedoController::setDacRouting(SpeedoDacRouting routing) {
 }
 
 void SpeedoController::setAutoSweep(bool enabled) {
-    _config.autoSweep = enabled;
-    if (!enabled) {
-        _state.currentKmh = static_cast<float>(_config.speedoKmh);
-        _state.currentRpm = static_cast<float>(_config.speedoRpm);
-        _state.currentTemp = static_cast<float>(_config.speedoTempPercent);
-        _state.currentFuel = static_cast<float>(_config.speedoFuelPercent);
-    }
-    _recalculate();
+    setRunMode(enabled ? SpeedoRunMode::AutoSweep : SpeedoRunMode::ManualFix);
 }
 
 void SpeedoController::setSweepTimeSec(float sec) {
@@ -195,85 +203,69 @@ void SpeedoController::update(float dtSeconds) {
         return;
     }
 
-    if (_config.autoSweep) {
+    if (_config.runMode == SpeedoRunMode::AutoSweep) {
         float speed = 1.0f / (_config.sweepTimeSec > 0.1f ? _config.sweepTimeSec : 5.0f);
         if (_state.sweepUp) {
             _state.sweepProgress += speed * dtSeconds;
-            if (_state.sweepProgress >= 1.0f) {
-                _state.sweepProgress = 1.0f;
-                _state.sweepUp = false;
-            }
+            if (_state.sweepProgress >= 1.0f) { _state.sweepProgress = 1.0f; _state.sweepUp = false; }
         } else {
             _state.sweepProgress -= speed * dtSeconds;
-            if (_state.sweepProgress <= 0.0f) {
-                _state.sweepProgress = 0.0f;
-                _state.sweepUp = true;
-            }
+            if (_state.sweepProgress <= 0.0f) { _state.sweepProgress = 0.0f; _state.sweepUp = true; }
         }
-
         _state.currentKmh = _config.speedoEnableKmh ? (_state.sweepProgress * _config.speedoKmh) : 0.0f;
         _state.currentRpm = _config.speedoEnableRpm ? (_state.sweepProgress * _config.speedoRpm) : 0.0f;
         _state.currentTemp = _config.speedoEnableTemp ? (_state.sweepProgress * _config.speedoTempPercent) : 0.0f;
         _state.currentFuel = _config.speedoEnableFuel ? (_state.sweepProgress * _config.speedoFuelPercent) : 0.0f;
+    } else if (_config.runMode == SpeedoRunMode::StepCalib) {
+        _state.stepTimerSec += dtSeconds;
+        if (_state.stepTimerSec >= 2.0f) {
+            _state.stepTimerSec = 0.0f;
+            _state.stepIndex = (_state.stepIndex + 1) % 5;
+        }
+        float stepFrac = _state.stepIndex * 0.25f;
+        _state.currentKmh = _config.speedoEnableKmh ? (stepFrac * _config.speedoKmh) : 0.0f;
+        _state.currentRpm = _config.speedoEnableRpm ? (stepFrac * _config.speedoRpm) : 0.0f;
+        _state.currentTemp = _config.speedoEnableTemp ? (stepFrac * 100.0f) : 0.0f;
+        _state.currentFuel = _config.speedoEnableFuel ? (stepFrac * 100.0f) : 0.0f;
     } else {
         _state.currentKmh = _config.speedoEnableKmh ? static_cast<float>(_config.speedoKmh) : 0.0f;
         _state.currentRpm = _config.speedoEnableRpm ? static_cast<float>(_config.speedoRpm) : 0.0f;
         _state.currentTemp = _config.speedoEnableTemp ? static_cast<float>(_config.speedoTempPercent) : 0.0f;
         _state.currentFuel = _config.speedoEnableFuel ? static_cast<float>(_config.speedoFuelPercent) : 0.0f;
+
+        if (_config.runMode == SpeedoRunMode::OdometerRun && _config.speedoEnableKmh) {
+            _state.totalDistanceKm += (_state.currentKmh * dtSeconds) / 3600.0f;
+        }
     }
 
     _recalculate();
 }
 
 void SpeedoController::_recalculate() {
-    // 1. KMH Frequency
     float effectiveKmh = _state.isRunning ? _state.currentKmh : static_cast<float>(_config.speedoKmh);
-    if (_config.speedoEnableKmh && effectiveKmh > 0.05f) {
-        _state.hzKmh = (effectiveKmh * _config.pulsePerKm) / 3600.0f;
-    } else {
-        _state.hzKmh = 0.0f;
-    }
+    _state.hzKmh = (_config.speedoEnableKmh && effectiveKmh > 0.05f) ? ((effectiveKmh * _config.pulsePerKm) / 3600.0f) : 0.0f;
 
-    // 2. RPM Frequency
     float effectiveRpm = _state.isRunning ? _state.currentRpm : static_cast<float>(_config.speedoRpm);
-    if (_config.speedoEnableRpm && effectiveRpm > 10.0f) {
-        _state.hzRpm = (effectiveRpm * _config.speedoTachoPpr) / 60.0f;
-    } else {
-        _state.hzRpm = 0.0f;
-    }
+    _state.hzRpm = (_config.speedoEnableRpm && effectiveRpm > 10.0f) ? ((effectiveRpm * _config.speedoTachoPpr) / 60.0f) : 0.0f;
 
-    // 3. Temp Duty & Voltage
     float effectiveTemp = _state.isRunning ? _state.currentTemp : static_cast<float>(_config.speedoTempPercent);
     if (_config.speedoEnableTemp) {
-        float rawFrac = effectiveTemp / 100.0f;
-        if (rawFrac < 0.0f) rawFrac = 0.0f;
-        if (rawFrac > 1.0f) rawFrac = 1.0f;
+        float rawFrac = std::max(0.0f, std::min(1.0f, effectiveTemp / 100.0f));
         float shaped = (_config.gaugeCurve == SpeedoGaugeCurve::SqrtThermal) ? std::sqrt(rawFrac) : rawFrac;
-        float frac = _apply3PointCal(shaped * 100.0f, _config.tempCalMin, _config.tempCalMid, _config.tempCalMax) / 100.0f;
-        if (frac < 0.0f) frac = 0.0f;
-        if (frac > 1.0f) frac = 1.0f;
-        _state.dutyTemp = frac * 100.0f;
-        _state.voltTemp = frac * 5.0f;
+        float frac = std::max(0.0f, std::min(1.0f, _apply3PointCal(shaped * 100.0f, _config.tempCalMin, _config.tempCalMid, _config.tempCalMax) / 100.0f));
+        _state.dutyTemp = frac * 100.0f; _state.voltTemp = frac * 5.0f;
     } else {
-        _state.dutyTemp = 0.0f;
-        _state.voltTemp = 0.0f;
+        _state.dutyTemp = 0.0f; _state.voltTemp = 0.0f;
     }
 
-    // 4. Fuel Duty & Voltage
     float effectiveFuel = _state.isRunning ? _state.currentFuel : static_cast<float>(_config.speedoFuelPercent);
     if (_config.speedoEnableFuel) {
-        float rawFrac = effectiveFuel / 100.0f;
-        if (rawFrac < 0.0f) rawFrac = 0.0f;
-        if (rawFrac > 1.0f) rawFrac = 1.0f;
+        float rawFrac = std::max(0.0f, std::min(1.0f, effectiveFuel / 100.0f));
         float shaped = (_config.gaugeCurve == SpeedoGaugeCurve::SqrtThermal) ? std::sqrt(rawFrac) : rawFrac;
-        float frac = _apply3PointCal(shaped * 100.0f, _config.fuelCalMin, _config.fuelCalMid, _config.fuelCalMax) / 100.0f;
-        if (frac < 0.0f) frac = 0.0f;
-        if (frac > 1.0f) frac = 1.0f;
-        _state.dutyFuel = frac * 100.0f;
-        _state.voltFuel = frac * 5.0f;
+        float frac = std::max(0.0f, std::min(1.0f, _apply3PointCal(shaped * 100.0f, _config.fuelCalMin, _config.fuelCalMid, _config.fuelCalMax) / 100.0f));
+        _state.dutyFuel = frac * 100.0f; _state.voltFuel = frac * 5.0f;
     } else {
-        _state.dutyFuel = 0.0f;
-        _state.voltFuel = 0.0f;
+        _state.dutyFuel = 0.0f; _state.voltFuel = 0.0f;
     }
 }
 

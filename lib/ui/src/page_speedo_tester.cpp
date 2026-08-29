@@ -3,6 +3,7 @@
 namespace EcuUi {
 
 static const float PPK_PRESETS[] = { 2548.0f, 4000.0f, 8000.0f, 23333.0f, 30000.0f };
+static const char* PPR_NAMES[]   = { "1.0 (1-Cyl)", "2.0 (4-Cyl)", "3.0 (6-Cyl)", "4.0 (8-Cyl)", "0.5 (Wasted)" };
 static const float PPR_PRESETS[] = { 1.0f, 2.0f, 3.0f, 4.0f, 0.5f };
 static const char* ROUTE_NAMES[] = { "Dual PWM", "Single Fuel", "Single Temp", "Dual MCP4725" };
 
@@ -12,7 +13,7 @@ void PageSpeedoTester::init() {
     _lastTab = 0xFF; _lastEditRow = 0xFF;
     _lastKmh = -1; _lastRpm = -1; _lastTemp = -1; _lastFuel = -1;
     _lastHzKmh = -1.0f; _lastHzRpm = -1.0f; _lastVoltTemp = -1.0f; _lastVoltFuel = -1.0f;
-    _lastRunning = false; _lastSweep = false;
+    _lastRunning = false; _lastMode = 0xFF;
     _lastEnKmh = false; _lastEnRpm = false; _lastEnTemp = false; _lastEnFuel = false;
     for (uint8_t i = 0; i < 6; ++i) _lastCalVals[i] = -99;
     _lastPpk = -1.0f; _lastPpr = -1.0f; _lastRouting = 0xFF; _lastCurve = 0xFF;
@@ -46,12 +47,17 @@ void PageSpeedoTester::_renderTabCockpit(bool fullRedraw, uint8_t editRow, const
     int32_t curRpm  = st.isRunning ? static_cast<int32_t>(st.currentRpm) : cfg.speedoRpm;
     int32_t curTemp = st.isRunning ? static_cast<int32_t>(st.currentTemp) : cfg.speedoTempPercent;
     int32_t curFuel = st.isRunning ? static_cast<int32_t>(st.currentFuel) : cfg.speedoFuelPercent;
+    uint8_t curMode = static_cast<uint8_t>(cfg.runMode);
 
     if (fullRedraw) {
         _gfx->fillRoundRect(8, 46, 228, 126, 6, 0x0841); _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1); _gfx->drawString("SPEEDOMETER", 18, 54);
+        _gfx->drawRoundRect(18, 156, 208, 8, 3, 0x31A6);
         _gfx->fillRoundRect(244, 46, 228, 126, 6, 0x0841); _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(1); _gfx->drawString("TACHOMETER", 254, 54);
+        _gfx->drawRoundRect(254, 156, 208, 8, 3, 0x31A6);
         _gfx->fillRoundRect(8, 178, 228, 78, 6, 0x0841); _gfx->setTextColor(0xFD20, 0x0841); _gfx->setTextSize(1); _gfx->drawString("SUHU MESIN (ECT)", 18, 186);
+        _gfx->drawRoundRect(18, 238, 208, 10, 3, 0x31A6);
         _gfx->fillRoundRect(244, 178, 228, 78, 6, 0x0841); _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(1); _gfx->drawString("KETINGGIAN BENSIN", 254, 186);
+        _gfx->drawRoundRect(254, 238, 208, 10, 3, 0x31A6);
         _gfx->fillRoundRect(8, 262, 464, 52, 6, 0x0841);
     }
     if (fullRedraw || editRow != _lastEditRow) {
@@ -114,16 +120,30 @@ void PageSpeedoTester::_renderTabCockpit(bool fullRedraw, uint8_t editRow, const
         _lastFuel = curFuel; _lastEnFuel = cfg.speedoEnableFuel; _lastVoltFuel = st.voltFuel;
     }
 
-    if (fullRedraw || st.isRunning != _lastRunning || cfg.autoSweep != _lastSweep) {
+    if (fullRedraw || st.isRunning != _lastRunning || curMode != _lastMode) {
         _gfx->fillRect(16, 270, 448, 36, 0x0841);
-        uint32_t bg = st.isRunning ? 0x03E0 : 0x3800, fg = st.isRunning ? 0x07E0 : 0xF800;
-        _gfx->fillRoundRect(20, 272, 110, 32, 4, bg); _gfx->drawRoundRect(20, 272, 110, 32, 4, fg);
-        _gfx->setTextColor(fg, bg); _gfx->setTextSize(2); _gfx->drawCenterString(st.isRunning ? "RUNNING" : "STOPPED", 75, 280);
+        if (st.isRunning) {
+            _gfx->fillRoundRect(20, 272, 110, 32, 4, 0x03E0); _gfx->drawRoundRect(20, 272, 110, 32, 4, 0x07E0);
+            _gfx->setTextColor(0x07E0, 0x03E0); _gfx->setTextSize(2); _gfx->drawCenterString("RUNNING", 75, 280);
+        } else {
+            _gfx->fillRoundRect(20, 272, 110, 32, 4, 0xF800); _gfx->drawRoundRect(20, 272, 110, 32, 4, 0xF800);
+            _gfx->setTextColor(TFT_WHITE, 0xF800); _gfx->setTextSize(2); _gfx->drawCenterString("STOPPED", 75, 280);
+        }
+
         _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(2);
-        char swBuf[32]; snprintf(swBuf, sizeof(swBuf), cfg.autoSweep ? "SWEEP: ON (%.0fs)" : "SWEEP: OFF (MANUAL)", cfg.sweepTimeSec);
-        _gfx->drawString(swBuf, 145, 274);
-        _gfx->setTextColor(0x52AA, 0x0841); _gfx->setTextSize(1); _gfx->drawString("Joy-X/Y: Pilih Panel | Putar: Ubah Nilai | Klik: Toggle/Run", 145, 294);
-        _lastRunning = st.isRunning; _lastSweep = cfg.autoSweep;
+        if (cfg.runMode == EcuEngine::SpeedoRunMode::AutoSweep) {
+            char swBuf[32]; snprintf(swBuf, sizeof(swBuf), "MODE: SWEEP (%.0fs)", cfg.sweepTimeSec); _gfx->drawString(swBuf, 145, 274);
+        } else if (cfg.runMode == EcuEngine::SpeedoRunMode::StepCalib) {
+            char stBuf[32]; snprintf(stBuf, sizeof(stBuf), "MODE: 4-PT STEP (%d%%)", st.stepIndex * 25); _gfx->drawString(stBuf, 145, 274);
+        } else if (cfg.runMode == EcuEngine::SpeedoRunMode::OdometerRun) {
+            char odoBuf[32]; snprintf(odoBuf, sizeof(odoBuf), "MODE: ODO (%.2f km)", st.totalDistanceKm); _gfx->drawString(odoBuf, 145, 274);
+        } else {
+            _gfx->drawString("MODE: MANUAL (FIX)", 145, 274);
+        }
+
+        _gfx->setTextColor(0x52AA, 0x0841); _gfx->setTextSize(1);
+        _gfx->drawString("Putar di Baris Mode: Ganti Mode | Klik: RUN / STOP", 145, 294);
+        _lastRunning = st.isRunning; _lastMode = curMode;
     }
 }
 
@@ -206,7 +226,11 @@ void PageSpeedoTester::onEncoderTurn(uint8_t currentTab, int32_t delta, uint8_t 
             case 1: controller.setRpm(cfg.speedoRpm + (delta * 100)); break;
             case 2: controller.setTemp(cfg.speedoTempPercent + (delta * 1)); break;
             case 3: controller.setFuel(cfg.speedoFuelPercent + (delta * 1)); break;
-            case 4: controller.setAutoSweep(!cfg.autoSweep); break;
+            case 4: {
+                int32_t m = (static_cast<int32_t>(cfg.runMode) + (delta > 0 ? 1 : -1) + 4) % 4;
+                controller.setRunMode(static_cast<EcuEngine::SpeedoRunMode>(m));
+                break;
+            }
         }
     } else if (currentTab == 2) {
         if (editRow == 0) controller.setTempCal(cfg.tempCalMin + delta, cfg.tempCalMid, cfg.tempCalMax);

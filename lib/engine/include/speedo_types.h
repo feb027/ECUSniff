@@ -15,6 +15,13 @@ enum class SpeedoDacRouting : uint8_t {
     DualMcp4725   = 3  // Dual MCP4725 (0x60 Fuel + 0x61 Temp)
 };
 
+enum class SpeedoRunMode : uint8_t {
+    ManualFix   = 0, // Manual Static Target
+    AutoSweep   = 1, // Continuous Auto-Sweep (0 -> Max -> 0)
+    StepCalib   = 2, // 4-Point Step Test (0%, 25%, 50%, 75%, 100%)
+    OdometerRun = 3  // Odo Mileage Counter
+};
+
 struct SpeedoConfig {
     int32_t          speedoKmh{120};
     int32_t          speedoRpm{4000};
@@ -30,6 +37,7 @@ struct SpeedoConfig {
     int32_t          speedoPwmFreqHz{5000};
     SpeedoGaugeCurve gaugeCurve{SpeedoGaugeCurve::SqrtThermal};
     SpeedoDacRouting dacRouting{SpeedoDacRouting::DualMcp4725};
+    SpeedoRunMode    runMode{SpeedoRunMode::ManualFix};
     int32_t          tempCalMin{0};
     int32_t          tempCalMid{50};
     int32_t          tempCalMax{100};
@@ -41,21 +49,25 @@ struct SpeedoConfig {
 };
 
 struct SpeedoRuntimeState {
-    bool  isRunning{false};
-    float currentKmh{0.0f};
-    float currentRpm{0.0f};
-    float currentTemp{0.0f};
-    float currentFuel{0.0f};
-    float hzKmh{0.0f};
-    float hzRpm{0.0f};
-    float dutyTemp{0.0f}; // 0.0 - 100.0 %
-    float dutyFuel{0.0f}; // 0.0 - 100.0 %
-    float voltTemp{0.0f}; // 0.0 - 5.0 V
-    float voltFuel{0.0f}; // 0.0 - 5.0 V
-    bool  dacFuelFound{false};
-    bool  dacTempFound{false};
-    bool  sweepUp{true};
-    float sweepProgress{0.0f};
+    bool          isRunning{false};
+    SpeedoRunMode activeMode{SpeedoRunMode::ManualFix};
+    float         currentKmh{0.0f};
+    float         currentRpm{0.0f};
+    float         currentTemp{0.0f};
+    float         currentFuel{0.0f};
+    float         hzKmh{0.0f};
+    float         hzRpm{0.0f};
+    float         dutyTemp{0.0f};
+    float         dutyFuel{0.0f};
+    float         voltTemp{0.0f};
+    float         voltFuel{0.0f};
+    bool          dacFuelFound{false};
+    bool          dacTempFound{false};
+    bool          sweepUp{true};
+    float         sweepProgress{0.0f};
+    uint8_t       stepIndex{0};
+    float         stepTimerSec{0.0f};
+    float         totalDistanceKm{0.0f};
 };
 
 } // namespace EcuEngine

@@ -10,6 +10,7 @@ public:
     void init();
     void setRunning(bool running);
     void toggleRunning();
+    void setRunMode(SpeedoRunMode mode);
     void setKmh(int32_t kmh);
     void setRpm(int32_t rpm);
     void setTemp(int32_t tempPercent);
@@ -22,7 +23,7 @@ public:
     void setDacRouting(SpeedoDacRouting routing);
     void setAutoSweep(bool enabled);
     void setSweepTimeSec(float sec);
-    void setChannelEnable(uint8_t ch, bool enable); // 0: KMH, 1: RPM, 2: TEMP, 3: FUEL
+    void setChannelEnable(uint8_t ch, bool enable);
 
     void setTempCal(int32_t minVal, int32_t midVal, int32_t maxVal);
     void setFuelCal(int32_t minVal, int32_t midVal, int32_t maxVal);

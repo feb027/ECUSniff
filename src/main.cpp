@@ -234,6 +234,8 @@ static void handleWebCommand(const JsonDocument& doc) {
         speedoController.setAutoSweep(val != 0);
     } else if (cmd == "speedo_set_sweep_time" && doc["val"].is<float>()) {
         speedoController.setSweepTimeSec(doc["val"].as<float>());
+    } else if (cmd == "speedo_set_mode" && val <= 3) {
+        speedoController.setRunMode(static_cast<EcuEngine::SpeedoRunMode>(val));
     }
 }
 

@@ -33,7 +33,7 @@ private:
     float   _lastVoltTemp{-1.0f};
     float   _lastVoltFuel{-1.0f};
     bool    _lastRunning{false};
-    bool    _lastSweep{false};
+    uint8_t _lastMode{0xFF};
     bool    _lastEnKmh{false};
     bool    _lastEnRpm{false};
     bool    _lastEnTemp{false};

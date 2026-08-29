@@ -100,22 +100,17 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
     ckp["inverted"] = wheel.inverted;
 
     JsonArray cmpArr = doc["cmp"].to<JsonArray>();
-    uint8_t evCount = cam.getEventCount();
-    const auto* evs = cam.getEvents();
-    if (evs) {
-        for (uint8_t i = 0; i < evCount && i < 8; ++i) {
-            JsonObject evObj = cmpArr.add<JsonObject>();
-            evObj["angle"] = evs[i].angleDeg;
-            evObj["high"] = evs[i].levelHigh;
-        }
+    const auto* events = cam.getEvents();
+    for (uint8_t i = 0; i < cam.getEventCount() && i < 16; ++i) {
+        JsonObject evObj = cmpArr.add<JsonObject>();
+        evObj["angle"] = events[i].angleDeg;
+        evObj["high"] = events[i].levelHigh;
     }
 
-    doc["wheelName"] = state.activeWheelName;
-    doc["capState"] = state.captureState;
-    doc["capRpm"] = state.captureRpm;
-    doc["capVehicle"] = state.matchedVehicle;
-
-    if (state.capTotalTeeth > 0) {
+    doc["captureState"] = state.captureState;
+    if (state.captureState == 3) {
+        doc["capRpm"] = state.captureRpm;
+        doc["matched"] = state.matchedVehicle;
         JsonObject capCkp = doc["capCkp"].to<JsonObject>();
         capCkp["totalTeeth"] = state.capTotalTeeth;
         capCkp["missingTeeth"] = state.capMissingTeeth;
@@ -176,6 +171,7 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
         const auto& spCfg = _speedoController->getConfig();
         const auto& spSt = _speedoController->getState();
         sp["isRunning"] = spSt.isRunning;
+        sp["runMode"] = static_cast<uint8_t>(spCfg.runMode);
         sp["kmh"] = spCfg.speedoKmh;
         sp["rpm"] = spCfg.speedoRpm;
         sp["maxRpm"] = spCfg.speedoMaxRpm;
@@ -204,6 +200,8 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
         sp["dutyFuel"] = spSt.dutyFuel;
         sp["voltTemp"] = spSt.voltTemp;
         sp["voltFuel"] = spSt.voltFuel;
+        sp["distanceKm"] = spSt.totalDistanceKm;
+        sp["stepIndex"] = spSt.stepIndex;
     }
 
     String out;
