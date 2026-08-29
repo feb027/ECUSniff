@@ -16,7 +16,7 @@ static const uint16_t CAT_WIDTHS[] = {
 PageWheelBrowser::PageWheelBrowser(LovyanGFX* gfx) : _gfx(gfx), _canvas(gfx) {}
 
 void PageWheelBrowser::init() {
-    _canvas.init(198, 70);
+    _canvas.init(198, 74);
 }
 
 void PageWheelBrowser::open(uint16_t initialGlobalIdx) {
@@ -80,7 +80,6 @@ void PageWheelBrowser::render(bool fullRedraw) {
     if (fullRedraw) {
         _gfx->fillScreen(TFT_BLACK);
         _drawHeader();
-        _drawFooter();
         _drawList(true);
         _drawPreview();
         _lastCategory = static_cast<uint8_t>(_category);
@@ -126,17 +125,17 @@ void PageWheelBrowser::_drawHeader() {
 }
 
 void PageWheelBrowser::_drawList(bool forceAll) {
-    int16_t startSlot = (_cursorIdx / 4) * 4;
+    int16_t startSlot = (_cursorIdx / 3) * 3;
     int32_t yBase = 46;
 
     if (forceAll) {
-        _gfx->fillRect(6, 44, 260, 236, 0x0841);
-        _gfx->drawRoundRect(6, 44, 260, 236, 6, 0x52AA);
+        _gfx->fillRect(6, 44, 262, 272, 0x0841);
+        _gfx->drawRoundRect(6, 44, 262, 272, 6, 0x52AA);
     }
 
-    for (uint8_t s = 0; s < 4; ++s) {
+    for (uint8_t s = 0; s < 3; ++s) {
         int16_t itemIdx = startSlot + s;
-        int32_t y = yBase + (s * 52);
+        int32_t y = yBase + (s * 82);
         bool isSel = (itemIdx == _cursorIdx);
 
         if (itemIdx < _filteredCount) {
@@ -147,42 +146,47 @@ void PageWheelBrowser::_drawList(bool forceAll) {
             uint8_t cams = (gIdx < OEM_DATABASE_COUNT) ? OEM_DATABASE_PRESETS[gIdx].camCount : PageDashboard::getCustomPreset(gIdx - OEM_DATABASE_COUNT)->camCount;
 
             uint32_t bg = isSel ? 0x18C3 : 0x10A2;
-            _gfx->fillRoundRect(12, y + 2, 248, 48, 4, bg);
-            _gfx->drawRoundRect(12, y + 2, 248, 48, 4, isSel ? 0xFFE0 : 0x31A6);
+            _gfx->fillRoundRect(12, y + 2, 250, 76, 5, bg);
+            _gfx->drawRoundRect(12, y + 2, 250, 76, 5, isSel ? 0xFFE0 : 0x31A6);
             if (isSel) {
-                _gfx->drawRoundRect(13, y + 3, 246, 46, 3, 0xFFE0);
+                _gfx->drawRoundRect(13, y + 3, 248, 74, 4, 0xFFE0);
             }
 
             _gfx->setTextColor(isSel ? 0xFFE0 : TFT_WHITE, bg);
-            _gfx->setTextSize(1);
-            char tBuf[32]; snprintf(tBuf, sizeof(tBuf), "%2d. %-22.22s", itemIdx + 1, name);
+            _gfx->setTextSize(2);
+            char tBuf[24]; snprintf(tBuf, sizeof(tBuf), "%2d. %-15.15s", itemIdx + 1, name);
             _gfx->drawString(tBuf, 18, y + 8);
 
             _gfx->setTextColor(isSel ? 0x07FF : 0x07E0, bg);
-            char subBuf[32]; snprintf(subBuf, sizeof(subBuf), "Pola: %u-%u CKP | %u Pulsa CAM", teeth, mTeeth, cams);
-            _gfx->drawString(subBuf, 28, y + 26);
+            _gfx->setTextSize(1);
+            char subBuf[36]; snprintf(subBuf, sizeof(subBuf), "Pola CKP: %u-%u Gigi (Duty 50%%)", teeth, mTeeth);
+            _gfx->drawString(subBuf, 22, y + 36);
+
+            _gfx->setTextColor(isSel ? 0xFFE0 : 0x07FF, bg);
+            char camBuf[36]; snprintf(camBuf, sizeof(camBuf), "Sinyal CMP: %u Event Fase Cam", cams);
+            _gfx->drawString(camBuf, 22, y + 54);
         } else {
-            _gfx->fillRect(12, y + 2, 248, 48, 0x0841);
+            _gfx->fillRect(12, y + 2, 250, 76, 0x0841);
         }
     }
 
-    _gfx->fillRect(12, 256, 248, 20, 0x0841);
+    _gfx->fillRect(12, 294, 250, 20, 0x0841);
     _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-    char pBuf[32];
-    snprintf(pBuf, sizeof(pBuf), "Hal %d/%d (%d Pola)", (_cursorIdx / 4) + 1, ((_filteredCount + 3) / 4), _filteredCount);
-    _gfx->drawString(pBuf, 18, 260);
+    char pBuf[36];
+    snprintf(pBuf, sizeof(pBuf), "Hal %d/%d (Total %d Pola)", (_cursorIdx / 3) + 1, ((_filteredCount + 2) / 3), _filteredCount);
+    _gfx->drawString(pBuf, 18, 298);
 }
 
 void PageWheelBrowser::_drawPreview() {
-    _gfx->fillRoundRect(270, 44, 204, 236, 6, 0x0841);
-    _gfx->drawRoundRect(270, 44, 204, 236, 6, 0x52AA);
+    _gfx->fillRoundRect(272, 44, 202, 272, 6, 0x0841);
+    _gfx->drawRoundRect(272, 44, 202, 272, 6, 0x52AA);
 
     _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(1);
-    _gfx->drawString("PREVIEW POLA GELOMBANG:", 278, 52);
+    _gfx->drawString("PREVIEW WAVEFORM:", 280, 52);
 
     if (_filteredCount == 0 || _cursorIdx >= _filteredCount) {
         _gfx->setTextColor(0xF800, 0x0841); _gfx->setTextSize(2);
-        _gfx->drawString("Tidak Ada Pola", 285, 120); return;
+        _gfx->drawString("Tidak Ada Pola", 285, 140); return;
     }
 
     uint16_t gIdx = _filteredIndices[_cursorIdx];
@@ -196,29 +200,25 @@ void PageWheelBrowser::_drawPreview() {
     EcuEngine::CamEventTable cam{};
     for (uint8_t i = 0; i < p->camCount; ++i) cam.addEvent(p->camAngles[i], p->camHighs[i]);
 
-    _canvas.render(wheel, cam, 273, 68);
+    _canvas.render(wheel, cam, 274, 66);
 
-    _gfx->fillRect(274, 144, 196, 92, 0x0841);
-    _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-    char buf[48];
-    snprintf(buf, sizeof(buf), "Nama   : %s", p->name); _gfx->drawString(buf, 278, 150);
+    _gfx->fillRect(276, 144, 194, 108, 0x0841);
+    _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(2);
+    char nameShort[18]; snprintf(nameShort, sizeof(nameShort), "%-15.15s", p->name);
+    _gfx->drawString(nameShort, 280, 146);
+
+    _gfx->setTextSize(1);
     _gfx->setTextColor(0xFFE0, 0x0841);
-    snprintf(buf, sizeof(buf), "Teeth  : %u Gigi (Missing %u)", p->totalTeeth, p->missingTeeth); _gfx->drawString(buf, 278, 170);
+    char buf[48];
+    snprintf(buf, sizeof(buf), "CKP : %u-%u (%u Gigi)", p->totalTeeth, p->missingTeeth, p->totalTeeth); _gfx->drawString(buf, 280, 172);
     _gfx->setTextColor(0x07FF, 0x0841);
-    snprintf(buf, sizeof(buf), "Duty   : %.0f %% | Inv: %s", p->dutyCycle * 100.0f, p->inverted ? "YES" : "NO"); _gfx->drawString(buf, 278, 190);
+    snprintf(buf, sizeof(buf), "Duty: %.0f%% | %s", p->dutyCycle * 100.0f, p->inverted ? "Inv (Active Low)" : "Normal High"); _gfx->drawString(buf, 280, 192);
     _gfx->setTextColor(0x07E0, 0x0841);
-    snprintf(buf, sizeof(buf), "Cam Evs: %u Transisi (720d)", p->camCount); _gfx->drawString(buf, 278, 210);
+    snprintf(buf, sizeof(buf), "CMP : %u Pulsa Cam (0-720d)", p->camCount); _gfx->drawString(buf, 280, 212);
 
-    _gfx->fillRoundRect(276, 238, 192, 36, 4, 0x03E0); _gfx->drawRoundRect(276, 238, 192, 36, 4, 0x07E0);
+    _gfx->fillRoundRect(276, 256, 194, 52, 6, 0x03E0); _gfx->drawRoundRect(276, 256, 194, 52, 6, 0x07E0);
     _gfx->setTextColor(0x07E0, 0x03E0); _gfx->setTextSize(2);
-    _gfx->drawCenterString("KLIK TERAPKAN", 372, 248);
-}
-
-void PageWheelBrowser::_drawFooter() {
-    _gfx->fillRect(0, 284, 480, 36, 0x0841);
-    _gfx->drawFastHLine(0, 284, 480, 0x52AA);
-    _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-    _gfx->drawString("Joy-X: Kategori | Joy-Y: Pilih Pola | Putar: Scroll | KLIK: Terapkan | 2x KLIK: Batal", 10, 296);
+    _gfx->drawCenterString("KLIK TERAPKAN", 373, 272);
 }
 
 void PageWheelBrowser::onEncoderTurn(int32_t delta) {
