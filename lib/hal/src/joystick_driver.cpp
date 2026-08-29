@@ -10,7 +10,6 @@ void JoystickDriver::init() {
     pinMode(PinConfig::JOY_VRX, INPUT);
     pinMode(PinConfig::JOY_VRY, INPUT);
 
-    // Auto-kalibrasi resting center point
     int32_t sumX = 0, sumY = 0;
     for (uint8_t i = 0; i < 16; ++i) {
         sumX += analogRead(PinConfig::JOY_VRX);
@@ -41,7 +40,7 @@ JoyAction JoystickDriver::update() {
 
     int dx = xVal - _centerX;
     int dy = yVal - _centerY;
-    constexpr int32_t DEADZONE = 650;
+    constexpr int32_t DEADZONE = 800;
 
     JoyAction rawDir = JoyAction::None;
     if (abs(dx) > abs(dy)) {
@@ -57,8 +56,8 @@ JoyAction JoystickDriver::update() {
         return JoyAction::None;
     }
 
-    constexpr uint32_t FIRST_DELAY_MS = 250;
-    constexpr uint32_t REPEAT_RATE_MS = 120;
+    constexpr uint32_t FIRST_DELAY_MS = 400;
+    constexpr uint32_t REPEAT_RATE_MS = 250;
 
     if (!_dirHeld) {
         _dirHeld = true;
