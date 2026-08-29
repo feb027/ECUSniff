@@ -250,6 +250,10 @@ void setup() {
 
     encoder.init(); joystick.init(); captureDriver.init(); signalGen.init();
     epsDriver.init(); speedoDriver.init();
+    bool dacFuel = false, dacTemp = false;
+    speedoDriver.detectDacs(dacFuel, dacTemp);
+    speedoController.setDacFound(dacFuel, dacTemp);
+
     signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm); signalGen.stop();
     display.init();
     menuMgr = new EcuUi::MenuManager(&display.getGfx());

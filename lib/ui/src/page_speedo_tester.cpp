@@ -16,9 +16,8 @@ void PageSpeedoTester::init() {
 }
 
 void PageSpeedoTester::_drawRowFrame(int32_t x, int32_t y, int32_t w, int32_t h, bool isSelected) {
-    uint32_t borderColor = isSelected ? 0xFFE0 : 0x52AA;
-    _gfx->drawRoundRect(x, y, w, h, 4, borderColor);
-    if (isSelected) _gfx->drawRoundRect(x - 1, y - 1, w + 2, h + 2, 5, 0xFFE0);
+    _gfx->drawRoundRect(x - 1, y - 1, w + 2, h + 2, 5, isSelected ? 0xFFE0 : TFT_BLACK);
+    _gfx->drawRoundRect(x, y, w, h, 4, isSelected ? 0xFFE0 : 0x52AA);
 }
 
 void PageSpeedoTester::render(uint8_t currentTab, bool fullRedraw, uint8_t editRow,
@@ -77,13 +76,17 @@ void PageSpeedoTester::_renderTabCockpit(bool fullRedraw, uint8_t editRow, const
     // Row 2: Suhu
     _gfx->fillRect(168, RY[2] + 4, 294, 34, 0x10A2);
     _gfx->setTextColor(cfg.speedoEnableTemp ? 0xFD20 : 0x7BEF, 0x10A2);
-    snprintf(buf, sizeof(buf), "%3d %% (%.2fV) %s", (int)st.currentTemp, st.voltTemp, cfg.speedoEnableTemp ? "ON" : "OFF");
+    const char* tempModeStr = (cfg.dacRouting == EcuEngine::SpeedoDacRouting::DualMcp4725 || cfg.dacRouting == EcuEngine::SpeedoDacRouting::SingleDacTemp)
+                              ? (st.dacTempFound ? "DAC 0x61" : "DAC OFF") : "PWM P45";
+    snprintf(buf, sizeof(buf), "%3d%% (%.2fV) [%s] %s", (int)st.currentTemp, st.voltTemp, tempModeStr, cfg.speedoEnableTemp ? "ON" : "OFF");
     _gfx->drawString(buf, 172, RY[2] + 10);
 
     // Row 3: Fuel
     _gfx->fillRect(168, RY[3] + 4, 294, 34, 0x10A2);
     _gfx->setTextColor(cfg.speedoEnableFuel ? 0xFFE0 : 0x7BEF, 0x10A2);
-    snprintf(buf, sizeof(buf), "%3d %% (%.2fV) %s", (int)st.currentFuel, st.voltFuel, cfg.speedoEnableFuel ? "ON" : "OFF");
+    const char* fuelModeStr = (cfg.dacRouting == EcuEngine::SpeedoDacRouting::DualMcp4725 || cfg.dacRouting == EcuEngine::SpeedoDacRouting::SingleDacFuel)
+                              ? (st.dacFuelFound ? "DAC 0x60" : "DAC OFF") : "PWM P46";
+    snprintf(buf, sizeof(buf), "%3d%% (%.2fV) [%s] %s", (int)st.currentFuel, st.voltFuel, fuelModeStr, cfg.speedoEnableFuel ? "ON" : "OFF");
     _gfx->drawString(buf, 172, RY[3] + 10);
 
     // Row 4: Master Run & Sweep
@@ -133,6 +136,7 @@ void PageSpeedoTester::_renderTabCalibration(bool fullRedraw, uint8_t editRow, c
 
 void PageSpeedoTester::_renderTabHardware(bool fullRedraw, uint8_t editRow, const EcuEngine::SpeedoController& controller) {
     const auto& cfg = controller.getConfig();
+    const auto& st = controller.getState();
     static constexpr uint16_t RY[] = {48, 96, 144, 192, 240};
 
     if (fullRedraw) {
@@ -166,16 +170,23 @@ void PageSpeedoTester::_renderTabHardware(bool fullRedraw, uint8_t editRow, cons
     snprintf(buf, sizeof(buf), "%.1f PPR", cfg.speedoTachoPpr);
     _gfx->drawString(buf, 155, RY[1] + 10);
 
-    // Row 2: Routing
-    _gfx->fillRect(150, RY[2] + 4, 312, 34, 0x10A2);
+    // Row 2: Routing with DAC status badges
+    _gfx->fillRect(150, RY[2] + 2, 312, 38, 0x10A2);
     _gfx->setTextColor(0xFFE0, 0x10A2);
+    _gfx->setTextSize(1);
     uint8_t rIdx = static_cast<uint8_t>(cfg.dacRouting);
-    _gfx->drawString(rIdx < 4 ? ROUTE_NAMES[rIdx] : "Dual DAC", 155, RY[2] + 10);
+    _gfx->drawString(rIdx < 4 ? ROUTE_NAMES[rIdx] : "Dual DAC", 155, RY[2] + 6);
+
+    _gfx->setTextColor(st.dacFuelFound ? 0x07E0 : 0xF800, 0x10A2);
+    _gfx->drawString(st.dacFuelFound ? "DAC1(0x60 FUEL): ON" : "DAC1(0x60): OFFLINE", 155, RY[2] + 22);
+    _gfx->setTextColor(st.dacTempFound ? 0x07E0 : 0xF800, 0x10A2);
+    _gfx->drawString(st.dacTempFound ? "DAC2(0x61 TEMP): ON" : "DAC2(0x61): OFFLINE", 305, RY[2] + 22);
 
     // Row 3: Curve
     _gfx->fillRect(150, RY[3] + 4, 312, 34, 0x10A2);
     _gfx->setTextColor(0xFD20, 0x10A2);
-    _gfx->drawString(cfg.gaugeCurve == EcuEngine::SpeedoGaugeCurve::SqrtThermal ? "Non-Linier (Thermal/Sqrt)" : "Linier 1:1 (Standar)", 155, RY[3] + 10);
+    _gfx->setTextSize(2);
+    _gfx->drawString(cfg.gaugeCurve == EcuEngine::SpeedoGaugeCurve::SqrtThermal ? "Non-Linier (Sqrt)" : "Linier 1:1", 155, RY[3] + 10);
 
     // Row 4: Sweep Time
     _gfx->fillRect(150, RY[4] + 4, 312, 34, 0x10A2);
