@@ -98,7 +98,7 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
     if (_uiLevel == UiLevel::EpsTester) {
         if (_epsController) _pageEps.render(isRedraw, _isEditMode, _editRow, *_epsController);
     } else if (_uiLevel == UiLevel::SpeedoTester) {
-        if (_speedoController) _pageSpeedo.render(isRedraw, _isEditMode, _editRow, *_speedoController);
+        if (_speedoController) _pageSpeedo.render(_genTab, isRedraw, _editRow, *_speedoController);
     } else if (_uiLevel == UiLevel::Generator) {
         switch (_genTab) {
             case 1: _pageDash.render(isRedraw, _isEditMode, _editRow, state, wheel, cam); break;
@@ -124,22 +124,12 @@ void MenuManager::onEncoderTurn(int32_t delta,
     }
 
     if (_uiLevel == UiLevel::EpsTester) {
-        if (!_epsController) return;
-        if (_isEditMode) _pageEps.onEncoderTurn(delta, _editRow, *_epsController);
-        else {
-            int32_t r = static_cast<int32_t>(_editRow) + (delta > 0 ? 1 : -1);
-            _editRow = static_cast<uint8_t>(r < 0 ? 4 : (r > 4 ? 0 : r));
-        }
+        if (_epsController) _pageEps.onEncoderTurn(delta, _editRow, *_epsController);
         return;
     }
 
     if (_uiLevel == UiLevel::SpeedoTester) {
-        if (!_speedoController) return;
-        if (_isEditMode) _pageSpeedo.onEncoderTurn(delta, _editRow, *_speedoController);
-        else {
-            int32_t r = static_cast<int32_t>(_editRow) + (delta > 0 ? 1 : -1);
-            _editRow = static_cast<uint8_t>(r < 0 ? 4 : (r > 4 ? 0 : r));
-        }
+        if (_speedoController) _pageSpeedo.onEncoderTurn(_genTab, delta, _editRow, *_speedoController);
         return;
     }
 
@@ -201,8 +191,9 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
     }
 
     if (_uiLevel == UiLevel::SpeedoTester) {
-        if (action == EcuHal::JoyAction::Up) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
-        else if (action == EcuHal::JoyAction::Down) _editRow = (_editRow + 1) % 5;
+        uint8_t maxRows = (_genTab == 2) ? 6 : 5;
+        if (action == EcuHal::JoyAction::Up) _editRow = (_editRow > 0) ? (_editRow - 1) : (maxRows - 1);
+        else if (action == EcuHal::JoyAction::Down) _editRow = (_editRow + 1) % maxRows;
         else if (action == EcuHal::JoyAction::Click) onEncoderClick();
         return;
     }
@@ -239,13 +230,12 @@ void MenuManager::onEncoderClick() {
 
     if (_uiLevel == UiLevel::EpsTester) {
         if (_editRow == 4 && _epsController) _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
-        else _isEditMode = !_isEditMode;
+        else if (_epsController) _epsController->toggleRunning();
         return;
     }
 
     if (_uiLevel == UiLevel::SpeedoTester) {
-        if (_editRow == 4 && _speedoController) _speedoController->setAutoSweep(!_speedoController->getConfig().autoSweep);
-        else _isEditMode = !_isEditMode;
+        if (_speedoController) _pageSpeedo.onEncoderClick(_genTab, _editRow, *_speedoController);
         return;
     }
 

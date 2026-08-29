@@ -58,7 +58,7 @@ void PageEpsTester::_drawStaticLayout() {
     _gfx->drawFastHLine(0, 290, 480, 0x03E0);
     _gfx->setTextColor(0x07FF, TFT_BLACK);
     _gfx->setTextSize(1);
-    _gfx->drawString("Knob/Joy-Y: Baris | Klik: Edit | Joy-Left / Tab [< MENU]: Keluar", 20, 302);
+    _gfx->drawString("Joy-Y: Baris | Putar: Langsung Atur | Klik: Run/Stop | Joy-Left: Menu", 20, 302);
 
     static const char* LABELS[] = {
         "PRESET OEM :",
@@ -79,12 +79,10 @@ void PageEpsTester::_drawStaticLayout() {
 void PageEpsTester::_drawRowHighlight(uint8_t row, bool isSelected, bool isEditing) {
     if (row >= TOTAL_ROWS) return;
     int32_t y = ROW_Y[row];
-    uint32_t borderColor = isEditing ? 0xF800 : (isSelected ? 0xFFE0 : 0x52AA);
+    uint32_t borderColor = isSelected ? 0xFFE0 : 0x52AA;
 
+    _gfx->drawRoundRect(11, y - 1, 458, 44, 5, isSelected ? 0xFFE0 : TFT_BLACK);
     _gfx->drawRoundRect(12, y, 456, 42, 4, borderColor);
-    if (isSelected || isEditing) {
-        _gfx->drawRoundRect(11, y - 1, 458, 44, 5, borderColor);
-    }
 }
 
 void PageEpsTester::_renderValues(const EcuEngine::EpsController& controller) {

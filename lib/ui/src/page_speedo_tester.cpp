@@ -2,169 +2,261 @@
 
 namespace EcuUi {
 
-static constexpr uint16_t ROW_Y[] = {48, 96, 144, 192, 240};
-static constexpr uint8_t  TOTAL_ROWS = 5;
+static const float PPK_PRESETS[] = { 2548.0f, 4000.0f, 8000.0f, 23333.0f, 30000.0f };
+static const char* PPK_NAMES[]   = { "2548 (JIS)", "4000 (Univ)", "8000 (Euro)", "23333 (Modern)", "30000 (ABS)" };
+static const float PPR_PRESETS[] = { 1.0f, 2.0f, 3.0f, 4.0f, 0.5f };
+static const char* PPR_NAMES[]   = { "1.0 (1-Cyl/ECU)", "2.0 (4-Cyl)", "3.0 (6-Cyl)", "4.0 (8-Cyl)", "0.5 (Wasted)" };
+static const char* ROUTE_NAMES[] = { "Standar Dual PWM", "Single DAC Fuel + PWM Temp", "Single DAC Temp + PWM Fuel", "Dual MCP4725 DAC" };
 
 PageSpeedoTester::PageSpeedoTester(LovyanGFX* gfx) : _gfx(gfx) {}
 
 void PageSpeedoTester::init() {
-    _lastRunning = false;
-    _lastKmh = -1.0f;
-    _lastRpm = -1.0f;
-    _lastTemp = -1.0f;
-    _lastFuel = -1.0f;
-    _lastHzKmh = -1.0f;
-    _lastHzRpm = -1.0f;
-    _lastSweep = false;
-    _lastEditMode = false;
+    _lastTab = 0xFF;
     _lastEditRow = 0xFF;
-    _lastDacFuel = false;
-    _lastDacTemp = false;
 }
 
-void PageSpeedoTester::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
+void PageSpeedoTester::_drawRowFrame(int32_t x, int32_t y, int32_t w, int32_t h, bool isSelected) {
+    uint32_t borderColor = isSelected ? 0xFFE0 : 0x52AA;
+    _gfx->drawRoundRect(x, y, w, h, 4, borderColor);
+    if (isSelected) _gfx->drawRoundRect(x - 1, y - 1, w + 2, h + 2, 5, 0xFFE0);
+}
+
+void PageSpeedoTester::render(uint8_t currentTab, bool fullRedraw, uint8_t editRow,
                              const EcuEngine::SpeedoController& controller) {
-    if (fullRedraw) {
-        _drawStaticLayout();
-        _lastKmh = -1.0f;
-        _lastRpm = -1.0f;
-        _lastTemp = -1.0f;
-        _lastFuel = -1.0f;
-        _lastHzKmh = -1.0f;
-        _lastHzRpm = -1.0f;
-        _lastEditRow = 0xFF;
+    bool tabChanged = (currentTab != _lastTab);
+    if (tabChanged || fullRedraw) {
+        _gfx->fillRect(0, 42, 480, 278, TFT_BLACK);
+        _lastTab = currentTab;
+        fullRedraw = true;
     }
 
-    if (fullRedraw || isEditMode != _lastEditMode || editRow != _lastEditRow) {
-        for (uint8_t i = 0; i < TOTAL_ROWS; ++i) {
-            _drawRowHighlight(i, i == editRow, isEditMode && (i == editRow));
-        }
-        _lastEditMode = isEditMode;
-        _lastEditRow = editRow;
-    }
+    if (currentTab == 1) _renderTabCockpit(fullRedraw, editRow, controller);
+    else if (currentTab == 2) _renderTabCalibration(fullRedraw, editRow, controller);
+    else if (currentTab == 3) _renderTabHardware(fullRedraw, editRow, controller);
 
-    _renderValues(controller);
+    _lastEditRow = editRow;
 }
 
-void PageSpeedoTester::_drawStaticLayout() {
-    _gfx->fillRect(0, 42, 480, 278, TFT_BLACK);
-
-    _gfx->drawFastHLine(0, 290, 480, 0x03E0);
-    _gfx->setTextColor(0x07FF, TFT_BLACK);
-    _gfx->setTextSize(1);
-    _gfx->drawString("Knob/Joy-Y: Baris | Klik: Edit | Joy-Left / Tab [< MENU]: Keluar", 20, 302);
-
-    static const char* LABELS[] = {
-        "SPEED (KM/H):",
-        "TACHO (RPM) :",
-        "SUHU (ECT)  :",
-        "BENSIN(FUEL):",
-        "AUTO SWEEP  :"
-    };
-
-    for (uint8_t i = 0; i < TOTAL_ROWS; ++i) {
-        _gfx->fillRoundRect(12, ROW_Y[i], 456, 42, 4, 0x10A2);
-        _gfx->setTextColor(TFT_WHITE, 0x10A2);
-        _gfx->setTextSize(1);
-        _gfx->drawString(LABELS[i], 24, ROW_Y[i] + 14);
-    }
-}
-
-void PageSpeedoTester::_drawRowHighlight(uint8_t row, bool isSelected, bool isEditing) {
-    if (row >= TOTAL_ROWS) return;
-    int32_t y = ROW_Y[row];
-    uint32_t borderColor = isEditing ? 0xF800 : (isSelected ? 0xFFE0 : 0x52AA);
-
-    _gfx->drawRoundRect(12, y, 456, 42, 4, borderColor);
-    if (isSelected || isEditing) {
-        _gfx->drawRoundRect(11, y - 1, 458, 44, 5, borderColor);
-    }
-}
-
-void PageSpeedoTester::_renderValues(const EcuEngine::SpeedoController& controller) {
+void PageSpeedoTester::_renderTabCockpit(bool fullRedraw, uint8_t editRow, const EcuEngine::SpeedoController& controller) {
     const auto& cfg = controller.getConfig();
-    const auto& state = controller.getState();
+    const auto& st = controller.getState();
 
-    // Row 0: Speed KM/H
-    if (state.currentKmh != _lastKmh || state.hzKmh != _lastHzKmh) {
-        _gfx->fillRect(140, ROW_Y[0] + 4, 320, 34, 0x10A2);
-        _gfx->setTextColor(0x07FF, 0x10A2);
-        _gfx->setTextSize(2);
-        char buf[48];
-        snprintf(buf, sizeof(buf), "%.0f km/h (%.1f Hz)", state.currentKmh, state.hzKmh);
-        _gfx->drawString(buf, 145, ROW_Y[0] + 10);
-        _lastKmh = state.currentKmh;
-        _lastHzKmh = state.hzKmh;
+    static constexpr uint16_t RY[] = {48, 96, 144, 192, 240};
+
+    if (fullRedraw) {
+        _gfx->drawFastHLine(0, 290, 480, 0x03E0);
+        _gfx->setTextColor(0x07FF, TFT_BLACK);
+        _gfx->setTextSize(1);
+        _gfx->drawString("Joy-Y: Baris | Putar: Langsung Atur | Klik: Toggle CH / Run | Joy-Left: Menu", 10, 302);
+
+        const char* LABELS[] = { "CH 1 SPEED (KM/H) :", "CH 2 TACHO (RPM)  :", "CH 3 SUHU ECT (%) :", "CH 4 FUEL LEVEL(%):", "MASTER RUN & SWEEP:" };
+        for (uint8_t i = 0; i < 5; ++i) {
+            _gfx->fillRoundRect(12, RY[i], 456, 42, 4, 0x10A2);
+            _gfx->setTextColor(TFT_WHITE, 0x10A2);
+            _gfx->setTextSize(1);
+            _gfx->drawString(LABELS[i], 22, RY[i] + 15);
+        }
     }
+
+    for (uint8_t i = 0; i < 5; ++i) _drawRowFrame(12, RY[i], 456, 42, i == editRow);
+
+    // Row 0: Speed
+    _gfx->fillRect(168, RY[0] + 4, 294, 34, 0x10A2);
+    _gfx->setTextSize(2);
+    _gfx->setTextColor(cfg.speedoEnableKmh ? 0x07FF : 0x7BEF, 0x10A2);
+    char buf[48];
+    snprintf(buf, sizeof(buf), "%3d km/h [%.1fHz] %s", (int)st.currentKmh, st.hzKmh, cfg.speedoEnableKmh ? "ON" : "OFF");
+    _gfx->drawString(buf, 172, RY[0] + 10);
 
     // Row 1: RPM
-    if (state.currentRpm != _lastRpm || state.hzRpm != _lastHzRpm) {
-        _gfx->fillRect(140, ROW_Y[1] + 4, 320, 34, 0x10A2);
-        _gfx->setTextColor(0x07E0, 0x10A2);
-        _gfx->setTextSize(2);
-        char buf[48];
-        snprintf(buf, sizeof(buf), "%.0f RPM (%.1f Hz)", state.currentRpm, state.hzRpm);
-        _gfx->drawString(buf, 145, ROW_Y[1] + 10);
-        _lastRpm = state.currentRpm;
-        _lastHzRpm = state.hzRpm;
-    }
+    _gfx->fillRect(168, RY[1] + 4, 294, 34, 0x10A2);
+    _gfx->setTextColor(cfg.speedoEnableRpm ? 0x07E0 : 0x7BEF, 0x10A2);
+    snprintf(buf, sizeof(buf), "%5d RPM [%.1fHz] %s", (int)st.currentRpm, st.hzRpm, cfg.speedoEnableRpm ? "ON" : "OFF");
+    _gfx->drawString(buf, 172, RY[1] + 10);
 
-    // Row 2: Temp
-    if (state.currentTemp != _lastTemp) {
-        _gfx->fillRect(140, ROW_Y[2] + 4, 320, 34, 0x10A2);
-        _gfx->setTextColor(0xFD20, 0x10A2);
-        _gfx->setTextSize(2);
-        char buf[48];
-        snprintf(buf, sizeof(buf), "%.0f %%  (%.2f V)", state.currentTemp, state.voltTemp);
-        _gfx->drawString(buf, 145, ROW_Y[2] + 10);
-        _lastTemp = state.currentTemp;
-    }
+    // Row 2: Suhu
+    _gfx->fillRect(168, RY[2] + 4, 294, 34, 0x10A2);
+    _gfx->setTextColor(cfg.speedoEnableTemp ? 0xFD20 : 0x7BEF, 0x10A2);
+    snprintf(buf, sizeof(buf), "%3d %% (%.2fV) %s", (int)st.currentTemp, st.voltTemp, cfg.speedoEnableTemp ? "ON" : "OFF");
+    _gfx->drawString(buf, 172, RY[2] + 10);
 
     // Row 3: Fuel
-    if (state.currentFuel != _lastFuel) {
-        _gfx->fillRect(140, ROW_Y[3] + 4, 320, 34, 0x10A2);
-        _gfx->setTextColor(0xFFE0, 0x10A2);
-        _gfx->setTextSize(2);
-        char buf[48];
-        snprintf(buf, sizeof(buf), "%.0f %%  (%.2f V)", state.currentFuel, state.voltFuel);
-        _gfx->drawString(buf, 145, ROW_Y[3] + 10);
-        _lastFuel = state.currentFuel;
-    }
+    _gfx->fillRect(168, RY[3] + 4, 294, 34, 0x10A2);
+    _gfx->setTextColor(cfg.speedoEnableFuel ? 0xFFE0 : 0x7BEF, 0x10A2);
+    snprintf(buf, sizeof(buf), "%3d %% (%.2fV) %s", (int)st.currentFuel, st.voltFuel, cfg.speedoEnableFuel ? "ON" : "OFF");
+    _gfx->drawString(buf, 172, RY[3] + 10);
 
-    // Row 4: Auto Sweep & Running
-    if (cfg.autoSweep != _lastSweep || state.isRunning != _lastRunning) {
-        _gfx->fillRect(140, ROW_Y[4] + 4, 320, 34, 0x10A2);
-        _gfx->setTextSize(2);
-        if (state.isRunning) {
-            _gfx->setTextColor(0x07E0, 0x10A2);
-            _gfx->drawString(cfg.autoSweep ? "SWEEP AKTIF (RUN)" : "MANUAL (RUN)", 145, ROW_Y[4] + 10);
-        } else {
-            _gfx->setTextColor(0xF800, 0x10A2);
-            _gfx->drawString(cfg.autoSweep ? "SWEEP (STOPPED)" : "OFF (STOPPED)", 145, ROW_Y[4] + 10);
+    // Row 4: Master Run & Sweep
+    _gfx->fillRect(168, RY[4] + 4, 294, 34, 0x10A2);
+    if (st.isRunning) {
+        _gfx->setTextColor(0x07E0, 0x10A2);
+        _gfx->drawString(cfg.autoSweep ? "RUNNING (SWEEP: ON)" : "RUNNING (MANUAL)", 172, RY[4] + 10);
+    } else {
+        _gfx->setTextColor(0xF800, 0x10A2);
+        _gfx->drawString(cfg.autoSweep ? "STOPPED (SWEEP: ON)" : "STOPPED (STANDBY)", 172, RY[4] + 10);
+    }
+}
+
+void PageSpeedoTester::_renderTabCalibration(bool fullRedraw, uint8_t editRow, const EcuEngine::SpeedoController& controller) {
+    const auto& cfg = controller.getConfig();
+    static constexpr uint16_t RY[] = {48, 88, 128, 168, 208, 248};
+
+    if (fullRedraw) {
+        _gfx->drawFastHLine(0, 290, 480, 0x03E0);
+        _gfx->setTextColor(0x07FF, TFT_BLACK);
+        _gfx->setTextSize(1);
+        _gfx->drawString("Joy-Y: Baris | Putar: +/-1% Kalibrasi | Klik: Reset Preset | Joy-L: Menu", 10, 302);
+
+        const char* LABELS[] = { "ECT MIN (COLD 0%) :", "ECT MID (NORM 50%):", "ECT MAX (HOT 100%):", "FUEL MIN (EMPTY 0%):", "FUEL MID (HALF 50%):", "FUEL MAX (FULL100%):" };
+        for (uint8_t i = 0; i < 6; ++i) {
+            _gfx->fillRoundRect(12, RY[i], 456, 36, 4, 0x10A2);
+            _gfx->setTextColor(TFT_WHITE, 0x10A2);
+            _gfx->setTextSize(1);
+            _gfx->drawString(LABELS[i], 22, RY[i] + 12);
         }
-        _lastSweep = cfg.autoSweep;
-        _lastRunning = state.isRunning;
+    }
+
+    for (uint8_t i = 0; i < 6; ++i) _drawRowFrame(12, RY[i], 456, 36, i == editRow);
+
+    int32_t vals[] = { cfg.tempCalMin, cfg.tempCalMid, cfg.tempCalMax, cfg.fuelCalMin, cfg.fuelCalMid, cfg.fuelCalMax };
+    uint32_t colors[] = { 0xFD20, 0xFD20, 0xFD20, 0xFFE0, 0xFFE0, 0xFFE0 };
+
+    for (uint8_t i = 0; i < 6; ++i) {
+        _gfx->fillRect(190, RY[i] + 4, 270, 28, 0x10A2);
+        _gfx->setTextColor(colors[i], 0x10A2);
+        _gfx->setTextSize(2);
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%3d %% Cal", vals[i]);
+        _gfx->drawString(buf, 195, RY[i] + 8);
     }
 }
 
-void PageSpeedoTester::onEncoderTurn(int32_t delta, uint8_t editRow, EcuEngine::SpeedoController& controller) {
+void PageSpeedoTester::_renderTabHardware(bool fullRedraw, uint8_t editRow, const EcuEngine::SpeedoController& controller) {
     const auto& cfg = controller.getConfig();
-    switch (editRow) {
-        case 0: controller.setKmh(cfg.speedoKmh + (delta * 10)); break;
-        case 1: controller.setRpm(cfg.speedoRpm + (delta * 500)); break;
-        case 2: controller.setTemp(cfg.speedoTempPercent + (delta * 5)); break;
-        case 3: controller.setFuel(cfg.speedoFuelPercent + (delta * 5)); break;
-        case 4: controller.setAutoSweep(!cfg.autoSweep); break;
-        default: break;
+    static constexpr uint16_t RY[] = {48, 96, 144, 192, 240};
+
+    if (fullRedraw) {
+        _gfx->drawFastHLine(0, 290, 480, 0x03E0);
+        _gfx->setTextColor(0x07FF, TFT_BLACK);
+        _gfx->setTextSize(1);
+        _gfx->drawString("Joy-Y: Baris | Putar: Ganti Preset / Routing | Klik: Toggle", 16, 302);
+
+        const char* LABELS[] = { "PPK PULSES/KM :", "TACHO PPR/CYL :", "HARDWARE ROUTE:", "GAUGE CURVE   :", "SWEEP TIME    :" };
+        for (uint8_t i = 0; i < 5; ++i) {
+            _gfx->fillRoundRect(12, RY[i], 456, 42, 4, 0x10A2);
+            _gfx->setTextColor(TFT_WHITE, 0x10A2);
+            _gfx->setTextSize(1);
+            _gfx->drawString(LABELS[i], 22, RY[i] + 15);
+        }
+    }
+
+    for (uint8_t i = 0; i < 5; ++i) _drawRowFrame(12, RY[i], 456, 42, i == editRow);
+
+    // Row 0: PPK
+    _gfx->fillRect(150, RY[0] + 4, 312, 34, 0x10A2);
+    _gfx->setTextColor(0x07FF, 0x10A2);
+    _gfx->setTextSize(2);
+    char buf[48];
+    snprintf(buf, sizeof(buf), "%.0f P/KM", cfg.pulsePerKm);
+    _gfx->drawString(buf, 155, RY[0] + 10);
+
+    // Row 1: PPR
+    _gfx->fillRect(150, RY[1] + 4, 312, 34, 0x10A2);
+    _gfx->setTextColor(0x07E0, 0x10A2);
+    snprintf(buf, sizeof(buf), "%.1f PPR", cfg.speedoTachoPpr);
+    _gfx->drawString(buf, 155, RY[1] + 10);
+
+    // Row 2: Routing
+    _gfx->fillRect(150, RY[2] + 4, 312, 34, 0x10A2);
+    _gfx->setTextColor(0xFFE0, 0x10A2);
+    uint8_t rIdx = static_cast<uint8_t>(cfg.dacRouting);
+    _gfx->drawString(rIdx < 4 ? ROUTE_NAMES[rIdx] : "Dual DAC", 155, RY[2] + 10);
+
+    // Row 3: Curve
+    _gfx->fillRect(150, RY[3] + 4, 312, 34, 0x10A2);
+    _gfx->setTextColor(0xFD20, 0x10A2);
+    _gfx->drawString(cfg.gaugeCurve == EcuEngine::SpeedoGaugeCurve::SqrtThermal ? "Non-Linier (Thermal/Sqrt)" : "Linier 1:1 (Standar)", 155, RY[3] + 10);
+
+    // Row 4: Sweep Time
+    _gfx->fillRect(150, RY[4] + 4, 312, 34, 0x10A2);
+    _gfx->setTextColor(0xD69F, 0x10A2);
+    snprintf(buf, sizeof(buf), "%.0f Detik", cfg.sweepTimeSec);
+    _gfx->drawString(buf, 155, RY[4] + 10);
+}
+
+void PageSpeedoTester::onEncoderTurn(uint8_t currentTab, int32_t delta, uint8_t editRow, EcuEngine::SpeedoController& controller) {
+    const auto& cfg = controller.getConfig();
+
+    if (currentTab == 1) { // COCKPIT TAB
+        switch (editRow) {
+            case 0: controller.setKmh(cfg.speedoKmh + (delta * 10)); break;
+            case 1: controller.setRpm(cfg.speedoRpm + (delta * 500)); break;
+            case 2: controller.setTemp(cfg.speedoTempPercent + (delta * 5)); break;
+            case 3: controller.setFuel(cfg.speedoFuelPercent + (delta * 5)); break;
+            case 4: controller.setAutoSweep(!cfg.autoSweep); break;
+            default: break;
+        }
+    } else if (currentTab == 2) { // 3-POINT CALIBRATION TAB
+        switch (editRow) {
+            case 0: controller.setTempCal(cfg.tempCalMin + delta, cfg.tempCalMid, cfg.tempCalMax); break;
+            case 1: controller.setTempCal(cfg.tempCalMin, cfg.tempCalMid + delta, cfg.tempCalMax); break;
+            case 2: controller.setTempCal(cfg.tempCalMin, cfg.tempCalMid, cfg.tempCalMax + delta); break;
+            case 3: controller.setFuelCal(cfg.fuelCalMin + delta, cfg.fuelCalMid, cfg.fuelCalMax); break;
+            case 4: controller.setFuelCal(cfg.fuelCalMin, cfg.fuelCalMid + delta, cfg.fuelCalMax); break;
+            case 5: controller.setFuelCal(cfg.fuelCalMin, cfg.fuelCalMid, cfg.fuelCalMax + delta); break;
+            default: break;
+        }
+    } else if (currentTab == 3) { // HARDWARE & ROUTING TAB
+        switch (editRow) {
+            case 0: {
+                int32_t idx = 1;
+                for (int i = 0; i < 5; ++i) if (abs(cfg.pulsePerKm - PPK_PRESETS[i]) < 10) idx = i;
+                idx = (idx + (delta > 0 ? 1 : -1) + 5) % 5;
+                controller.setPulsePerKm(PPK_PRESETS[idx]);
+                break;
+            }
+            case 1: {
+                int32_t idx = 1;
+                for (int i = 0; i < 5; ++i) if (abs(cfg.speedoTachoPpr - PPR_PRESETS[i]) < 0.1f) idx = i;
+                idx = (idx + (delta > 0 ? 1 : -1) + 5) % 5;
+                controller.setTachoPpr(PPR_PRESETS[idx]);
+                break;
+            }
+            case 2: {
+                int32_t r = (static_cast<int32_t>(cfg.dacRouting) + (delta > 0 ? 1 : -1) + 4) % 4;
+                controller.setDacRouting(static_cast<EcuEngine::SpeedoDacRouting>(r));
+                break;
+            }
+            case 3: {
+                auto c = (cfg.gaugeCurve == EcuEngine::SpeedoGaugeCurve::SqrtThermal) ? EcuEngine::SpeedoGaugeCurve::Linear : EcuEngine::SpeedoGaugeCurve::SqrtThermal;
+                controller.setGaugeCurve(c);
+                break;
+            }
+            case 4: controller.setSweepTimeSec(cfg.sweepTimeSec + delta); break;
+            default: break;
+        }
     }
 }
 
-void PageSpeedoTester::onJoystickAction(EcuHal::JoyAction action, EcuEngine::SpeedoController& controller) {
+void PageSpeedoTester::onEncoderClick(uint8_t currentTab, uint8_t editRow, EcuEngine::SpeedoController& controller) {
     const auto& cfg = controller.getConfig();
-    if (action == EcuHal::JoyAction::Left) {
-        controller.setKmh(cfg.speedoKmh - 10);
-    } else if (action == EcuHal::JoyAction::Right) {
-        controller.setKmh(cfg.speedoKmh + 10);
+    if (currentTab == 1) {
+        switch (editRow) {
+            case 0: controller.setChannelEnable(0, !cfg.speedoEnableKmh); break;
+            case 1: controller.setChannelEnable(1, !cfg.speedoEnableRpm); break;
+            case 2: controller.setChannelEnable(2, !cfg.speedoEnableTemp); break;
+            case 3: controller.setChannelEnable(3, !cfg.speedoEnableFuel); break;
+            case 4: controller.toggleRunning(); break;
+            default: break;
+        }
+    } else if (currentTab == 2) {
+        if (editRow <= 2) controller.setTempCal(0, 50, 100);
+        else controller.setFuelCal(0, 50, 100);
+    } else if (currentTab == 3) {
+        if (editRow == 3) {
+            auto c = (cfg.gaugeCurve == EcuEngine::SpeedoGaugeCurve::SqrtThermal) ? EcuEngine::SpeedoGaugeCurve::Linear : EcuEngine::SpeedoGaugeCurve::SqrtThermal;
+            controller.setGaugeCurve(c);
+        }
     }
 }
 
