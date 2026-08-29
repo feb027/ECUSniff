@@ -166,16 +166,6 @@ float SpeedoController::_apply3PointCal(float rawPercent, int32_t minVal, int32_
     }
 }
 
-float SpeedoController::_applyCurve(float calibratedPercent, SpeedoGaugeCurve curve) {
-    float frac = calibratedPercent / 100.0f;
-    if (frac < 0.0f) frac = 0.0f;
-    if (frac > 1.0f) frac = 1.0f;
-    if (curve == SpeedoGaugeCurve::SqrtThermal) {
-        return std::sqrt(frac);
-    }
-    return frac;
-}
-
 void SpeedoController::update(float dtSeconds) {
     if (!_state.isRunning) {
         _state.currentKmh = 0.0f;
@@ -248,8 +238,13 @@ void SpeedoController::_recalculate() {
 
     // 3. Temp Duty & Voltage
     if (_config.speedoEnableTemp) {
-        float calTemp = _apply3PointCal(_state.currentTemp, _config.tempCalMin, _config.tempCalMid, _config.tempCalMax);
-        float frac = _applyCurve(calTemp, _config.gaugeCurve);
+        float rawFrac = _state.currentTemp / 100.0f;
+        if (rawFrac < 0.0f) rawFrac = 0.0f;
+        if (rawFrac > 1.0f) rawFrac = 1.0f;
+        float shaped = (_config.gaugeCurve == SpeedoGaugeCurve::SqrtThermal) ? std::sqrt(rawFrac) : rawFrac;
+        float frac = _apply3PointCal(shaped * 100.0f, _config.tempCalMin, _config.tempCalMid, _config.tempCalMax) / 100.0f;
+        if (frac < 0.0f) frac = 0.0f;
+        if (frac > 1.0f) frac = 1.0f;
         _state.dutyTemp = frac * 100.0f;
         _state.voltTemp = frac * 5.0f;
     } else {
@@ -259,8 +254,13 @@ void SpeedoController::_recalculate() {
 
     // 4. Fuel Duty & Voltage
     if (_config.speedoEnableFuel) {
-        float calFuel = _apply3PointCal(_state.currentFuel, _config.fuelCalMin, _config.fuelCalMid, _config.fuelCalMax);
-        float frac = _applyCurve(calFuel, _config.gaugeCurve);
+        float rawFrac = _state.currentFuel / 100.0f;
+        if (rawFrac < 0.0f) rawFrac = 0.0f;
+        if (rawFrac > 1.0f) rawFrac = 1.0f;
+        float shaped = (_config.gaugeCurve == SpeedoGaugeCurve::SqrtThermal) ? std::sqrt(rawFrac) : rawFrac;
+        float frac = _apply3PointCal(shaped * 100.0f, _config.fuelCalMin, _config.fuelCalMid, _config.fuelCalMax) / 100.0f;
+        if (frac < 0.0f) frac = 0.0f;
+        if (frac > 1.0f) frac = 1.0f;
         _state.dutyFuel = frac * 100.0f;
         _state.voltFuel = frac * 5.0f;
     } else {

@@ -39,7 +39,6 @@ private:
     SpeedoRuntimeState _state;
 
     float _apply3PointCal(float rawPercent, int32_t minVal, int32_t midVal, int32_t maxVal);
-    float _applyCurve(float calibratedPercent, SpeedoGaugeCurve curve);
     void  _recalculate();
 };
 
