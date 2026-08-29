@@ -57,14 +57,14 @@ void PageMainHub::_drawCard(uint8_t moduleIndex, bool isSelected) {
     if (moduleIndex >= TOTAL_MODULES) return;
     int32_t y = 48 + (moduleIndex * 58);
     uint32_t bgColor = isSelected ? 0x18C3 : 0x0841;
-    uint32_t borderColor = isSelected ? 0xFFE0 : 0x31A6;
     uint32_t titleColor = isSelected ? 0xFFE0 : TFT_WHITE;
     uint32_t descColor = isSelected ? 0x07FF : 0x52AA;
 
+    _gfx->drawRoundRect(11, y - 1, 458, 54, 7, TFT_BLACK);
     _gfx->fillRoundRect(12, y, 456, 52, 6, bgColor);
-    _gfx->drawRoundRect(12, y, 456, 52, 6, borderColor);
+    _gfx->drawRoundRect(12, y, 456, 52, 6, isSelected ? 0xFFE0 : 0x31A6);
     if (isSelected) {
-        _gfx->drawRoundRect(11, y - 1, 458, 54, 7, 0xFFE0);
+        _gfx->drawRoundRect(13, y + 1, 454, 50, 5, 0xFFE0);
     }
 
     _gfx->setTextColor(titleColor, bgColor);

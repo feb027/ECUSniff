@@ -57,8 +57,8 @@ void MenuManager::_drawGeneratorTabBar(bool force) {
             uint32_t bg = _isEditMode ? 0xF800 : 0x07E0;
             _gfx->fillRoundRect(x, 4, 110, 32, 6, bg);
             if (_focusTabBar || _genTab == 0) {
-                _gfx->drawRoundRect(x - 1, 3, 112, 34, 6, 0xFFE0);
                 _gfx->drawRoundRect(x, 4, 110, 32, 6, 0xFFE0);
+                _gfx->drawRoundRect(x + 1, 5, 108, 30, 5, 0xFFE0);
             }
             _gfx->setTextColor(TFT_BLACK, bg);
         } else {
