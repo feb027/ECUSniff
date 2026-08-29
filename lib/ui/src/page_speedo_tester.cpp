@@ -3,7 +3,6 @@
 namespace EcuUi {
 
 static const float PPK_PRESETS[] = { 2548.0f, 4000.0f, 8000.0f, 23333.0f, 30000.0f };
-static const char* PPR_NAMES[]   = { "1.0 (1-Cyl)", "2.0 (4-Cyl)", "3.0 (6-Cyl)", "4.0 (8-Cyl)", "0.5 (Wasted)" };
 static const float PPR_PRESETS[] = { 1.0f, 2.0f, 3.0f, 4.0f, 0.5f };
 static const char* ROUTE_NAMES[] = { "Dual PWM", "Single Fuel", "Single Temp", "Dual MCP4725" };
 
@@ -33,6 +32,20 @@ void PageSpeedoTester::render(uint8_t currentTab, bool fullRedraw, uint8_t editR
         _lastEditRow = 0xFF; _lastKmh = -1; _lastRpm = -1; _lastTemp = -1; _lastFuel = -1;
         for (uint8_t i = 0; i < 6; ++i) _lastCalVals[i] = -99;
         _lastPpk = -1.0f; _lastPpr = -1.0f; _lastRouting = 0xFF; _lastCurve = 0xFF;
+    }
+
+    if (currentTab == 0) {
+        if (fullRedraw) {
+            _gfx->fillRoundRect(40, 100, 400, 130, 8, 0x0841);
+            _gfx->drawRoundRect(40, 100, 400, 130, 8, 0xF800);
+            _gfx->setTextColor(0xF800, 0x0841); _gfx->setTextSize(2);
+            _gfx->drawCenterString("< KELUAR KE MENU UTAMA", 240, 125);
+            _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawCenterString("Tekan / Klik Knob untuk Keluar", 240, 165);
+            _gfx->setTextColor(0x07E0, 0x0841);
+            _gfx->drawCenterString("Geser Joystick ke Kanan (>) untuk Batal", 240, 190);
+        }
+        return;
     }
 
     if (currentTab == 1) _renderTabCockpit(fullRedraw, editRow, controller);
