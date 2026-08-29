@@ -149,7 +149,9 @@ void PageWheelBrowser::_drawList(bool forceAll) {
             uint32_t bg = isSel ? 0x18C3 : 0x10A2;
             _gfx->fillRoundRect(12, y + 2, 248, 48, 4, bg);
             _gfx->drawRoundRect(12, y + 2, 248, 48, 4, isSel ? 0xFFE0 : 0x31A6);
-            if (isSel) _gfx->drawRoundRect(11, y + 1, 250, 50, 5, 0xFFE0);
+            if (isSel) {
+                _gfx->drawRoundRect(13, y + 3, 246, 46, 3, 0xFFE0);
+            }
 
             _gfx->setTextColor(isSel ? 0xFFE0 : TFT_WHITE, bg);
             _gfx->setTextSize(1);

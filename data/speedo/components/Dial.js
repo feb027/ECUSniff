@@ -86,8 +86,6 @@ export function Dial({ label, value, unit, min, max, step, onChange, disabled, s
 
     const handlePointerDown = (e) => {
         if (disabled) return;
-        e.preventDefault();
-        e.stopPropagation();
         isDraggingRef.current = true;
         setIsDragging(true);
         startPointerXRef.current = e.clientX;
@@ -95,18 +93,18 @@ export function Dial({ label, value, unit, min, max, step, onChange, disabled, s
         hasMovedBeyondDeadbandRef.current = false;
 
         if (trackRef.current) {
-            trackRef.current.setPointerCapture(e.pointerId);
+            try {
+                trackRef.current.setPointerCapture(e.pointerId);
+            } catch (err) {}
         }
         setDragVal(startValRef.current);
     };
 
     const handlePointerMove = (e) => {
         if (disabled || !isDraggingRef.current) return;
-        e.preventDefault();
-        e.stopPropagation();
 
         const dx = Math.abs(e.clientX - startPointerXRef.current);
-        if (!hasMovedBeyondDeadbandRef.current && dx < 6) {
+        if (!hasMovedBeyondDeadbandRef.current && dx < 4) {
             return;
         }
         hasMovedBeyondDeadbandRef.current = true;
@@ -118,12 +116,12 @@ export function Dial({ label, value, unit, min, max, step, onChange, disabled, s
 
     const handlePointerUp = (e) => {
         if (!isDraggingRef.current) return;
-        e.preventDefault();
-        e.stopPropagation();
         isDraggingRef.current = false;
         setIsDragging(false);
         if (trackRef.current && trackRef.current.hasPointerCapture(e.pointerId)) {
-            trackRef.current.releasePointerCapture(e.pointerId);
+            try {
+                trackRef.current.releasePointerCapture(e.pointerId);
+            } catch (err) {}
         }
         if (hasMovedBeyondDeadbandRef.current) {
             const finalVal = calculateValueFromPointer(e);
@@ -135,7 +133,7 @@ export function Dial({ label, value, unit, min, max, step, onChange, disabled, s
     };
 
     return html`
-        <div class="${panelClass || 'panel'}" style="padding: 10px 14px; touch-action: none; user-select: none;">
+        <div class="${panelClass || 'panel'}" style="padding: 10px 14px; touch-action: pan-y; -webkit-user-select: none; user-select: none;">
             <div class="panel-header" style="margin-bottom: 2px; font-size: 0.72rem; display: flex; justify-content: space-between; align-items: center;">
                 <span style="color: ${dynamicColor}; font-weight: 800; letter-spacing: 0.04em;">${label}</span>
                 <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: bold;">${min} - ${max} ${unit}</span>
@@ -154,7 +152,7 @@ export function Dial({ label, value, unit, min, max, step, onChange, disabled, s
 
             <div 
                 class="slider-container" 
-                style="opacity: ${disabled ? 0.35 : 1}; pointer-events: ${disabled ? 'none' : 'auto'}; padding: 12px 0; touch-action: none;"
+                style="opacity: ${disabled ? 0.35 : 1}; pointer-events: ${disabled ? 'none' : 'auto'}; padding: 12px 0; touch-action: pan-y;"
             >
                 <div 
                     class="fader-track" 
