@@ -15,7 +15,7 @@ uint16_t ParametricWheel::getActiveTeethCount() const {
 }
 
 bool ParametricWheel::isValid() const {
-    if (totalTeeth < 4 || totalTeeth > 120) return false;
+    if (totalTeeth < 1 || totalTeeth > 360) return false;
     if (missingTeeth >= totalTeeth) return false;
     if (missingPosition >= totalTeeth) return false;
     if (dutyCycle < 0.05f || dutyCycle > 0.95f) return false;
@@ -71,7 +71,7 @@ size_t ParametricEngine::generateCkpCycle(const ParametricWheel& wheel,
         return 0;
     }
 
-    size_t totalCycleTeeth = static_cast<size_t>(wheel.totalTeeth) * 2; // 2 Revolutions (720 deg)
+    size_t totalCycleTeeth = static_cast<size_t>(wheel.totalTeeth) * 2;
     if (totalCycleTeeth > maxSegments) {
         return 0;
     }
@@ -90,19 +90,18 @@ size_t ParametricEngine::generateCkpCycle(const ParametricWheel& wheel,
         bool isMissing = (toothInRev >= wheel.missingPosition && 
                           toothInRev < (wheel.missingPosition + wheel.missingTeeth));
 
-        PulseSegment seg{};
         if (isMissing) {
-            seg.duration0Us = highUs;
-            seg.level0 = 0;
-            seg.duration1Us = lowUs;
-            seg.level1 = 0;
+            outSegments[outIdx].duration0Us = toothPeriodUs;
+            outSegments[outIdx].level0     = wheel.inverted ? 1 : 0;
+            outSegments[outIdx].duration1Us = 0;
+            outSegments[outIdx].level1     = wheel.inverted ? 1 : 0;
         } else {
-            seg.duration0Us = highUs;
-            seg.level0 = wheel.inverted ? 0 : 1;
-            seg.duration1Us = lowUs;
-            seg.level1 = wheel.inverted ? 1 : 0;
+            outSegments[outIdx].duration0Us = highUs;
+            outSegments[outIdx].level0     = wheel.inverted ? 0 : 1;
+            outSegments[outIdx].duration1Us = lowUs;
+            outSegments[outIdx].level1     = wheel.inverted ? 1 : 0;
         }
-        outSegments[outIdx++] = seg;
+        outIdx++;
     }
 
     return outIdx;
@@ -112,39 +111,31 @@ size_t ParametricEngine::generateCmpCycle(const CamEventTable& cam,
                                           uint32_t rpm, 
                                           PulseSegment* outSegments, 
                                           size_t maxSegments) {
-    if (rpm == 0 || outSegments == nullptr || cam.getEventCount() == 0) {
+    uint8_t eventCount = cam.getEventCount();
+    if (eventCount == 0 || rpm == 0 || outSegments == nullptr || !cam.validate()) {
         return 0;
     }
 
     uint32_t cycleTotalUs = TimingMath::calculateCyclePeriodUs(rpm);
-    uint8_t count = cam.getEventCount();
-    const CmpEvent* ev = cam.getEvents();
+    const CmpEvent* events = cam.getEvents();
 
     size_t outIdx = 0;
-    uint32_t lastTimeUs = 0;
-    bool currentLevel = !ev[0].levelHigh;
+    for (uint8_t i = 0; i < eventCount; ++i) {
+        if (outIdx >= maxSegments) break;
 
-    for (uint8_t i = 0; i < count && outIdx < maxSegments; ++i) {
-        uint32_t eventTimeUs = (uint32_t)(((uint64_t)ev[i].angleDeg * cycleTotalUs) / 720.0f);
-        if (eventTimeUs > lastTimeUs) {
-            PulseSegment seg{};
-            seg.duration0Us = eventTimeUs - lastTimeUs;
-            seg.level0 = currentLevel ? 1 : 0;
-            seg.duration1Us = 0;
-            seg.level1 = 0;
-            outSegments[outIdx++] = seg;
-            lastTimeUs = eventTimeUs;
+        float currentAngle = events[i].angleDeg;
+        float nextAngle    = (i + 1 < eventCount) ? events[i + 1].angleDeg : 720.0f;
+
+        uint32_t startUs = TimingMath::angleToTimeUs(currentAngle, rpm);
+        uint32_t endUs   = TimingMath::angleToTimeUs(nextAngle, rpm);
+
+        if (endUs > startUs) {
+            outSegments[outIdx].duration0Us = endUs - startUs;
+            outSegments[outIdx].level0     = events[i].levelHigh ? 1 : 0;
+            outSegments[outIdx].duration1Us = 0;
+            outSegments[outIdx].level1     = events[i].levelHigh ? 1 : 0;
+            outIdx++;
         }
-        currentLevel = ev[i].levelHigh;
-    }
-
-    if (lastTimeUs < cycleTotalUs && outIdx < maxSegments) {
-        PulseSegment seg{};
-        seg.duration0Us = cycleTotalUs - lastTimeUs;
-        seg.level0 = currentLevel ? 1 : 0;
-        seg.duration1Us = 0;
-        seg.level1 = 0;
-        outSegments[outIdx++] = seg;
     }
 
     return outIdx;

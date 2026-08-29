@@ -60,9 +60,6 @@ uint32_t SignalSniffer::_calcPhaseLockOffset(const RawSignalEdge* events, size_t
     }
 
     if (firstRisingOffsetUs != 0xFFFFFFFF) {
-        // If the cam pulse occurred in the first 360 degrees (0 .. revUs):
-        // That means the recording started at the gap of Rev 2!
-        // Shift phase reference by 1 revolution (revUs) so the pulse always lands in Rev 2 (360 .. 720 deg)
         if (firstRisingOffsetUs < revUs) {
             return gap0Us + revUs;
         }
@@ -138,7 +135,7 @@ SignalHealthStatus SignalSniffer::evaluateHealth(bool ckpActive, bool cmpActive,
         if (revPeriodUs >= 1000 && revPeriodUs <= 1200000) {
             h.liveRpm = (uint32_t)(60000000ULL / revPeriodUs);
             if (nominalUs > 0) h.liveTeeth = (uint16_t)roundf((float)revPeriodUs / (float)nominalUs);
-            if (h.liveTeeth >= 3 && h.liveTeeth <= 120) {
+            if (h.liveTeeth >= 1 && h.liveTeeth <= 120) {
                 h.quality = SignalQuality::PhaseLocked;
                 snprintf(h.diagnosticMsg, sizeof(h.diagnosticMsg), cmpActive ? "720-deg Locked (%u RPM)" : "CKP Locked (%u RPM)", (unsigned)h.liveRpm);
             } else {
@@ -227,9 +224,34 @@ SnifferResult SignalSniffer::decode(const RawSignalEdge* events, size_t eventCou
     res.detectedRpm = (uint32_t)(60000000ULL / revPeriodUs);
     if (res.detectedRpm < 50 || res.detectedRpm > 20000) return res;
 
+    // Dynamically calculate real physical CKP pulse width (duty cycle)
+    uint64_t totalHighUs = 0;
+    size_t highPulseCount = 0;
+    for (size_t i = 0; i + 1 < eventCount; ++i) {
+        if (events[i].channel == 0 && events[i].level == 1) {
+            for (size_t j = i + 1; j < eventCount; ++j) {
+                if (events[j].channel == 0) {
+                    if (events[j].level == 0) {
+                        uint32_t highDuration = events[j].timestampUs - events[i].timestampUs;
+                        if (highDuration > 5 && highDuration < nominalPeriod) {
+                            totalHighUs += highDuration;
+                            highPulseCount++;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    float measuredDuty = 0.50f;
+    if (highPulseCount > 0 && nominalPeriod > 0) {
+        float avgHigh = (float)totalHighUs / (float)highPulseCount;
+        measuredDuty = avgHigh / (float)nominalPeriod;
+    }
+
     res.wheel.totalTeeth = totalTeeth; res.wheel.missingTeeth = missingTeeth;
     res.wheel.missingPosition = 0;
-    res.wheel.dutyCycle = 0.50f;
+    res.wheel.dutyCycle = clampVal(measuredDuty, 0.10f, 0.90f);
     res.wheel.inverted = false;
 
     // True Gap-Start 0.0 deg Reference: (Tooth #1 - (M * nominalPeriod))
