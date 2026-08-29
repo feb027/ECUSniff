@@ -3,13 +3,17 @@
 namespace EcuUi {
 
 MenuManager::MenuManager(LovyanGFX* gfx)
-    : _gfx(gfx), _pageHub(gfx), _pageDash(gfx), _pageCkp(gfx), _pageCmp(gfx), _pageCapture(gfx), _pageEps(gfx) {}
+    : _gfx(gfx), _pageHub(gfx), _pageDash(gfx), _pageCkp(gfx), _pageCmp(gfx),
+      _pageCapture(gfx), _pageEps(gfx), _pageSpeedo(gfx) {}
 
-void MenuManager::init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffer* sniffer, EcuEngine::EpsController* eps) {
+void MenuManager::init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffer* sniffer,
+                       EcuEngine::EpsController* eps, EcuEngine::SpeedoController* speedo) {
     _epsController = eps;
+    _speedoController = speedo;
     _pageDash.init();
     _pageCapture.init(capDriver, sniffer);
     _pageEps.init();
+    _pageSpeedo.init();
     _uiLevel = UiLevel::MainHub;
     _hubIndex = 0;
     _genTab = 1;
@@ -83,9 +87,13 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
     }
 
     if (_uiLevel == UiLevel::EpsTester) {
-        if (_epsController) {
-            _pageEps.render(_needsFullRedraw, _isEditMode, _editRow, *_epsController);
-        }
+        if (_epsController) _pageEps.render(_needsFullRedraw, _isEditMode, _editRow, *_epsController);
+        _needsFullRedraw = false;
+        return;
+    }
+
+    if (_uiLevel == UiLevel::SpeedoTester) {
+        if (_speedoController) _pageSpeedo.render(_needsFullRedraw, _isEditMode, _editRow, *_speedoController);
         _needsFullRedraw = false;
         return;
     }
@@ -121,6 +129,19 @@ void MenuManager::onEncoderTurn(int32_t delta,
         if (!_epsController) return;
         if (_isEditMode) {
             _pageEps.onEncoderTurn(delta, _editRow, *_epsController);
+        } else {
+            int32_t r = static_cast<int32_t>(_editRow) + (delta > 0 ? 1 : -1);
+            if (r < 0) r = 4;
+            if (r > 4) r = 0;
+            _editRow = static_cast<uint8_t>(r);
+        }
+        return;
+    }
+
+    if (_uiLevel == UiLevel::SpeedoTester) {
+        if (!_speedoController) return;
+        if (_isEditMode) {
+            _pageSpeedo.onEncoderTurn(delta, _editRow, *_speedoController);
         } else {
             int32_t r = static_cast<int32_t>(_editRow) + (delta > 0 ? 1 : -1);
             if (r < 0) r = 4;
@@ -174,50 +195,45 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
     if (action == EcuHal::JoyAction::None) return;
 
     if (_uiLevel == UiLevel::EpsTester) {
-        if (action == EcuHal::JoyAction::Up) {
-            _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
-        } else if (action == EcuHal::JoyAction::Down) {
-            _editRow = (_editRow + 1) % 5;
-        } else if (action == EcuHal::JoyAction::Left || action == EcuHal::JoyAction::Right) {
+        if (action == EcuHal::JoyAction::Up) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
+        else if (action == EcuHal::JoyAction::Down) _editRow = (_editRow + 1) % 5;
+        else if (action == EcuHal::JoyAction::Left || action == EcuHal::JoyAction::Right) {
             if (_epsController) _pageEps.onJoystickAction(action, *_epsController);
         } else if (action == EcuHal::JoyAction::Click) {
-            if (_editRow == 4 && _epsController) {
-                _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
-            } else {
-                _isEditMode = !_isEditMode;
-            }
+            if (_editRow == 4 && _epsController) _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
+            else _isEditMode = !_isEditMode;
+        }
+        return;
+    }
+
+    if (_uiLevel == UiLevel::SpeedoTester) {
+        if (action == EcuHal::JoyAction::Up) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
+        else if (action == EcuHal::JoyAction::Down) _editRow = (_editRow + 1) % 5;
+        else if (action == EcuHal::JoyAction::Left || action == EcuHal::JoyAction::Right) {
+            if (_speedoController) _pageSpeedo.onJoystickAction(action, *_speedoController);
+        } else if (action == EcuHal::JoyAction::Click) {
+            if (_editRow == 4 && _speedoController) _speedoController->setAutoSweep(!_speedoController->getConfig().autoSweep);
+            else _isEditMode = !_isEditMode;
         }
         return;
     }
 
     if (action == EcuHal::JoyAction::Left) {
-        if (_uiLevel == UiLevel::MainHub) {
-            _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 2;
-        } else if (_genTab > 0) {
-            _genTab--;
-            _editRow = 0;
-            _needsFullRedraw = true;
-        }
+        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 3;
+        else if (_genTab > 0) { _genTab--; _editRow = 0; _needsFullRedraw = true; }
     } else if (action == EcuHal::JoyAction::Right) {
-        if (_uiLevel == UiLevel::MainHub) {
-            _hubIndex = (_hubIndex + 1) % 3;
-        } else if (_genTab < 3) {
-            _genTab++;
-            _editRow = 0;
-            _needsFullRedraw = true;
-        }
+        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex + 1) % 4;
+        else if (_genTab < 3) { _genTab++; _editRow = 0; _needsFullRedraw = true; }
     } else if (action == EcuHal::JoyAction::Up) {
-        if (_uiLevel == UiLevel::MainHub) {
-            _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 2;
-        } else if (_uiLevel == UiLevel::Generator) {
+        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex > 0) ? (_hubIndex - 1) : 3;
+        else if (_uiLevel == UiLevel::Generator) {
             if (_genTab == 1) _editRow = (_editRow > 0) ? (_editRow - 1) : 2;
             else if (_genTab == 2) _editRow = (_editRow > 0) ? (_editRow - 1) : 4;
             else if (_genTab == 3) _editRow = (_editRow > 0) ? (_editRow - 1) : 3;
         }
     } else if (action == EcuHal::JoyAction::Down) {
-        if (_uiLevel == UiLevel::MainHub) {
-            _hubIndex = (_hubIndex + 1) % 3;
-        } else if (_uiLevel == UiLevel::Generator) {
+        if (_uiLevel == UiLevel::MainHub) _hubIndex = (_hubIndex + 1) % 4;
+        else if (_uiLevel == UiLevel::Generator) {
             if (_genTab == 1) _editRow = (_editRow + 1) % 3;
             else if (_genTab == 2) _editRow = (_editRow + 1) % 5;
             else if (_genTab == 3) _editRow = (_editRow + 1) % 4;
@@ -227,6 +243,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
             if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
             else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
             else if (_hubIndex == 2) { _uiLevel = UiLevel::EpsTester; _editRow = 0; _isEditMode = false; }
+            else if (_hubIndex == 3) { _uiLevel = UiLevel::SpeedoTester; _editRow = 0; _isEditMode = false; }
             _needsFullRedraw = true;
         } else if (_genTab == 0) {
             returnToMainHub();
@@ -243,16 +260,20 @@ void MenuManager::onEncoderClick() {
         if (_hubIndex == 0) { _uiLevel = UiLevel::Generator; _genTab = 1; }
         else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
         else if (_hubIndex == 2) { _uiLevel = UiLevel::EpsTester; _editRow = 0; _isEditMode = false; }
+        else if (_hubIndex == 3) { _uiLevel = UiLevel::SpeedoTester; _editRow = 0; _isEditMode = false; }
         _needsFullRedraw = true;
         return;
     }
 
     if (_uiLevel == UiLevel::EpsTester) {
-        if (_editRow == 4 && _epsController) {
-            _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
-        } else {
-            _isEditMode = !_isEditMode;
-        }
+        if (_editRow == 4 && _epsController) _epsController->setAutoSweep(!_epsController->getConfig().autoSweep);
+        else _isEditMode = !_isEditMode;
+        return;
+    }
+
+    if (_uiLevel == UiLevel::SpeedoTester) {
+        if (_editRow == 4 && _speedoController) _speedoController->setAutoSweep(!_speedoController->getConfig().autoSweep);
+        else _isEditMode = !_isEditMode;
         return;
     }
 
@@ -278,6 +299,10 @@ void MenuManager::onEncoderDoubleClick(EcuEngine::ParametricWheel& wheel, EcuEng
     }
     if (_uiLevel == UiLevel::EpsTester) {
         if (_epsController) _epsController->toggleRunning();
+        return;
+    }
+    if (_uiLevel == UiLevel::SpeedoTester) {
+        if (_speedoController) _speedoController->toggleRunning();
         return;
     }
     returnToMainHub();

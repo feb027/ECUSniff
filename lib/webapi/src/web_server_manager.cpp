@@ -171,6 +171,41 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
         eps["sweep"] = epsCfg.autoSweep;
     }
 
+    if (_speedoController) {
+        JsonObject sp = doc["speedo"].to<JsonObject>();
+        const auto& spCfg = _speedoController->getConfig();
+        const auto& spSt = _speedoController->getState();
+        sp["isRunning"] = spSt.isRunning;
+        sp["kmh"] = spCfg.speedoKmh;
+        sp["rpm"] = spCfg.speedoRpm;
+        sp["maxRpm"] = spCfg.speedoMaxRpm;
+        sp["temp"] = spCfg.speedoTempPercent;
+        sp["fuel"] = spCfg.speedoFuelPercent;
+        sp["enKmh"] = spCfg.speedoEnableKmh;
+        sp["enRpm"] = spCfg.speedoEnableRpm;
+        sp["enTemp"] = spCfg.speedoEnableTemp;
+        sp["enFuel"] = spCfg.speedoEnableFuel;
+        sp["ppk"] = spCfg.pulsePerKm;
+        sp["ppr"] = spCfg.speedoTachoPpr;
+        sp["pwmFreq"] = spCfg.speedoPwmFreqHz;
+        sp["curve"] = static_cast<uint8_t>(spCfg.gaugeCurve);
+        sp["dacRouting"] = static_cast<uint8_t>(spCfg.dacRouting);
+        sp["dacFuel"] = spSt.dacFuelFound;
+        sp["dacTemp"] = spSt.dacTempFound;
+        sp["sweep"] = spCfg.autoSweep;
+        sp["sweepTime"] = spCfg.sweepTimeSec;
+        sp["liveKmh"] = spSt.currentKmh;
+        sp["liveRpm"] = spSt.currentRpm;
+        sp["liveTemp"] = spSt.currentTemp;
+        sp["liveFuel"] = spSt.currentFuel;
+        sp["hzKmh"] = spSt.hzKmh;
+        sp["hzRpm"] = spSt.hzRpm;
+        sp["dutyTemp"] = spSt.dutyTemp;
+        sp["dutyFuel"] = spSt.dutyFuel;
+        sp["voltTemp"] = spSt.voltTemp;
+        sp["voltFuel"] = spSt.voltFuel;
+    }
+
     String out;
     serializeJson(doc, out);
     _ws.textAll(out);

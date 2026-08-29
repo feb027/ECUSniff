@@ -10,7 +10,9 @@
 #include "page_cmp.h"
 #include "page_capture.h"
 #include "page_eps_tester.h"
+#include "page_speedo_tester.h"
 #include "eps_controller.h"
+#include "speedo_controller.h"
 
 namespace EcuUi {
 
@@ -18,14 +20,16 @@ enum class UiLevel : uint8_t {
     MainHub = 0,
     Generator = 1,
     Capture = 2,
-    EpsTester = 3
+    EpsTester = 3,
+    SpeedoTester = 4
 };
 
 class MenuManager {
 public:
     explicit MenuManager(LovyanGFX* gfx);
 
-    void init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffer* sniffer, EcuEngine::EpsController* eps);
+    void init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffer* sniffer,
+              EcuEngine::EpsController* eps, EcuEngine::SpeedoController* speedo);
     void render(const EcuEngine::EngineRuntimeState& state,
                 const EcuEngine::ParametricWheel& wheel,
                 const EcuEngine::CamEventTable& cam);
@@ -48,6 +52,7 @@ public:
     uint8_t getActiveTab() const { return _genTab; }
     const PageCapture& getPageCapture() const { return _pageCapture; }
     PageEpsTester& getPageEps() { return _pageEps; }
+    PageSpeedoTester& getPageSpeedo() { return _pageSpeedo; }
 
     void setUiLevel(UiLevel level);
     void setGenTab(uint8_t tab);
@@ -67,14 +72,16 @@ private:
     uint8_t _lastDrawnTab{0xFF};
     bool    _lastDrawnEditMode{false};
 
-    PageMainHub   _pageHub;
-    PageDashboard _pageDash;
-    PageCkp       _pageCkp;
-    PageCmp       _pageCmp;
-    PageCapture   _pageCapture;
-    PageEpsTester _pageEps;
+    PageMainHub      _pageHub;
+    PageDashboard    _pageDash;
+    PageCkp          _pageCkp;
+    PageCmp          _pageCmp;
+    PageCapture      _pageCapture;
+    PageEpsTester    _pageEps;
+    PageSpeedoTester _pageSpeedo;
 
-    EcuEngine::EpsController* _epsController{nullptr};
+    EcuEngine::EpsController*    _epsController{nullptr};
+    EcuEngine::SpeedoController* _speedoController{nullptr};
 
     void _drawGeneratorTabBar(bool force);
 };

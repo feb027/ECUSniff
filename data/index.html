@@ -48,19 +48,19 @@
                 </div>
                 <span class="drawer-badge badge-active">AKTIF</span>
             </div>
-            <div class="drawer-item disabled">
+            <div class="drawer-item" id="drawerItemSpeedo" onclick="selectDrawerModule('speedo')">
                 <div>
-                    <div class="drawer-item-title">4. Bus Communication</div>
-                    <div class="drawer-item-sub">CAN-Bus, LIN, K-Line Protocol</div>
+                    <div class="drawer-item-title">4. Speedometer Tester</div>
+                    <div class="drawer-item-sub">Speed, Tacho, Suhu ECT, Bensin & Sweep</div>
                 </div>
-                <span class="drawer-badge badge-future">TAHAP 7</span>
+                <span class="drawer-badge badge-active">AKTIF</span>
             </div>
             <div class="drawer-item disabled">
                 <div>
-                    <div class="drawer-item-title">5. ECU Bench Validation</div>
-                    <div class="drawer-item-sub">Injector, Ignition, Sync Test</div>
+                    <div class="drawer-item-title">5. Bus Communication</div>
+                    <div class="drawer-item-sub">CAN-Bus, LIN, K-Line Protocol</div>
                 </div>
-                <span class="drawer-badge badge-future">TAHAP 8</span>
+                <span class="drawer-badge badge-future">TAHAP 7</span>
             </div>
         </div>
     </aside>
@@ -309,6 +309,11 @@
 
                 <button id="btnEpsPower" class="btn-power-full btn-start" style="min-height: 44px;" onclick="toggleEpsPower()">JALANKAN EPS</button>
             </div>
+        </div>
+
+        <!-- MODULE 4: SPEEDOMETER & CLUSTER TESTER -->
+        <div id="moduleSpeedo" style="display: none; width: 100%; height: calc(100vh - 70px); min-height: 600px;">
+            <iframe src="/speedo.html" style="width: 100%; height: 100%; border: none; border-radius: 6px; background: #000;" title="Speedometer & Cluster Tester"></iframe>
         </div>
     </main>
 

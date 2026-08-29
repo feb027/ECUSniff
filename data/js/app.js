@@ -35,32 +35,37 @@ function selectDrawerModule(mod) {
 
 function switchMainModule(mod, userTriggered = true) {
     if (userTriggered) userActionLockUntil = Date.now() + 2000;
-    const isGen = (mod === 'generator'), isCap = (mod === 'capture'), isEps = (mod === 'eps');
+    const isGen = (mod === 'generator'), isCap = (mod === 'capture'), isEps = (mod === 'eps'), isSpeedo = (mod === 'speedo');
     const genEl = document.getElementById('moduleGenerator');
     const capEl = document.getElementById('moduleCapture');
     const epsEl = document.getElementById('moduleEps');
+    const speedoEl = document.getElementById('moduleSpeedo');
     const navEl = document.getElementById('generatorBottomNav');
     if (genEl) genEl.style.display = isGen ? 'block' : 'none';
     if (capEl) capEl.style.display = isCap ? 'block' : 'none';
     if (epsEl) epsEl.style.display = isEps ? 'block' : 'none';
+    if (speedoEl) speedoEl.style.display = isSpeedo ? 'block' : 'none';
     if (navEl) navEl.style.display = isGen ? 'flex' : 'none';
 
     const itemGen = document.getElementById('drawerItemGen');
     const itemCap = document.getElementById('drawerItemCap');
     const itemEps = document.getElementById('drawerItemEps');
+    const itemSpeedo = document.getElementById('drawerItemSpeedo');
     if (itemGen) itemGen.classList.toggle('active', isGen);
     if (itemCap) itemCap.classList.toggle('active', isCap);
     if (itemEps) itemEps.classList.toggle('active', isEps);
+    if (itemSpeedo) itemSpeedo.classList.toggle('active', isSpeedo);
 
     const titleEl = document.getElementById('headerActiveTitle');
     if (titleEl) {
         if (isGen) titleEl.innerText = 'GENERATOR SINYAL';
         else if (isCap) titleEl.innerText = 'SIGNAL CAPTURE / SNIFFER';
         else if (isEps) titleEl.innerText = 'EPS & VSS BENCH TESTER';
+        else if (isSpeedo) titleEl.innerText = 'SPEEDOMETER & CLUSTER TESTER';
     }
 
     if (userTriggered) {
-        const lvl = isGen ? 1 : (isCap ? 2 : 3);
+        const lvl = isGen ? 1 : (isCap ? 2 : (isEps ? 3 : 4));
         lastSyncedLevel = lvl;
         sendCommand('set_ui_level', lvl);
     }
@@ -152,6 +157,7 @@ function handlePhysicalSync(msg) {
     if (msg.uiLevel === 1 && lastSyncedLevel !== 1) { lastSyncedLevel = 1; switchMainModule('generator', false); }
     else if (msg.uiLevel === 2 && lastSyncedLevel !== 2) { lastSyncedLevel = 2; switchMainModule('capture', false); }
     else if (msg.uiLevel === 3 && lastSyncedLevel !== 3) { lastSyncedLevel = 3; switchMainModule('eps', false); }
+    else if (msg.uiLevel === 4 && lastSyncedLevel !== 4) { lastSyncedLevel = 4; switchMainModule('speedo', false); }
     else if (msg.uiLevel === 0) { lastSyncedLevel = 0; }
 
     if (msg.uiLevel === 1 && msg.tab && msg.tab !== lastSyncedTab) {

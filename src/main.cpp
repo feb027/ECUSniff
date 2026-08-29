@@ -13,6 +13,8 @@
 #include "signal_sniffer.h"
 #include "eps_controller.h"
 #include "eps_driver.h"
+#include "speedo_controller.h"
+#include "speedo_driver.h"
 #include "web_server_manager.h"
 #include "menu_manager.h"
 
@@ -24,6 +26,8 @@ static EcuHal::CaptureDriver        captureDriver;
 static EcuEngine::SignalSniffer     sniffer;
 static EcuEngine::EpsController     epsController;
 static EcuHal::EpsDriver            epsDriver;
+static EcuEngine::SpeedoController  speedoController;
+static EcuHal::SpeedoDriver         speedoDriver;
 static EcuWebApi::WebServerManager  webManager;
 static EcuEngine::RpmController     rpmController;
 static EcuUi::MenuManager*          menuMgr = nullptr;
@@ -113,7 +117,8 @@ static void loadSettings() {
 }
 
 void taskCore0UiWeb(void *pvParameters) {
-    uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, lastEps = 0, btnTime = 0, relTime = 0;
+    uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, lastEps = 0, lastSpeedo = 0;
+    uint32_t btnTime = 0, relTime = 0;
     uint8_t clickCount = 0; bool btnDown = false, longHandled = false;
 
     for (;;) {
@@ -180,6 +185,12 @@ void taskCore0UiWeb(void *pvParameters) {
             float dtSec = (now - lastEps) / 1000.0f; lastEps = now;
             epsController.update(dtSec);
             epsDriver.updateOutputs(epsController.getState());
+        }
+
+        if (now - lastSpeedo >= 20) {
+            float dtSec = (now - lastSpeedo) / 1000.0f; lastSpeedo = now;
+            speedoController.update(dtSec);
+            speedoDriver.updateOutputs(speedoController.getConfig(), speedoController.getState());
         }
 
         if (now - lastWeb >= 100) {
@@ -278,17 +289,50 @@ void setup() {
             epsController.setPreset(static_cast<EcuEngine::EpsOemPreset>(val));
         } else if (cmd == "eps_sweep") {
             epsController.setAutoSweep(val != 0);
+        } else if (cmd == "speedo_toggle") {
+            speedoController.toggleRunning();
+        } else if (cmd == "speedo_set") {
+            if (doc["kmh"].is<int32_t>()) speedoController.setKmh(doc["kmh"].as<int32_t>());
+            if (doc["rpm"].is<int32_t>()) speedoController.setRpm(doc["rpm"].as<int32_t>());
+            if (doc["temp"].is<int32_t>()) speedoController.setTemp(doc["temp"].as<int32_t>());
+            if (doc["fuel"].is<int32_t>()) speedoController.setFuel(doc["fuel"].as<int32_t>());
+        } else if (cmd == "speedo_set_ch") {
+            String ch = doc["ch"] | ""; bool en = doc["en"] | true;
+            if (ch == "kmh") speedoController.setChannelEnable(0, en);
+            else if (ch == "rpm") speedoController.setChannelEnable(1, en);
+            else if (ch == "temp") speedoController.setChannelEnable(2, en);
+            else if (ch == "fuel") speedoController.setChannelEnable(3, en);
+        } else if (cmd == "speedo_set_ppk") {
+            if (doc["val"].is<float>()) speedoController.setPulsePerKm(doc["val"].as<float>());
+        } else if (cmd == "speedo_set_ppr") {
+            if (doc["val"].is<float>()) speedoController.setTachoPpr(doc["val"].as<float>());
+        } else if (cmd == "speedo_set_max_rpm") {
+            if (doc["val"].is<int32_t>()) speedoController.setMaxRpm(doc["val"].as<int32_t>());
+        } else if (cmd == "speedo_set_temp_cal") {
+            speedoController.setTempCal(doc["min"] | 0, doc["mid"] | 50, doc["max"] | 100);
+        } else if (cmd == "speedo_set_fuel_cal") {
+            speedoController.setFuelCal(doc["min"] | 0, doc["mid"] | 50, doc["max"] | 100);
+        } else if (cmd == "speedo_set_curve") {
+            speedoController.setGaugeCurve(static_cast<EcuEngine::SpeedoGaugeCurve>(val));
+        } else if (cmd == "speedo_set_dac_routing") {
+            speedoController.setDacRouting(static_cast<EcuEngine::SpeedoDacRouting>(val));
+        } else if (cmd == "speedo_set_sweep") {
+            speedoController.setAutoSweep(val != 0);
+        } else if (cmd == "speedo_set_sweep_time") {
+            if (doc["val"].is<float>()) speedoController.setSweepTimeSec(doc["val"].as<float>());
         }
     });
     webManager.setCaptureDriver(&captureDriver);
     webManager.setEpsController(&epsController);
+    webManager.setSpeedoController(&speedoController);
     webManager.init();
 
-    encoder.init(); joystick.init(); captureDriver.init(); signalGen.init(); epsDriver.init();
+    encoder.init(); joystick.init(); captureDriver.init(); signalGen.init();
+    epsDriver.init(); speedoDriver.init();
     signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm); signalGen.stop();
     display.init();
     menuMgr = new EcuUi::MenuManager(&display.getGfx());
-    menuMgr->init(&captureDriver, &sniffer, &epsController);
+    menuMgr->init(&captureDriver, &sniffer, &epsController, &speedoController);
 
     xTaskCreatePinnedToCore(taskCore0UiWeb, "UiWebTask", 12288, NULL, 1, NULL, 0);
 }

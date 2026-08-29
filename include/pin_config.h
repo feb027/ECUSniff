@@ -49,6 +49,14 @@ constexpr int8_t EPS_RPM  = 39;  ///< Engine Speed Tachometer Pulse OUT
 constexpr int8_t EPS_TRQ1 = 40;  ///< Steering Torque Sensor 1 / PWM OUT
 constexpr int8_t EPS_TRQ2 = 41;  ///< Steering Torque Sensor 2 / PWM OUT
 
+// 7. Dedicated Speedometer Cluster Tester Outputs
+constexpr int8_t SPEEDO_KMH  = 47; ///< Speedometer Pulse OUT
+constexpr int8_t SPEEDO_RPM  = 48; ///< Tachometer Pulse OUT
+constexpr int8_t SPEEDO_TEMP = 45; ///< Temperature Gauge PWM OUT
+constexpr int8_t SPEEDO_FUEL = 46; ///< Fuel Gauge PWM OUT
+constexpr int8_t I2C_SDA     = 13; ///< I2C SDA for MCP4725 Dual DAC
+constexpr int8_t I2C_SCL     = 20; ///< I2C SCL for MCP4725 Dual DAC
+
 #else
 
 // ============================================================================
@@ -89,6 +97,14 @@ constexpr int8_t EPS_VSS  = 4;   ///< Vehicle Speed Sensor (VSS) Pulse OUT
 constexpr int8_t EPS_RPM  = 2;   ///< Engine Speed Tachometer Pulse OUT
 constexpr int8_t EPS_TRQ1 = 15;  ///< Steering Torque Sensor 1 / PWM OUT
 constexpr int8_t EPS_TRQ2 = 5;   ///< Steering Torque Sensor 2 / PWM OUT
+
+// 7. Dedicated Speedometer Cluster Tester Outputs
+constexpr int8_t SPEEDO_KMH  = 2;  ///< Speedometer Pulse OUT
+constexpr int8_t SPEEDO_RPM  = 4;  ///< Tachometer Pulse OUT
+constexpr int8_t SPEEDO_TEMP = 15; ///< Temperature Gauge PWM OUT (4N35)
+constexpr int8_t SPEEDO_FUEL = 5;  ///< Fuel Gauge PWM OUT (4N35)
+constexpr int8_t I2C_SDA     = 21; ///< I2C SDA for MCP4725 Dual DAC
+constexpr int8_t I2C_SCL     = 22; ///< I2C SCL for MCP4725 Dual DAC
 
 #endif
 
