@@ -6,7 +6,11 @@
 namespace EcuUi {
 
 static const char* CAT_NAMES[] = {
-    "SEMUA", "TOYOTA", "HONDA", "MITSU/MAZDA", "EURO/US", "UNIVERSAL", "CUSTOM"
+    "ALL", "TOYOTA", "HONDA", "MITSU", "EURO/US", "UNIV", "CUSTOM"
+};
+
+static const uint16_t CAT_WIDTHS[] = {
+    54, 62, 58, 56, 66, 54, 66
 };
 
 PageWheelBrowser::PageWheelBrowser(LovyanGFX* gfx) : _gfx(gfx), _canvas(gfx) {}
@@ -106,9 +110,9 @@ void PageWheelBrowser::_drawHeader() {
     _gfx->drawFastHLine(0, 42, 480, 0x52AA);
 
     uint8_t catIdx = static_cast<uint8_t>(_category);
-    int32_t xPos = 4;
+    int32_t xPos = 20;
     for (uint8_t c = 0; c < 7; ++c) {
-        int32_t w = (c == 3 || c == 4) ? 82 : 62;
+        int32_t w = CAT_WIDTHS[c];
         bool active = (c == catIdx);
         _gfx->fillRoundRect(xPos, 5, w, 32, 5, active ? 0x07E0 : 0x18C3);
         if (active) _gfx->drawRoundRect(xPos, 5, w, 32, 5, 0xFFE0);
@@ -152,9 +156,9 @@ void PageWheelBrowser::_drawList(bool forceAll) {
             char tBuf[32]; snprintf(tBuf, sizeof(tBuf), "%2d. %-22.22s", itemIdx + 1, name);
             _gfx->drawString(tBuf, 18, y + 8);
 
-            _gfx->setTextColor(isSel ? 0x07FF : 0x52AA, bg);
+            _gfx->setTextColor(isSel ? 0x07FF : 0x07E0, bg);
             char subBuf[32]; snprintf(subBuf, sizeof(subBuf), "Pola: %u-%u CKP | %u Pulsa CAM", teeth, mTeeth, cams);
-            _gfx->drawString(subBuf, 34, y + 26);
+            _gfx->drawString(subBuf, 28, y + 26);
         } else {
             _gfx->fillRect(12, y + 2, 248, 48, 0x0841);
         }
@@ -192,15 +196,18 @@ void PageWheelBrowser::_drawPreview() {
 
     _canvas.render(wheel, cam, 273, 68);
 
-    _gfx->fillRect(274, 144, 196, 130, 0x0841);
+    _gfx->fillRect(274, 144, 196, 92, 0x0841);
     _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
     char buf[48];
     snprintf(buf, sizeof(buf), "Nama   : %s", p->name); _gfx->drawString(buf, 278, 150);
-    snprintf(buf, sizeof(buf), "Teeth  : %u Gigi (Missing %u)", p->totalTeeth, p->missingTeeth); _gfx->drawString(buf, 278, 172);
-    snprintf(buf, sizeof(buf), "Duty   : %.0f %% | Inv: %s", p->dutyCycle * 100.0f, p->inverted ? "YES" : "NO"); _gfx->drawString(buf, 278, 194);
-    snprintf(buf, sizeof(buf), "Cam Evs: %u Transisi (720d)", p->camCount); _gfx->drawString(buf, 278, 216);
+    _gfx->setTextColor(0xFFE0, 0x0841);
+    snprintf(buf, sizeof(buf), "Teeth  : %u Gigi (Missing %u)", p->totalTeeth, p->missingTeeth); _gfx->drawString(buf, 278, 170);
+    _gfx->setTextColor(0x07FF, 0x0841);
+    snprintf(buf, sizeof(buf), "Duty   : %.0f %% | Inv: %s", p->dutyCycle * 100.0f, p->inverted ? "YES" : "NO"); _gfx->drawString(buf, 278, 190);
+    _gfx->setTextColor(0x07E0, 0x0841);
+    snprintf(buf, sizeof(buf), "Cam Evs: %u Transisi (720d)", p->camCount); _gfx->drawString(buf, 278, 210);
 
-    _gfx->fillRoundRect(276, 240, 192, 34, 4, 0x03E0); _gfx->drawRoundRect(276, 240, 192, 34, 4, 0x07E0);
+    _gfx->fillRoundRect(276, 238, 192, 36, 4, 0x03E0); _gfx->drawRoundRect(276, 238, 192, 36, 4, 0x07E0);
     _gfx->setTextColor(0x07E0, 0x03E0); _gfx->setTextSize(2);
     _gfx->drawCenterString("KLIK TERAPKAN", 372, 248);
 }
@@ -209,7 +216,7 @@ void PageWheelBrowser::_drawFooter() {
     _gfx->fillRect(0, 284, 480, 36, 0x0841);
     _gfx->drawFastHLine(0, 284, 480, 0x52AA);
     _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-    _gfx->drawString("Joy-X: Ganti Kategori | Joy-Y: Pilih Pola | Putar: Scroll | KLIK: Terapkan | DOUBLE-KLIK: Batal", 10, 296);
+    _gfx->drawString("Joy-X: Kategori | Joy-Y: Pilih Pola | Putar: Scroll | KLIK: Terapkan | 2x KLIK: Batal", 10, 296);
 }
 
 void PageWheelBrowser::onEncoderTurn(int32_t delta) {
