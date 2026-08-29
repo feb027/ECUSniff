@@ -7,7 +7,7 @@
 namespace EcuUi {
 
 struct WheelPresetItem {
-    char     name[32];
+    char     name[48];
     uint16_t totalTeeth;
     uint8_t  missingTeeth;
     uint8_t  missingPosition;

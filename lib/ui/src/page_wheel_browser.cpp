@@ -96,7 +96,7 @@ void PageWheelBrowser::_drawList(bool forceAll) {
             _gfx->drawRoundRect(12, y + 2, 264, 76, 5, isSel ? 0xFFE0 : 0x31A6);
             if (isSel) _gfx->drawRoundRect(13, y + 3, 262, 74, 4, 0xFFE0);
 
-            char titleLine1[24]{}, titleLine2[24]{}, fullTitle[48];
+            char titleLine1[28]{}, titleLine2[36]{}, fullTitle[64];
             snprintf(fullTitle, sizeof(fullTitle), "%d. %s", itemIdx + 1, name);
             bool isMultiLine = (strlen(fullTitle) > 19);
             if (!isMultiLine) strncpy(titleLine1, fullTitle, sizeof(titleLine1) - 1);
@@ -149,7 +149,7 @@ void PageWheelBrowser::_drawPreview() {
     _gfx->fillRect(290, 142, 180, 110, 0x0841); _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(2);
     if (strlen(p->name) <= 14) _gfx->drawString(p->name, 292, 144);
     else {
-        char line1[16]{}, line2[20]{}; int split = 14;
+        char line1[24]{}, line2[32]{}; int split = 14;
         while (split > 0 && p->name[split] != ' ') split--;
         if (split <= 0) split = 14;
         strncpy(line1, p->name, split); line1[split] = '\0';
