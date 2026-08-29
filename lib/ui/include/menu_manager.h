@@ -63,14 +63,16 @@ private:
     UiLevel _uiLevel{UiLevel::MainHub};
     uint8_t _hubIndex{0};
 
-    uint8_t _genTab{1};       // 0: < MENU, 1: DASH, 2: CKP, 3: CMP
+    uint8_t _genTab{1};       // 0: < MENU, 1: DASH/COCKPIT, 2: CKP/CAL, 3: CMP/HW
     uint8_t _lastTab{0xFF};
     bool    _isEditMode{false};
     uint8_t _editRow{0};
+    bool    _focusTabBar{false};
     bool    _needsFullRedraw{true};
 
     uint8_t _lastDrawnTab{0xFF};
     bool    _lastDrawnEditMode{false};
+    bool    _lastDrawnFocusTabBar{false};
 
     PageMainHub      _pageHub;
     PageDashboard    _pageDash;
