@@ -8,6 +8,7 @@ namespace EcuHal {
 SpeedoDriver::SpeedoDriver() = default;
 
 void SpeedoDriver::detectDacs(bool& fuelFound, bool& tempFound) {
+    Wire.setTimeOut(2);
     Wire.beginTransmission(MCP4725_ADDR_FUEL);
     _dacFuelFound = (Wire.endTransmission() == 0);
 
@@ -24,6 +25,7 @@ void SpeedoDriver::_writeDac(uint8_t addr, float volts) {
     uint16_t dacValue = static_cast<uint16_t>((volts / 5.0f) * 4095.0f);
     if (dacValue > 4095) dacValue = 4095;
 
+    Wire.setTimeOut(2);
     Wire.beginTransmission(addr);
     Wire.write(static_cast<uint8_t>((dacValue >> 8) & 0x0F));
     Wire.write(static_cast<uint8_t>(dacValue & 0xFF));
@@ -34,6 +36,8 @@ void SpeedoDriver::init() {
     if (_initialized) return;
 
     Wire.begin(PinConfig::I2C_SDA, PinConfig::I2C_SCL);
+    Wire.setClock(400000);
+    Wire.setTimeOut(2);
     bool f, t;
     detectDacs(f, t);
 
@@ -65,7 +69,7 @@ void SpeedoDriver::updateOutputs(const EcuEngine::SpeedoConfig& config, const Ec
     if (!_initialized) init();
 
     uint32_t now = millis();
-    if (!state.isRunning && (now - _lastDacPollMs > 3000)) {
+    if (!state.isRunning && (now - _lastDacPollMs > 10000)) {
         bool f, t;
         detectDacs(f, t);
         _lastDacPollMs = now;
@@ -80,18 +84,9 @@ void SpeedoDriver::updateOutputs(const EcuEngine::SpeedoConfig& config, const Ec
     }
     _lastRunning = true;
 
-    // 1. Reconfigure PWM Frequency if changed
-    if (config.speedoPwmFreqHz != _lastPwmFreq && config.speedoPwmFreqHz >= 10 && config.speedoPwmFreqHz <= 20000) {
-        ledcSetup(LEDC_CH_TEMP, config.speedoPwmFreqHz, 8);
-        ledcSetup(LEDC_CH_FUEL, config.speedoPwmFreqHz, 8);
-        _lastPwmFreq = config.speedoPwmFreqHz;
-        _lastDutyTemp = -1.0f;
-        _lastDutyFuel = -1.0f;
-    }
-
-    // 2. Output KM/H Frequency
+    // 1. Output KM/H Frequency
     if (state.hzKmh != _lastHzKmh) {
-        if (state.hzKmh > 0.5f && config.speedoEnableKmh) {
+        if (config.speedoEnableKmh && state.hzKmh > 0.5f) {
             ledcWriteTone(LEDC_CH_KMH, static_cast<double>(state.hzKmh));
         } else {
             ledcWrite(LEDC_CH_KMH, 0);
@@ -99,9 +94,9 @@ void SpeedoDriver::updateOutputs(const EcuEngine::SpeedoConfig& config, const Ec
         _lastHzKmh = state.hzKmh;
     }
 
-    // 3. Output RPM Frequency
+    // 2. Output RPM Frequency
     if (state.hzRpm != _lastHzRpm) {
-        if (state.hzRpm > 0.5f && config.speedoEnableRpm) {
+        if (config.speedoEnableRpm && state.hzRpm > 0.5f) {
             ledcWriteTone(LEDC_CH_RPM, static_cast<double>(state.hzRpm));
         } else {
             ledcWrite(LEDC_CH_RPM, 0);
@@ -109,7 +104,7 @@ void SpeedoDriver::updateOutputs(const EcuEngine::SpeedoConfig& config, const Ec
         _lastHzRpm = state.hzRpm;
     }
 
-    // 4. Output Temp (DAC / PWM)
+    // 3. Output Temp (PWM or DAC)
     bool isTempDac = (config.dacRouting == EcuEngine::SpeedoDacRouting::DualMcp4725 ||
                       config.dacRouting == EcuEngine::SpeedoDacRouting::SingleDacTemp);
     if (isTempDac && _dacTempFound) {
@@ -117,20 +112,16 @@ void SpeedoDriver::updateOutputs(const EcuEngine::SpeedoConfig& config, const Ec
             _writeDac(MCP4725_ADDR_TEMP, config.speedoEnableTemp ? state.voltTemp : 0.0f);
             _lastDacTempVolt = state.voltTemp;
         }
-        if (_lastDutyTemp != 0.0f) {
-            ledcWrite(LEDC_CH_TEMP, 0);
-            _lastDutyTemp = 0.0f;
-        }
     } else {
         if (state.dutyTemp != _lastDutyTemp) {
-            uint32_t dutyVal = config.speedoEnableTemp ? static_cast<uint32_t>((state.dutyTemp / 100.0f) * 255.0f) : 0;
-            if (dutyVal > 255) dutyVal = 255;
-            ledcWrite(LEDC_CH_TEMP, dutyVal);
+            uint32_t duty8 = config.speedoEnableTemp ? static_cast<uint32_t>((state.dutyTemp / 100.0f) * 255.0f) : 0;
+            if (duty8 > 255) duty8 = 255;
+            ledcWrite(LEDC_CH_TEMP, duty8);
             _lastDutyTemp = state.dutyTemp;
         }
     }
 
-    // 5. Output Fuel (DAC / PWM)
+    // 4. Output Fuel (PWM or DAC)
     bool isFuelDac = (config.dacRouting == EcuEngine::SpeedoDacRouting::DualMcp4725 ||
                       config.dacRouting == EcuEngine::SpeedoDacRouting::SingleDacFuel);
     if (isFuelDac && _dacFuelFound) {
@@ -138,28 +129,25 @@ void SpeedoDriver::updateOutputs(const EcuEngine::SpeedoConfig& config, const Ec
             _writeDac(MCP4725_ADDR_FUEL, config.speedoEnableFuel ? state.voltFuel : 0.0f);
             _lastDacFuelVolt = state.voltFuel;
         }
-        if (_lastDutyFuel != 0.0f) {
-            ledcWrite(LEDC_CH_FUEL, 0);
-            _lastDutyFuel = 0.0f;
-        }
     } else {
         if (state.dutyFuel != _lastDutyFuel) {
-            uint32_t dutyVal = config.speedoEnableFuel ? static_cast<uint32_t>((state.dutyFuel / 100.0f) * 255.0f) : 0;
-            if (dutyVal > 255) dutyVal = 255;
-            ledcWrite(LEDC_CH_FUEL, dutyVal);
+            uint32_t duty8 = config.speedoEnableFuel ? static_cast<uint32_t>((state.dutyFuel / 100.0f) * 255.0f) : 0;
+            if (duty8 > 255) duty8 = 255;
+            ledcWrite(LEDC_CH_FUEL, duty8);
             _lastDutyFuel = state.dutyFuel;
         }
     }
 }
 
 void SpeedoDriver::stop() {
-    if (!_initialized) return;
     ledcWrite(LEDC_CH_KMH, 0);
     ledcWrite(LEDC_CH_RPM, 0);
     ledcWrite(LEDC_CH_TEMP, 0);
     ledcWrite(LEDC_CH_FUEL, 0);
+
     if (_dacFuelFound) _writeDac(MCP4725_ADDR_FUEL, 0.0f);
     if (_dacTempFound) _writeDac(MCP4725_ADDR_TEMP, 0.0f);
+
     _lastHzKmh = -1.0f;
     _lastHzRpm = -1.0f;
     _lastDutyTemp = -1.0f;

@@ -27,10 +27,10 @@ private:
     bool     _dacTempFound{false};
     uint32_t _lastDacPollMs{0};
 
+    static constexpr uint8_t LEDC_CH_KMH  = 0;
     static constexpr uint8_t LEDC_CH_RPM  = 1;
-    static constexpr uint8_t LEDC_CH_KMH  = 2;
-    static constexpr uint8_t LEDC_CH_TEMP = 4;
-    static constexpr uint8_t LEDC_CH_FUEL = 5;
+    static constexpr uint8_t LEDC_CH_TEMP = 2;
+    static constexpr uint8_t LEDC_CH_FUEL = 3;
 
     static constexpr uint8_t MCP4725_ADDR_FUEL = 0x60;
     static constexpr uint8_t MCP4725_ADDR_TEMP = 0x61;

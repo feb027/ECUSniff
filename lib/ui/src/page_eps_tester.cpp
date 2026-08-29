@@ -2,8 +2,16 @@
 
 namespace EcuUi {
 
-static constexpr uint16_t ROW_Y[] = {52, 100, 148, 196, 244};
+static constexpr uint16_t ROW_Y[] = {48, 96, 144, 192, 240};
 static constexpr uint8_t  TOTAL_ROWS = 5;
+
+static const char* PRESET_NAMES[] = {
+    "Toyota / Daihatsu",
+    "Suzuki Karimun",
+    "Suzuki Ertiga",
+    "Honda Jazz / Brio",
+    "Custom Tuning"
+};
 
 PageEpsTester::PageEpsTester(LovyanGFX* gfx) : _gfx(gfx) {}
 
@@ -33,7 +41,6 @@ void PageEpsTester::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _lastEditRow = 0xFF;
     }
 
-    // Update Row Focus Boxes
     if (fullRedraw || isEditMode != _lastEditMode || editRow != _lastEditRow) {
         for (uint8_t i = 0; i < TOTAL_ROWS; ++i) {
             _drawRowHighlight(i, i == editRow, isEditMode && (i == editRow));
@@ -46,22 +53,13 @@ void PageEpsTester::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
 }
 
 void PageEpsTester::_drawStaticLayout() {
-    _gfx->fillScreen(TFT_BLACK);
+    _gfx->fillRect(0, 42, 480, 278, TFT_BLACK);
 
-    // Top Header Banner
-    _gfx->fillRect(0, 0, 480, 42, 0x0841);
-    _gfx->drawFastHLine(0, 42, 480, 0x03E0);
-    _gfx->setTextColor(TFT_WHITE, 0x0841);
-    _gfx->setTextSize(2);
-    _gfx->drawString("EPS & VSS BENCH TESTER", 16, 12);
-
-    // Bottom Action / Navigation Bar
     _gfx->drawFastHLine(0, 290, 480, 0x03E0);
     _gfx->setTextColor(0x07FF, TFT_BLACK);
     _gfx->setTextSize(1);
-    _gfx->drawString("Knob/Joy-Y: Pilih Baris | Klik: Edit/Tog | Joy-X: Steer | Dbl-Klik: Menu", 16, 302);
+    _gfx->drawString("Knob/Joy-Y: Baris | Klik: Edit | Joy-Left / Tab [< MENU]: Keluar", 20, 302);
 
-    // Static Row Labels
     static const char* LABELS[] = {
         "PRESET OEM :",
         "SPEED (VSS):",
@@ -73,138 +71,115 @@ void PageEpsTester::_drawStaticLayout() {
     for (uint8_t i = 0; i < TOTAL_ROWS; ++i) {
         _gfx->fillRoundRect(12, ROW_Y[i], 456, 42, 4, 0x10A2);
         _gfx->setTextColor(TFT_WHITE, 0x10A2);
-        _gfx->setTextSize(2);
-        _gfx->drawString(LABELS[i], 24, ROW_Y[i] + 12);
+        _gfx->setTextSize(1);
+        _gfx->drawString(LABELS[i], 24, ROW_Y[i] + 14);
     }
 }
 
-void PageEpsTester::_drawRowHighlight(uint8_t row, bool selected, bool isEditMode) {
+void PageEpsTester::_drawRowHighlight(uint8_t row, bool isSelected, bool isEditing) {
     if (row >= TOTAL_ROWS) return;
-    uint32_t borderColor = TFT_DARKGRAY;
-    if (selected) {
-        borderColor = isEditMode ? 0x07E0 : 0xFFE0; // Green if editing, Yellow if focused
-    }
-    _gfx->drawRoundRect(12, ROW_Y[row], 456, 42, 4, borderColor);
-    if (selected) {
-        _gfx->drawRoundRect(11, ROW_Y[row] - 1, 458, 44, 5, borderColor);
+    int32_t y = ROW_Y[row];
+    uint32_t borderColor = isEditing ? 0xF800 : (isSelected ? 0xFFE0 : 0x52AA);
+
+    _gfx->drawRoundRect(12, y, 456, 42, 4, borderColor);
+    if (isSelected || isEditing) {
+        _gfx->drawRoundRect(11, y - 1, 458, 44, 5, borderColor);
     }
 }
 
 void PageEpsTester::_renderValues(const EcuEngine::EpsController& controller) {
     const auto& cfg = controller.getConfig();
-    const auto& st = controller.getState();
+    const auto& state = controller.getState();
 
-    // 1. Header Status (RUNNING / STOPPED)
-    if (st.isRunning != _lastRunning) {
-        _gfx->fillRoundRect(350, 8, 120, 26, 4, st.isRunning ? 0x03E0 : 0x7800);
-        _gfx->setTextColor(TFT_WHITE, st.isRunning ? 0x03E0 : 0x7800);
-        _gfx->setTextSize(2);
-        _gfx->drawString(st.isRunning ? "RUNNING" : "STOPPED", 362, 13);
-        _lastRunning = st.isRunning;
-    }
-
-    // 2. Row 0: Preset Name
-    uint8_t pIdx = static_cast<uint8_t>(cfg.preset);
-    if (pIdx != _lastPreset) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%-18s", controller.getPresetName(cfg.preset));
+    // Row 0: Preset
+    uint8_t curPreset = static_cast<uint8_t>(cfg.preset);
+    if (curPreset != _lastPreset) {
+        _gfx->fillRect(140, ROW_Y[0] + 4, 320, 34, 0x10A2);
         _gfx->setTextColor(0xFFE0, 0x10A2);
         _gfx->setTextSize(2);
-        _gfx->drawString(buf, 200, ROW_Y[0] + 12);
-        _lastPreset = pIdx;
+        const char* pName = (curPreset < 5) ? PRESET_NAMES[curPreset] : "Custom";
+        _gfx->drawString(pName, 145, ROW_Y[0] + 10);
+        _lastPreset = curPreset;
     }
 
-    // 3. Row 1: Speed & VSS Freq
-    if (st.currentSpeedKmh != _lastSpeed || st.vssFreqHz != _lastVssFreq) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%3.0f km/h (%5.1f Hz)", st.currentSpeedKmh, st.vssFreqHz);
-        _gfx->setTextColor(0xFFE0, 0x10A2);
+    // Row 1: Speed
+    if (state.currentSpeedKmh != _lastSpeed || state.vssFreqHz != _lastVssFreq) {
+        _gfx->fillRect(140, ROW_Y[1] + 4, 320, 34, 0x10A2);
+        _gfx->setTextColor(0x07FF, 0x10A2);
         _gfx->setTextSize(2);
-        _gfx->drawString(buf, 200, ROW_Y[1] + 12);
-        _lastSpeed = st.currentSpeedKmh;
-        _lastVssFreq = st.vssFreqHz;
+        char buf[48];
+        snprintf(buf, sizeof(buf), "%.0f km/h  (%.1f Hz)", state.currentSpeedKmh, state.vssFreqHz);
+        _gfx->drawString(buf, 145, ROW_Y[1] + 10);
+        _lastSpeed = state.currentSpeedKmh;
+        _lastVssFreq = state.vssFreqHz;
     }
 
-    // 4. Row 2: RPM & Tach Freq
-    if (st.currentRpm != _lastRpm || st.rpmFreqHz != _lastRpmFreq) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%4u RPM (%5.1f Hz)", st.currentRpm, st.rpmFreqHz);
-        _gfx->setTextColor(0xFFE0, 0x10A2);
+    // Row 2: RPM
+    if (state.currentRpm != _lastRpm || state.rpmFreqHz != _lastRpmFreq) {
+        _gfx->fillRect(140, ROW_Y[2] + 4, 320, 34, 0x10A2);
+        _gfx->setTextColor(0x07E0, 0x10A2);
         _gfx->setTextSize(2);
-        _gfx->drawString(buf, 200, ROW_Y[2] + 12);
-        _lastRpm = st.currentRpm;
-        _lastRpmFreq = st.rpmFreqHz;
+        char buf[48];
+        snprintf(buf, sizeof(buf), "%u RPM  (%.1f Hz)", (unsigned)state.currentRpm, state.rpmFreqHz);
+        _gfx->drawString(buf, 145, ROW_Y[2] + 10);
+        _lastRpm = state.currentRpm;
+        _lastRpmFreq = state.rpmFreqHz;
     }
 
-    // 5. Row 3: Steer Torque
+    // Row 3: Steer Torque
     if (cfg.steerTorque != _lastTorque) {
-        char buf[32];
-        if (cfg.steerTorque < -0.05f) {
-            snprintf(buf, sizeof(buf), "KIRI  %2.0f%% (T1:%.2fV)", -cfg.steerTorque * 100.0f, st.trq1Voltage);
-        } else if (cfg.steerTorque > 0.05f) {
-            snprintf(buf, sizeof(buf), "KANAN %2.0f%% (T1:%.2fV)", cfg.steerTorque * 100.0f, st.trq1Voltage);
-        } else {
-            snprintf(buf, sizeof(buf), "LURUS  0%% (2.50V)    ");
-        }
-        _gfx->setTextColor(0xFFE0, 0x10A2);
+        _gfx->fillRect(140, ROW_Y[3] + 4, 320, 34, 0x10A2);
+        _gfx->setTextColor(0xFD20, 0x10A2);
         _gfx->setTextSize(2);
-        _gfx->drawString(buf, 200, ROW_Y[3] + 12);
+        char buf[48];
+        float pct = cfg.steerTorque * 100.0f;
+        const char* dir = (pct > 5.0f) ? "KANAN" : ((pct < -5.0f) ? "KIRI" : "LURUS");
+        snprintf(buf, sizeof(buf), "%+.0f%% [%s] (%.2fV)", pct, dir, state.trq1Voltage);
+        _gfx->drawString(buf, 145, ROW_Y[3] + 10);
         _lastTorque = cfg.steerTorque;
     }
 
-    // 6. Row 4: Auto Sweep
-    if (cfg.autoSweep != _lastSweep) {
-        _gfx->setTextColor(cfg.autoSweep ? 0x07E0 : 0xF800, 0x10A2);
+    // Row 4: Auto Sweep & Running
+    if (cfg.autoSweep != _lastSweep || state.isRunning != _lastRunning) {
+        _gfx->fillRect(140, ROW_Y[4] + 4, 320, 34, 0x10A2);
         _gfx->setTextSize(2);
-        _gfx->drawString(cfg.autoSweep ? "AKTIF (0-120 km/h) " : "OFF (Manual)       ", 200, ROW_Y[4] + 12);
+        if (state.isRunning) {
+            _gfx->setTextColor(0x07E0, 0x10A2);
+            _gfx->drawString(cfg.autoSweep ? "SWEEP AKTIF (RUN)" : "MANUAL (RUN)", 145, ROW_Y[4] + 10);
+        } else {
+            _gfx->setTextColor(0xF800, 0x10A2);
+            _gfx->drawString(cfg.autoSweep ? "SWEEP (STOPPED)" : "OFF (STOPPED)", 145, ROW_Y[4] + 10);
+        }
         _lastSweep = cfg.autoSweep;
+        _lastRunning = state.isRunning;
     }
 }
 
-void PageEpsTester::onEncoderTurn(int32_t delta, uint8_t editRow,
-                                 EcuEngine::EpsController& controller) {
-    auto& cfg = controller.getConfig();
+void PageEpsTester::onEncoderTurn(int32_t delta, uint8_t editRow, EcuEngine::EpsController& controller) {
+    const auto& cfg = controller.getConfig();
     switch (editRow) {
-        case 0: { // Preset
-            int32_t next = static_cast<int32_t>(cfg.preset) + (delta > 0 ? 1 : -1);
-            if (next < 0) next = static_cast<int32_t>(EcuEngine::EpsOemPreset::COUNT) - 1;
-            if (next >= static_cast<int32_t>(EcuEngine::EpsOemPreset::COUNT)) next = 0;
-            controller.setPreset(static_cast<EcuEngine::EpsOemPreset>(next));
+        case 0: {
+            int32_t p = static_cast<int32_t>(cfg.preset) + (delta > 0 ? 1 : -1);
+            if (p < 0) p = 4;
+            if (p > 4) p = 0;
+            controller.setPreset(static_cast<EcuEngine::EpsOemPreset>(p));
             break;
         }
-        case 1: { // Speed
-            controller.setSpeed(cfg.speedKmh + (delta * 5.0f));
-            break;
-        }
-        case 2: { // RPM
-            int32_t rpm = static_cast<int32_t>(cfg.targetRpm) + (delta * 100);
-            if (rpm < 0) rpm = 0;
-            controller.setRpm(static_cast<uint32_t>(rpm));
-            break;
-        }
-        case 3: { // Steer Torque
-            controller.setSteerTorque(cfg.steerTorque + (delta * 0.10f));
-            break;
-        }
-        case 4: { // Sweep
-            controller.setAutoSweep(!cfg.autoSweep);
-            break;
-        }
+        case 1: controller.setSpeed(cfg.speedKmh + (delta * 5.0f)); break;
+        case 2: controller.setRpm(cfg.targetRpm + (delta * 100)); break;
+        case 3: controller.setSteerTorque((cfg.steerTorque * 100.0f) + (delta * 5.0f)); break;
+        case 4: controller.setAutoSweep(!cfg.autoSweep); break;
         default: break;
     }
 }
 
-void PageEpsTester::onJoystickAction(EcuHal::JoyAction action,
-                                    EcuEngine::EpsController& controller) {
+void PageEpsTester::onJoystickAction(EcuHal::JoyAction action, EcuEngine::EpsController& controller) {
+    const auto& cfg = controller.getConfig();
     if (action == EcuHal::JoyAction::Left) {
-        controller.setSteerTorque(controller.getConfig().steerTorque - 0.20f);
+        controller.setSteerTorque((cfg.steerTorque * 100.0f) - 10.0f);
     } else if (action == EcuHal::JoyAction::Right) {
-        controller.setSteerTorque(controller.getConfig().steerTorque + 0.20f);
+        controller.setSteerTorque((cfg.steerTorque * 100.0f) + 10.0f);
     }
-}
-
-void PageEpsTester::onEncoderClick(EcuEngine::EpsController& controller) {
-    controller.toggleRunning();
 }
 
 } // namespace EcuUi
