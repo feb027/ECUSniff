@@ -68,13 +68,6 @@ void SpeedoDriver::init() {
 void SpeedoDriver::updateOutputs(const EcuEngine::SpeedoConfig& config, const EcuEngine::SpeedoRuntimeState& state) {
     if (!_initialized) init();
 
-    uint32_t now = millis();
-    if (!state.isRunning && (now - _lastDacPollMs > 10000)) {
-        bool f, t;
-        detectDacs(f, t);
-        _lastDacPollMs = now;
-    }
-
     if (!state.isRunning) {
         if (_lastRunning) {
             stop();

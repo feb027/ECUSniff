@@ -39,6 +39,16 @@ private:
     bool    _lastEnTemp{false};
     bool    _lastEnFuel{false};
 
+    // Tab 2 & 3 Caches
+    int32_t _lastCalVals[6]{-99, -99, -99, -99, -99, -99};
+    float   _lastPpk{-1.0f};
+    float   _lastPpr{-1.0f};
+    uint8_t _lastRouting{0xFF};
+    uint8_t _lastCurve{0xFF};
+    float   _lastSweepTime{-1.0f};
+    bool    _lastDac1{false};
+    bool    _lastDac2{false};
+
     void _renderTabCockpit(bool fullRedraw, uint8_t editRow, const EcuEngine::SpeedoController& controller);
     void _renderTabCalibration(bool fullRedraw, uint8_t editRow, const EcuEngine::SpeedoController& controller);
     void _renderTabHardware(bool fullRedraw, uint8_t editRow, const EcuEngine::SpeedoController& controller);

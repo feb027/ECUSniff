@@ -140,7 +140,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
     }
 
     if (_uiLevel == UiLevel::SpeedoTester) {
-        if (_genTab == 1) {
+        if (_genTab == 1) { // 2D Dual Cluster Grid
             if (action == EcuHal::JoyAction::Up) {
                 if (_editRow == 2) _editRow = 0; else if (_editRow == 3) _editRow = 1;
                 else if (_editRow == 4) _editRow = 2; else _editRow = 4;
@@ -155,16 +155,29 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
                 else { if (_genTab < 3) { _genTab++; _editRow = 0; _needsFullRedraw = true; } }
             } else if (action == EcuHal::JoyAction::Click) onEncoderClick();
             return;
+        } else if (_genTab == 2) { // Twin Column Calibration Studio
+            if (action == EcuHal::JoyAction::Up) { if (_editRow % 3 > 0) _editRow--; }
+            else if (action == EcuHal::JoyAction::Down) { if (_editRow % 3 < 2) _editRow++; }
+            else if (action == EcuHal::JoyAction::Left) {
+                if (_editRow >= 3) _editRow -= 3;
+                else { if (_genTab > 0) { _genTab--; _editRow = 0; _needsFullRedraw = true; } else returnToMainHub(); }
+            } else if (action == EcuHal::JoyAction::Right) {
+                if (_editRow < 3) _editRow += 3;
+                else { if (_genTab < 3) { _genTab++; _editRow = 0; _needsFullRedraw = true; } }
+            } else if (action == EcuHal::JoyAction::Click) onEncoderClick();
+            return;
+        } else if (_genTab == 3) { // 4-Box Hardware Studio
+            if (action == EcuHal::JoyAction::Up) { if (_editRow >= 2) _editRow -= 2; }
+            else if (action == EcuHal::JoyAction::Down) { if (_editRow < 2) _editRow += 2; }
+            else if (action == EcuHal::JoyAction::Left) {
+                if (_editRow % 2 == 1) _editRow--;
+                else { if (_genTab > 0) { _genTab--; _editRow = 0; _needsFullRedraw = true; } else returnToMainHub(); }
+            } else if (action == EcuHal::JoyAction::Right) {
+                if (_editRow % 2 == 0) _editRow++;
+                else { if (_genTab < 3) { _genTab++; _editRow = 0; _needsFullRedraw = true; } }
+            } else if (action == EcuHal::JoyAction::Click) onEncoderClick();
+            return;
         }
-        uint8_t maxRows = (_genTab == 2) ? 6 : 5;
-        if (action == EcuHal::JoyAction::Up) _editRow = (_editRow > 0) ? (_editRow - 1) : (maxRows - 1);
-        else if (action == EcuHal::JoyAction::Down) _editRow = (_editRow + 1) % maxRows;
-        else if (action == EcuHal::JoyAction::Left) {
-            if (_genTab > 0) { _genTab--; _editRow = 0; _needsFullRedraw = true; } else returnToMainHub();
-        } else if (action == EcuHal::JoyAction::Right) {
-            if (_genTab < 3) { _genTab++; _editRow = 0; _needsFullRedraw = true; }
-        } else if (action == EcuHal::JoyAction::Click) onEncoderClick();
-        return;
     }
 
     if (action == EcuHal::JoyAction::Left) {
