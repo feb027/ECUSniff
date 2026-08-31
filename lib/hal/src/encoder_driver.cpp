@@ -44,10 +44,10 @@ void EncoderDriver::read() {
     noInterrupts();
     int32_t ticks = s_encoderTicks;
     
-    // Setiap 1 trek fisik knob encoder = 2 transisi logika
-    if (ticks >= 2 || ticks <= -2) {
-        _accumulatedDelta = ticks / 2;
-        s_encoderTicks = ticks % 2;
+    // 1 physical detent click on standard rotary encoder = 4 state transitions
+    if (ticks >= 4 || ticks <= -4) {
+        _accumulatedDelta = ticks / 4;
+        s_encoderTicks = ticks % 4;
     } else {
         _accumulatedDelta = 0;
     }

@@ -3,8 +3,8 @@
 
 namespace EcuUi {
 
-static const uint32_t STEP_PRESETS[] = { 10, 50, 100, 250, 500, 1000 };
-static constexpr uint8_t TOTAL_STEP_PRESETS = 6;
+static const uint32_t STEP_PRESETS[] = { 1, 10, 50, 100, 250, 500, 1000 };
+static constexpr uint8_t TOTAL_STEP_PRESETS = 7;
 
 PageGenSettings::PageGenSettings(LovyanGFX* gfx) : _gfx(gfx) {}
 
@@ -20,9 +20,7 @@ void PageGenSettings::init() {
 
 void PageGenSettings::_drawPanel(int32_t x, int32_t y, int32_t w, int32_t h, bool isSel) {
     _gfx->drawRoundRect(x, y, w, h, 6, isSel ? 0xFFE0 : 0x52AA);
-    if (isSel) {
-        _gfx->drawRoundRect(x + 1, y + 1, w - 2, h - 2, 5, 0xFFE0);
-    }
+    _gfx->drawRoundRect(x + 1, y + 1, w - 2, h - 2, 5, isSel ? 0xFFE0 : 0x0841);
 }
 
 void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
@@ -136,7 +134,7 @@ void PageGenSettings::onEncoderTurn(int32_t delta, uint8_t editRow,
                                    EcuEngine::EngineRuntimeState& state,
                                    EcuEngine::ParametricWheel& wheel) {
     if (editRow == 0) {
-        int idx = 1;
+        int idx = 2;
         for (int i = 0; i < TOTAL_STEP_PRESETS; ++i) {
             if (STEP_PRESETS[i] == state.rpmStep) { idx = i; break; }
         }
@@ -146,10 +144,10 @@ void PageGenSettings::onEncoderTurn(int32_t delta, uint8_t editRow,
         state.rpmStep = STEP_PRESETS[idx];
     } else if (editRow == 1) {
         int32_t val = (int32_t)state.sweep.minRpm + (delta * 100);
-        state.sweep.minRpm = (uint32_t)constrain(val, 100, 6000);
+        state.sweep.minRpm = (uint32_t)constrain(val, 0, 6000);
     } else if (editRow == 2) {
         int32_t val = (int32_t)state.sweep.maxRpm + (delta * 100);
-        state.sweep.maxRpm = (uint32_t)constrain(val, 1000, 12000);
+        state.sweep.maxRpm = (uint32_t)constrain(val, 500, 12000);
     } else if (editRow == 3) {
         int32_t val = (int32_t)state.sweep.sweepRateRpmPerSec + (delta * 50);
         state.sweep.sweepRateRpmPerSec = (uint32_t)constrain(val, 50, 3000);

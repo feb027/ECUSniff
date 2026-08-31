@@ -176,18 +176,14 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
 }
 
 void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel) {
-    uint32_t cRpm   = (editRow == 0) ? 0xFFE0 : 0x52AA;
-    uint32_t cMode  = (editRow == 1) ? 0xFFE0 : 0x52AA;
-    uint32_t cWheel = (editRow == 2) ? 0xFFE0 : 0x52AA;
+    _gfx->drawRoundRect(16, 138, 220, 66, 6, (editRow == 0) ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(17, 139, 218, 64, 5, (editRow == 0) ? 0xFFE0 : 0x0841);
 
-    _gfx->drawRoundRect(16, 138, 220, 66, 6, cRpm);
-    if (editRow == 0) _gfx->drawRoundRect(17, 139, 218, 64, 5, 0xFFE0);
+    _gfx->drawRoundRect(244, 138, 220, 66, 6, (editRow == 1) ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(245, 139, 218, 64, 5, (editRow == 1) ? 0xFFE0 : 0x0841);
 
-    _gfx->drawRoundRect(244, 138, 220, 66, 6, cMode);
-    if (editRow == 1) _gfx->drawRoundRect(245, 139, 218, 64, 5, 0xFFE0);
-
-    _gfx->drawRoundRect(16, 210, 448, 66, 6, cWheel);
-    if (editRow == 2) _gfx->drawRoundRect(17, 211, 446, 64, 5, 0xFFE0);
+    _gfx->drawRoundRect(16, 210, 448, 66, 6, (editRow == 2) ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(17, 211, 446, 64, 5, (editRow == 2) ? 0xFFE0 : 0x0841);
 
     _gfx->fillRect(16, 282, 448, 24, 0x0841);
     _gfx->drawRoundRect(16, 282, 448, 24, 4, 0x31A6);
@@ -212,7 +208,7 @@ void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
     if (editRow == 0) {
         uint32_t step = (state.rpmStep > 0) ? state.rpmStep : 50;
         int32_t newRpm = static_cast<int32_t>(state.targetRpm) + (delta * (int32_t)step);
-        state.targetRpm = constrain(newRpm, 100, 12000);
+        state.targetRpm = constrain(newRpm, 0, 12000);
     } else if (editRow == 1) {
         int32_t m = static_cast<int32_t>(state.runMode) + (delta > 0 ? 1 : -1);
         if (m < 0) m = 2;
