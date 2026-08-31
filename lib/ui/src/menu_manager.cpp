@@ -12,19 +12,19 @@ void MenuManager::init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffe
     _pageDash.init(); _pageGenSettings.init(); _pageCapture.init(capDriver, sniffer);
     _pageEps.init(); _pageSpeedo.init(); _pageBrowser.init();
     _uiLevel = UiLevel::MainHub; _hubIndex = 0; _genTab = 1;
-    _focusTabBar = false; _needsFullRedraw = true;
+    _focusTabBar = true; _needsFullRedraw = true;
 }
 
 void MenuManager::returnToMainHub() {
     _uiLevel = UiLevel::MainHub; _needsFullRedraw = true;
-    _lastTab = 0xFF; _lastDrawnTab = 0xFF; _isEditMode = false; _focusTabBar = false;
+    _lastTab = 0xFF; _lastDrawnTab = 0xFF; _isEditMode = false; _focusTabBar = true;
     _pageBrowser.close();
 }
 
 void MenuManager::setUiLevel(UiLevel level) {
     if (_uiLevel != level) {
         _uiLevel = level; _genTab = 1; _editRow = 0;
-        _isEditMode = false; _focusTabBar = false; _needsFullRedraw = true;
+        _isEditMode = false; _focusTabBar = true; _needsFullRedraw = true;
         _pageBrowser.close();
     }
 }
@@ -159,7 +159,7 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
         return;
     }
     if (_genTab == 0) {
-        if (action == EcuHal::JoyAction::Right) { _genTab = 1; _editRow = 0; _focusTabBar = false; _needsFullRedraw = true; }
+        if (action == EcuHal::JoyAction::Right) { _genTab = 1; _editRow = 0; _focusTabBar = true; _needsFullRedraw = true; }
         else if (action == EcuHal::JoyAction::Click) returnToMainHub();
         return;
     }
@@ -247,7 +247,7 @@ void MenuManager::onEncoderClick(EcuEngine::EngineRuntimeState& state,
         else if (_hubIndex == 1) { _uiLevel = UiLevel::Capture; _genTab = 1; }
         else if (_hubIndex == 2) { _uiLevel = UiLevel::EpsTester; _genTab = 1; _editRow = 0; }
         else if (_hubIndex == 3) { _uiLevel = UiLevel::SpeedoTester; _genTab = 1; _editRow = 0; }
-        _focusTabBar = false; _needsFullRedraw = true; return;
+        _focusTabBar = true; _needsFullRedraw = true; return;
     }
     if (_genTab == 0) { returnToMainHub(); return; }
     if (_uiLevel == UiLevel::EpsTester) {

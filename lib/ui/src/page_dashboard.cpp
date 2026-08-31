@@ -6,6 +6,21 @@ namespace EcuUi {
 WheelPresetItem PageDashboard::s_customSlots[PageDashboard::MAX_CUSTOM_PRESETS]{};
 uint8_t PageDashboard::s_customCount = 0;
 
+static inline uint16_t getRpmGradientColor(int32_t px, int32_t totalW) {
+    int32_t midW = (totalW * 55) / 100;
+    uint8_t r = 0, g = 0;
+    if (px <= midW) {
+        r = (uint8_t)((px * 255) / midW);
+        g = 255;
+    } else {
+        int32_t rem = px - midW;
+        int32_t span = totalW - midW;
+        r = 255;
+        g = (span > 0) ? (uint8_t)(255 - ((rem * 255) / span)) : 0;
+    }
+    return ((r >> 3) << 11) | ((g >> 2) << 5);
+}
+
 PageDashboard::PageDashboard(LovyanGFX* gfx) : _gfx(gfx), _canvas(gfx) {}
 
 void PageDashboard::init() {
@@ -102,32 +117,26 @@ void PageDashboard::_drawRpmBar(uint32_t activeRpm, bool fullRedraw) {
     if (fullRedraw) {
         _gfx->fillRoundRect(16, 126, 448, 20, 4, 0x0841);
         _gfx->drawRoundRect(16, 126, 448, 20, 4, 0x52AA);
-        _lastBarW = -1;
+        _lastBarW = 0;
+        for (int32_t x = 0; x < targetW; ++x) {
+            _gfx->drawFastVLine(18 + x, 128, 16, getRpmGradientColor(x, 444));
+        }
+        _lastBarW = targetW;
+        return;
     }
 
-    if (targetW == _lastBarW && !fullRedraw) return;
+    if (targetW == _lastBarW) return;
 
     int32_t startX = 18;
     int32_t startY = 128;
     int32_t barH = 16;
 
-    if (targetW > 0) {
-        int32_t greenW = (targetW < 266) ? targetW : 266;
-        if (greenW > 0) _gfx->fillRect(startX, startY, greenW, barH, 0x07E0);
-
-        if (targetW > 266) {
-            int32_t yellowW = (targetW < 376) ? (targetW - 266) : (376 - 266);
-            if (yellowW > 0) _gfx->fillRect(startX + 266, startY, yellowW, barH, 0xFFE0);
+    if (targetW > _lastBarW) {
+        for (int32_t x = _lastBarW; x < targetW; ++x) {
+            _gfx->drawFastVLine(startX + x, startY, barH, getRpmGradientColor(x, 444));
         }
-
-        if (targetW > 376) {
-            int32_t redW = targetW - 376;
-            if (redW > 0) _gfx->fillRect(startX + 376, startY, redW, barH, 0xF800);
-        }
-    }
-
-    if (targetW < 444) {
-        _gfx->fillRect(startX + targetW, startY, 444 - targetW, barH, 0x0841);
+    } else if (targetW < _lastBarW) {
+        _gfx->fillRect(startX + targetW, startY, _lastBarW - targetW, barH, 0x0841);
     }
 
     _lastBarW = targetW;
