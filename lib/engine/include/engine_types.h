@@ -65,6 +65,7 @@ struct EngineRuntimeState {
     
     CrankingConfig cranking{};
     SweepConfig    sweep{};
+    uint32_t       rpmStep{50};
 
     // Bi-directional UI & Sniffer sync fields
     char     activeWheelName[48]{"Honda / Ford 36-1"};

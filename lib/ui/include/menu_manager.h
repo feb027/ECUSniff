@@ -12,6 +12,7 @@
 #include "page_eps_tester.h"
 #include "page_speedo_tester.h"
 #include "page_wheel_browser.h"
+#include "page_gen_settings.h"
 #include "eps_controller.h"
 #include "speedo_controller.h"
 
@@ -81,6 +82,7 @@ private:
     PageDashboard      _pageDash;
     PageCkp            _pageCkp;
     PageCmp            _pageCmp;
+    PageGenSettings    _pageGenSettings;
     PageCapture        _pageCapture;
     PageEpsTester      _pageEps;
     PageSpeedoTester   _pageSpeedo;

@@ -129,7 +129,7 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     bool isRunningChanged = (state.isRunning != _lastIsRunning);
     bool rpmChanged = (activeRpm != _lastRpm);
     bool modeChanged = (curMode != _lastMode);
-    bool editChanged = (isEditMode != _lastIsEditMode || editRow != _lastEditRow);
+    bool editChanged = (editRow != _lastEditRow);
 
     if (rpmChanged || isRunningChanged || fullRedraw) {
         char rpmStr[8]; snprintf(rpmStr, sizeof(rpmStr), "%04u", (unsigned)activeRpm);
@@ -181,8 +181,13 @@ void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRun
     uint32_t cWheel = (editRow == 2) ? 0xFFE0 : 0x52AA;
 
     _gfx->drawRoundRect(16, 138, 220, 66, 6, cRpm);
+    if (editRow == 0) _gfx->drawRoundRect(17, 139, 218, 64, 5, 0xFFE0);
+
     _gfx->drawRoundRect(244, 138, 220, 66, 6, cMode);
+    if (editRow == 1) _gfx->drawRoundRect(245, 139, 218, 64, 5, 0xFFE0);
+
     _gfx->drawRoundRect(16, 210, 448, 66, 6, cWheel);
+    if (editRow == 2) _gfx->drawRoundRect(17, 211, 446, 64, 5, 0xFFE0);
 
     _gfx->fillRect(16, 282, 448, 24, 0x0841);
     _gfx->drawRoundRect(16, 282, 448, 24, 4, 0x31A6);
@@ -190,13 +195,13 @@ void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRun
 
     if (editRow == 0) {
         _gfx->setTextColor(0xFFE0, 0x0841);
-        _gfx->drawString("[TARGET RPM] Putar: +/-50 RPM | Joystick: Pindah Baris", 24, 289);
+        _gfx->drawString("[RPM MESIN] Putar: Ubah Nilai | Klik: RUN/STOP Generator", 24, 289);
     } else if (editRow == 1) {
         _gfx->setTextColor(0xFFE0, 0x0841);
-        _gfx->drawString("[MODE MESIN] Putar: FIX / CRANK / SWEEP | Joystick: Pindah Baris", 16, 289);
+        _gfx->drawString("[MODE MESIN] Putar: FIX / CRANK / SWEEP | Klik: RUN/STOP", 24, 289);
     } else if (editRow == 2) {
         _gfx->setTextColor(0xFFE0, 0x0841);
-        _gfx->drawString("[PROFIL POLA] KLIK KNOB: Buka Library Pola Lengkap | Putar: Ganti", 16, 289);
+        _gfx->drawString("[POLA RODA] KLIK: Buka Library Studio | Putar: Ganti Cepat", 24, 289);
     }
 }
 
@@ -205,7 +210,8 @@ void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
                                   EcuEngine::ParametricWheel& wheel,
                                   EcuEngine::CamEventTable& cam) {
     if (editRow == 0) {
-        int32_t newRpm = static_cast<int32_t>(state.targetRpm) + (delta * 50);
+        uint32_t step = (state.rpmStep > 0) ? state.rpmStep : 50;
+        int32_t newRpm = static_cast<int32_t>(state.targetRpm) + (delta * (int32_t)step);
         state.targetRpm = constrain(newRpm, 100, 12000);
     } else if (editRow == 1) {
         int32_t m = static_cast<int32_t>(state.runMode) + (delta > 0 ? 1 : -1);
