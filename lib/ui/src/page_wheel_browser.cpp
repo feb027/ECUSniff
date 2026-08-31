@@ -28,11 +28,11 @@ bool PageWheelBrowser::_matchesCategory(uint16_t globalIdx, WheelCategory cat) {
     if (cat == WheelCategory::Custom) return false;
 
     const char* name = OEM_DATABASE_PRESETS[globalIdx].name;
-    if (cat == WheelCategory::ToyotaDaihatsu) return (strstr(name, "Toyota") || strstr(name, "Daihatsu") || strstr(name, "4AG"));
-    if (cat == WheelCategory::HondaSuzuki) return (strstr(name, "Honda") || strstr(name, "Suzuki") || strstr(name, "Yamaha") || strstr(name, "RC51") || strstr(name, "D17") || strstr(name, "R1"));
-    if (cat == WheelCategory::MitsuNissanMazda) return (strstr(name, "Mitsubishi") || strstr(name, "Nissan") || strstr(name, "Mazda") || strstr(name, "Subaru") || strstr(name, "Miata") || strstr(name, "4g63") || strstr(name, "6g72") || strstr(name, "3A92") || strstr(name, "323"));
+    if (cat == WheelCategory::ToyotaDaihatsu) return (strstr(name, "Toyota") || strstr(name, "Daihatsu") || strstr(name, "4AG") || strstr(name, "Avanza") || strstr(name, "Xenia") || strstr(name, "Rush") || strstr(name, "Terios"));
+    if (cat == WheelCategory::HondaSuzuki) return (strstr(name, "Honda") || strstr(name, "Suzuki") || strstr(name, "Yamaha") || strstr(name, "RC51") || strstr(name, "D17") || strstr(name, "R1") || strstr(name, "Jazz") || strstr(name, "Fit"));
+    if (cat == WheelCategory::MitsuNissanMazda) return (strstr(name, "Mitsubishi") || strstr(name, "Nissan") || strstr(name, "Mazda") || strstr(name, "Subaru") || strstr(name, "Miata") || strstr(name, "4g63") || strstr(name, "6g72") || strstr(name, "3A92") || strstr(name, "323") || strstr(name, "Livina") || strstr(name, "Juke"));
     if (cat == WheelCategory::EuroAmerika) return (strstr(name, "BMW") || strstr(name, "Audi") || strstr(name, "Fiat") || strstr(name, "Volvo") || strstr(name, "GM") || strstr(name, "Ford") || strstr(name, "Chrysler") || strstr(name, "Jeep") || strstr(name, "Dodge") || strstr(name, "Viper") || strstr(name, "Lotus") || strstr(name, "Weber") || strstr(name, "Buell") || strstr(name, "DSM"));
-    if (cat == WheelCategory::Universal) return (strstr(name, "60-2") || strstr(name, "36-1") || strstr(name, "24-1") || strstr(name, "12-1") || strstr(name, "8-1") || strstr(name, "4-1") || strstr(name, "40-1") || strstr(name, "dizzy") || strstr(name, "12/1") || strstr(name, "24/1") || strstr(name, "12-3") || strstr(name, "odd"));
+    if (cat == WheelCategory::Universal) return (strstr(name, "60-2") || strstr(name, "36-1") || strstr(name, "24-1") || strstr(name, "12-1") || strstr(name, "8-1") || strstr(name, "4-1") || strstr(name, "40-1") || strstr(name, "dizzy") || strstr(name, "12/1") || strstr(name, "24/1") || strstr(name, "12-3") || strstr(name, "odd") || strstr(name, "36-2"));
     return false;
 }
 
