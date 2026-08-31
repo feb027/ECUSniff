@@ -110,8 +110,8 @@ void PageDashboard::_applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel,
 }
 
 void PageDashboard::_drawRpmBar(uint32_t activeRpm, bool fullRedraw) {
-    uint32_t maxScale = (activeRpm > 8000) ? 12000 : 8000;
-    int32_t targetW = (int32_t)(((uint64_t)activeRpm * 444) / maxScale);
+    constexpr uint32_t MAX_SCALE_RPM = 12000;
+    int32_t targetW = (int32_t)(((uint64_t)activeRpm * 444) / MAX_SCALE_RPM);
     if (targetW > 444) targetW = 444;
 
     if (fullRedraw) {
