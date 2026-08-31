@@ -220,11 +220,19 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
             else if (action == EcuHal::JoyAction::Down && _editRow < 3) _editRow++;
             else if (action == EcuHal::JoyAction::Click) onEncoderClick(state, wheel, cam);
         } else if (_genTab == 4) {
-            if (action == EcuHal::JoyAction::Up) { if (_editRow <= 1) { _focusTabBar = true; _needsFullRedraw = true; } else _editRow -= 2; }
-            else if (action == EcuHal::JoyAction::Down && _editRow <= 3) _editRow += 2;
-            else if (action == EcuHal::JoyAction::Left && (_editRow % 2 == 1)) _editRow--;
-            else if (action == EcuHal::JoyAction::Right && (_editRow % 2 == 0)) _editRow++;
-            else if (action == EcuHal::JoyAction::Click) onEncoderClick(state, wheel, cam);
+            if (_editRow <= 4) {
+                if (action == EcuHal::JoyAction::Up) { if (_editRow <= 1) { _focusTabBar = true; _needsFullRedraw = true; } else if (_editRow <= 3) _editRow -= 2; else _editRow = 2; }
+                else if (action == EcuHal::JoyAction::Down) { if (_editRow <= 1) _editRow += 2; else if (_editRow <= 3) _editRow = 4; else { _editRow = 5; _needsFullRedraw = true; } }
+                else if (action == EcuHal::JoyAction::Left && (_editRow == 1 || _editRow == 3)) _editRow--;
+                else if (action == EcuHal::JoyAction::Right) { if (_editRow == 0 || _editRow == 2) _editRow++; else if (_editRow == 4) { _editRow = 5; _needsFullRedraw = true; } }
+                else if (action == EcuHal::JoyAction::Click) onEncoderClick(state, wheel, cam);
+            } else {
+                if (action == EcuHal::JoyAction::Up) { if (_editRow <= 6) { _focusTabBar = true; _needsFullRedraw = true; } else if (_editRow <= 8) _editRow -= 2; else _editRow = 7; }
+                else if (action == EcuHal::JoyAction::Down) { if (_editRow <= 6) _editRow += 2; else if (_editRow <= 8) _editRow = 9; else { _editRow = 0; _needsFullRedraw = true; } }
+                else if (action == EcuHal::JoyAction::Left) { if (_editRow == 6 || _editRow == 8) _editRow--; else if (_editRow == 9) { _editRow = 0; _needsFullRedraw = true; } }
+                else if (action == EcuHal::JoyAction::Right && (_editRow == 5 || _editRow == 7)) _editRow++;
+                else if (action == EcuHal::JoyAction::Click) onEncoderClick(state, wheel, cam);
+            }
         }
         return;
     }
@@ -265,6 +273,8 @@ void MenuManager::onEncoderClick(EcuEngine::EngineRuntimeState& state,
             if (_editRow == 2) { _pageBrowser.open(_pageDash.getActivePresetIdx()); _needsFullRedraw = true; return; }
             state.isRunning = !state.isRunning; _needsFullRedraw = true;
         } else if (_genTab == 4) {
+            if (_editRow == 4) { _editRow = 5; _needsFullRedraw = true; return; }
+            if (_editRow == 9) { _editRow = 0; _needsFullRedraw = true; return; }
             _pageGenSettings.onEncoderClick(_editRow, state, wheel);
             _needsFullRedraw = true;
         }

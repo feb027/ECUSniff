@@ -22,8 +22,13 @@ public:
                         EcuEngine::EngineRuntimeState& state,
                         EcuEngine::ParametricWheel& wheel);
 
+    uint8_t getCurrentPage() const { return _currentPage; }
+    void setCurrentPage(uint8_t p) { _currentPage = p; }
+
 private:
     LovyanGFX* _gfx;
+    uint8_t  _currentPage{0};
+    uint8_t  _lastDrawnPage{0xFF};
     uint8_t  _lastEditRow{0xFF};
     uint32_t _lastRpmStep{0};
     uint32_t _lastCrankDur{0};
