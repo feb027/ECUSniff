@@ -11,10 +11,11 @@ PageGenSettings::PageGenSettings(LovyanGFX* gfx) : _gfx(gfx) {}
 void PageGenSettings::init() {
     _lastEditRow = 0xFF;
     _lastRpmStep = 0;
+    _lastCrankDur = 0;
+    _lastCrankRpm = 0;
+    _lastSweepRate = 0;
     _lastSweepMin = 0;
     _lastSweepMax = 0;
-    _lastSweepRate = 0;
-    _lastCrankRpm = 0;
     _lastInverted = false;
 }
 
@@ -36,11 +37,11 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
 
         _gfx->fillRoundRect(244, 50, 220, 72, 6, 0x0841);
         _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("2. SWEEP MIN RPM:", 252, 56);
+        _gfx->drawString("2. CRANK DURATION (WAKTU):", 252, 56);
 
         _gfx->fillRoundRect(16, 128, 220, 72, 6, 0x0841);
         _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("3. SWEEP MAX RPM:", 24, 134);
+        _gfx->drawString("3. CRANKING START RPM:", 24, 134);
 
         _gfx->fillRoundRect(244, 128, 220, 72, 6, 0x0841);
         _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
@@ -48,14 +49,15 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
 
         _gfx->fillRoundRect(16, 206, 220, 72, 6, 0x0841);
         _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("5. CRANKING START RPM:", 24, 212);
+        _gfx->drawString("5. SWEEP MIN / MAX RPM:", 24, 212);
 
         _gfx->fillRoundRect(244, 206, 220, 72, 6, 0x0841);
         _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
         _gfx->drawString("6. CKP OUTPUT POLARITY:", 252, 212);
 
-        _lastEditRow = 0xFF; _lastRpmStep = 0; _lastSweepMin = 0;
-        _lastSweepMax = 0; _lastSweepRate = 0; _lastCrankRpm = 0;
+        _lastEditRow = 0xFF; _lastRpmStep = 0; _lastCrankDur = 0;
+        _lastCrankRpm = 0; _lastSweepRate = 0; _lastSweepMin = 0;
+        _lastSweepMax = 0;
     }
 
     uint32_t stepVal = (state.rpmStep > 0) ? state.rpmStep : 50;
@@ -68,22 +70,23 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
         _lastRpmStep = stepVal;
     }
 
-    if (state.sweep.minRpm != _lastSweepMin || fullRedraw) {
-        char buf[16]; snprintf(buf, sizeof(buf), "%u RPM   ", (unsigned)state.sweep.minRpm);
+    if (state.cranking.crankDurationMs != _lastCrankDur || fullRedraw) {
+        char buf[16]; float sec = state.cranking.crankDurationMs / 1000.0f;
+        snprintf(buf, sizeof(buf), "%.1f DETIK  ", sec);
         _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
         _gfx->drawString(buf, 252, 76);
         _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("Batas Bawah Auto Sweep", 252, 102);
-        _lastSweepMin = state.sweep.minRpm;
+        _gfx->drawString("Durasi Starter Mesin", 252, 102);
+        _lastCrankDur = state.cranking.crankDurationMs;
     }
 
-    if (state.sweep.maxRpm != _lastSweepMax || fullRedraw) {
-        char buf[16]; snprintf(buf, sizeof(buf), "%u RPM   ", (unsigned)state.sweep.maxRpm);
+    if (state.cranking.crankingRpm != _lastCrankRpm || fullRedraw) {
+        char buf[16]; snprintf(buf, sizeof(buf), "%u RPM   ", (unsigned)state.cranking.crankingRpm);
         _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
         _gfx->drawString(buf, 24, 154);
         _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("Batas Atas Auto Sweep", 24, 180);
-        _lastSweepMax = state.sweep.maxRpm;
+        _gfx->drawString("RPM Awal Starter Mesin", 24, 180);
+        _lastCrankRpm = state.cranking.crankingRpm;
     }
 
     if (state.sweep.sweepRateRpmPerSec != _lastSweepRate || fullRedraw) {
@@ -95,13 +98,13 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
         _lastSweepRate = state.sweep.sweepRateRpmPerSec;
     }
 
-    if (state.cranking.crankingRpm != _lastCrankRpm || fullRedraw) {
-        char buf[16]; snprintf(buf, sizeof(buf), "%u RPM   ", (unsigned)state.cranking.crankingRpm);
+    if (state.sweep.minRpm != _lastSweepMin || state.sweep.maxRpm != _lastSweepMax || fullRedraw) {
+        char buf[24]; snprintf(buf, sizeof(buf), "%u - %u ", (unsigned)state.sweep.minRpm, (unsigned)state.sweep.maxRpm);
         _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
         _gfx->drawString(buf, 24, 232);
         _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("RPM Saat Starter Mesin", 24, 258);
-        _lastCrankRpm = state.cranking.crankingRpm;
+        _gfx->drawString("Batas Rentang Auto Sweep", 24, 258);
+        _lastSweepMin = state.sweep.minRpm; _lastSweepMax = state.sweep.maxRpm;
     }
 
     if (wheel.inverted != _lastInverted || fullRedraw) {
@@ -143,17 +146,17 @@ void PageGenSettings::onEncoderTurn(int32_t delta, uint8_t editRow,
         if (idx >= TOTAL_STEP_PRESETS) idx = 0;
         state.rpmStep = STEP_PRESETS[idx];
     } else if (editRow == 1) {
-        int32_t val = (int32_t)state.sweep.minRpm + (delta * 100);
-        state.sweep.minRpm = (uint32_t)constrain(val, 0, 6000);
+        int32_t val = (int32_t)state.cranking.crankDurationMs + (delta * 500);
+        state.cranking.crankDurationMs = (uint32_t)constrain(val, 500, 10000);
     } else if (editRow == 2) {
-        int32_t val = (int32_t)state.sweep.maxRpm + (delta * 100);
-        state.sweep.maxRpm = (uint32_t)constrain(val, 500, 12000);
+        int32_t val = (int32_t)state.cranking.crankingRpm + (delta * 25);
+        state.cranking.crankingRpm = (uint32_t)constrain(val, 50, 1000);
     } else if (editRow == 3) {
         int32_t val = (int32_t)state.sweep.sweepRateRpmPerSec + (delta * 50);
         state.sweep.sweepRateRpmPerSec = (uint32_t)constrain(val, 50, 3000);
     } else if (editRow == 4) {
-        int32_t val = (int32_t)state.cranking.crankingRpm + (delta * 25);
-        state.cranking.crankingRpm = (uint32_t)constrain(val, 50, 1000);
+        int32_t val = (int32_t)state.sweep.maxRpm + (delta * 250);
+        state.sweep.maxRpm = (uint32_t)constrain(val, 1000, 12000);
     } else if (editRow == 5 && delta != 0) {
         wheel.inverted = !wheel.inverted;
     }

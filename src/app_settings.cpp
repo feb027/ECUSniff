@@ -16,6 +16,7 @@ void saveSettings(const EcuEngine::EngineRuntimeState& engineState,
     pref.putUInt("sw_max", engineState.sweep.maxRpm);
     pref.putUInt("sw_rate", engineState.sweep.sweepRateRpmPerSec);
     pref.putUInt("crk_rpm", engineState.cranking.crankingRpm);
+    pref.putUInt("crk_dur", engineState.cranking.crankDurationMs);
     pref.putString("wname", engineState.activeWheelName);
     pref.putUShort("teeth", wheelCfg.totalTeeth);
     pref.putUChar("mteeth", wheelCfg.missingTeeth);
@@ -67,6 +68,7 @@ void loadSettings(EcuEngine::EngineRuntimeState& engineState,
     engineState.sweep.maxRpm = pref.getUInt("sw_max", 6000);
     engineState.sweep.sweepRateRpmPerSec = pref.getUInt("sw_rate", 500);
     engineState.cranking.crankingRpm = pref.getUInt("crk_rpm", 200);
+    engineState.cranking.crankDurationMs = pref.getUInt("crk_dur", 3000);
 
     String wn = pref.getString("wname", "Honda / Ford 36-1");
     strncpy(engineState.activeWheelName, wn.c_str(), sizeof(engineState.activeWheelName));

@@ -190,9 +190,10 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     }
 
     if (modeChanged || isRunningChanged || fullRedraw) {
-        const char* modeNames[] = { "FIX", "CRANK", "SWEEP" };
-        _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(3);
-        _gfx->drawString("        ", 254, 178); _gfx->drawString(modeNames[curMode % 3], 254, 178);
+        const char* modeNames[] = { "FIX", "SWEEP", "CRK>FIX", "CRK>SWP" };
+        _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize((curMode >= 2) ? 2 : 3);
+        _gfx->drawString("          ", 254, 178);
+        _gfx->drawString(modeNames[curMode % 4], 254, (curMode >= 2) ? 182 : 178);
 
         if (state.isRunning) {
             _gfx->fillRoundRect(354, 166, 98, 44, 4, 0x03E0); _gfx->drawRoundRect(354, 166, 98, 44, 4, 0x07E0);
@@ -248,8 +249,8 @@ void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
         state.targetRpm = constrain(newRpm, 0, 12000);
     } else if (editRow == 1) {
         int32_t m = static_cast<int32_t>(state.runMode) + (delta > 0 ? 1 : -1);
-        if (m < 0) m = 2;
-        if (m > 2) m = 0;
+        if (m < 0) m = 3;
+        if (m > 3) m = 0;
         state.runMode = static_cast<EcuEngine::EngineRunMode>(m);
     } else if (editRow == 2) {
         size_t count = BASE_PRESET_COUNT + s_customCount;

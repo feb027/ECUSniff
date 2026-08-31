@@ -12,9 +12,9 @@ void RpmController::reset() {
 }
 
 void RpmController::startCranking(const CrankingConfig& config) {
-    _crankStage = CrankingStage::Cranking;
+    _crankStage = CrankingStage::SpinUp;
     _elapsedCrankMs = 0;
-    _currentDynamicRpm = config.crankingRpm;
+    _currentDynamicRpm = 0;
 }
 
 uint32_t RpmController::update(EngineRuntimeState& state, uint32_t deltaMs) {
@@ -30,33 +30,9 @@ uint32_t RpmController::update(EngineRuntimeState& state, uint32_t deltaMs) {
             break;
         }
 
-        case EngineRunMode::Cranking: {
-            _elapsedCrankMs += deltaMs;
-            if (_crankStage == CrankingStage::Cranking) {
-                _currentDynamicRpm = state.cranking.crankingRpm;
-                if (_elapsedCrankMs >= state.cranking.crankDurationMs) {
-                    _crankStage = CrankingStage::Ramping;
-                    _elapsedCrankMs = 0;
-                }
-            } else if (_crankStage == CrankingStage::Ramping) {
-                float progress = static_cast<float>(_elapsedCrankMs) / static_cast<float>(state.cranking.rampDurationMs);
-                if (progress >= 1.0f) {
-                    _crankStage = CrankingStage::Running;
-                    _currentDynamicRpm = state.cranking.runRpm;
-                } else {
-                    int32_t diff = static_cast<int32_t>(state.cranking.runRpm) - static_cast<int32_t>(state.cranking.crankingRpm);
-                    _currentDynamicRpm = state.cranking.crankingRpm + static_cast<uint32_t>(diff * progress);
-                }
-            } else {
-                _currentDynamicRpm = state.cranking.runRpm;
-            }
-            break;
-        }
-
         case EngineRunMode::AutoSweep: {
             uint32_t step = (state.sweep.sweepRateRpmPerSec * deltaMs) / 1000;
             if (step == 0) step = 1;
-
             if (_sweepAscending) {
                 _currentDynamicRpm += step;
                 if (_currentDynamicRpm >= state.sweep.maxRpm) {
@@ -69,6 +45,64 @@ uint32_t RpmController::update(EngineRuntimeState& state, uint32_t deltaMs) {
                     _sweepAscending = true;
                 } else {
                     _currentDynamicRpm -= step;
+                }
+            }
+            break;
+        }
+
+        case EngineRunMode::CrankToFix:
+        case EngineRunMode::CrankToSweep: {
+            _elapsedCrankMs += deltaMs;
+            constexpr uint32_t SPINUP_MS = 400;
+            uint32_t crankHoldMs = (state.cranking.crankDurationMs > 0) ? state.cranking.crankDurationMs : 3000;
+            uint32_t rampUpMs = (state.cranking.rampDurationMs > 0) ? state.cranking.rampDurationMs : 800;
+
+            if (_crankStage == CrankingStage::SpinUp) {
+                float prog = (float)_elapsedCrankMs / (float)SPINUP_MS;
+                if (prog >= 1.0f) {
+                    _currentDynamicRpm = state.cranking.crankingRpm;
+                    _crankStage = CrankingStage::Cranking;
+                    _elapsedCrankMs = 0;
+                } else {
+                    _currentDynamicRpm = (uint32_t)(state.cranking.crankingRpm * prog);
+                }
+            } else if (_crankStage == CrankingStage::Cranking) {
+                _currentDynamicRpm = state.cranking.crankingRpm;
+                if (_elapsedCrankMs >= crankHoldMs) {
+                    _crankStage = CrankingStage::Ramping;
+                    _elapsedCrankMs = 0;
+                }
+            } else if (_crankStage == CrankingStage::Ramping) {
+                uint32_t destRpm = (state.runMode == EngineRunMode::CrankToFix) ? state.targetRpm : state.sweep.minRpm;
+                float prog = (float)_elapsedCrankMs / (float)rampUpMs;
+                if (prog >= 1.0f) {
+                    _currentDynamicRpm = destRpm;
+                    _crankStage = CrankingStage::PostCrank;
+                    _sweepAscending = true;
+                } else {
+                    int32_t diff = (int32_t)destRpm - (int32_t)state.cranking.crankingRpm;
+                    _currentDynamicRpm = state.cranking.crankingRpm + (uint32_t)(diff * prog);
+                }
+            } else {
+                if (state.runMode == EngineRunMode::CrankToFix) {
+                    _currentDynamicRpm = state.targetRpm;
+                } else {
+                    uint32_t step = (state.sweep.sweepRateRpmPerSec * deltaMs) / 1000;
+                    if (step == 0) step = 1;
+                    if (_sweepAscending) {
+                        _currentDynamicRpm += step;
+                        if (_currentDynamicRpm >= state.sweep.maxRpm) {
+                            _currentDynamicRpm = state.sweep.maxRpm;
+                            _sweepAscending = false;
+                        }
+                    } else {
+                        if (_currentDynamicRpm <= state.sweep.minRpm + step) {
+                            _currentDynamicRpm = state.sweep.minRpm;
+                            _sweepAscending = true;
+                        } else {
+                            _currentDynamicRpm -= step;
+                        }
+                    }
                 }
             }
             break;

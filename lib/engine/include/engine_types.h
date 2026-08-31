@@ -6,15 +6,16 @@ namespace EcuEngine {
 
 enum class EngineRunMode : uint8_t {
     FixedRpm = 0,
-    Cranking = 1,
-    AutoSweep = 2
+    AutoSweep = 1,
+    CrankToFix = 2,
+    CrankToSweep = 3
 };
 
 struct CrankingConfig {
     uint32_t crankingRpm{200};
     uint32_t runRpm{850};
-    uint32_t crankDurationMs{1500};
-    uint32_t rampDurationMs{1000};
+    uint32_t crankDurationMs{3000};
+    uint32_t rampDurationMs{800};
 };
 
 struct SweepConfig {

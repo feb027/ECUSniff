@@ -40,6 +40,7 @@ void taskCore0UiWeb(void *pvParameters) {
     uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, lastEps = 0, lastSpeedo = 0;
     uint32_t btnTime = 0, relTime = 0, lastSettingChange = 0;
     uint8_t clickCount = 0; bool btnDown = false, longHandled = false, pendingSave = false;
+    bool lastRunState = false;
 
     for (;;) {
         uint32_t now = millis();
@@ -66,10 +67,6 @@ void taskCore0UiWeb(void *pvParameters) {
             if (!longHandled && (now - btnTime) >= 600) {
                 longHandled = true; clickCount = 0;
                 engineState.isRunning = !engineState.isRunning;
-                if (engineState.isRunning) {
-                    if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
-                    signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
-                } else { signalGen.stop(); }
             }
         } else if (!isDown && btnDown) {
             if (!longHandled) { clickCount++; relTime = now; }
@@ -99,6 +96,18 @@ void taskCore0UiWeb(void *pvParameters) {
                 pendingSave = false;
             }
             clickCount = 0;
+        }
+
+        if (engineState.isRunning != lastRunState) {
+            lastRunState = engineState.isRunning;
+            if (engineState.isRunning) {
+                if (engineState.runMode == EcuEngine::EngineRunMode::CrankToFix || engineState.runMode == EcuEngine::EngineRunMode::CrankToSweep) {
+                    rpmController.startCranking(engineState.cranking);
+                }
+                signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
+            } else {
+                signalGen.stop();
+            }
         }
 
         if (pendingSave && (now - lastSettingChange >= 2000)) {
@@ -163,10 +172,8 @@ static void handleWebCommand(const JsonDocument& doc) {
     String cmd = doc["cmd"] | ""; uint32_t val = doc["val"] | 0;
     if (cmd == "start") {
         engineState.isRunning = true;
-        if (engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
-        signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
     } else if (cmd == "stop") {
-        engineState.isRunning = false; signalGen.stop();
+        engineState.isRunning = false;
     } else if (cmd == "set_rpm" && val <= 12000) {
         engineState.targetRpm = val; signalGen.setRpm(val);
         EcuApp::saveSettings(engineState, wheelCfg, camCfg);
@@ -197,9 +204,8 @@ static void handleWebCommand(const JsonDocument& doc) {
         if (EcuUi::PageDashboard::deleteCustomPreset(slot)) {
             EcuApp::saveSettings(engineState, wheelCfg, camCfg); if (menuMgr) menuMgr->markNeedsRedraw();
         }
-    } else if (cmd == "set_mode" && val <= 2) {
+    } else if (cmd == "set_mode" && val <= 3) {
         engineState.runMode = static_cast<EcuEngine::EngineRunMode>(val);
-        if (engineState.isRunning && engineState.runMode == EcuEngine::EngineRunMode::Cranking) rpmController.startCranking(engineState.cranking);
         if (menuMgr) menuMgr->markNeedsRedraw();
     } else if (cmd == "set_ui_level") {
         if (menuMgr) menuMgr->setUiLevel(static_cast<EcuUi::UiLevel>(val));
