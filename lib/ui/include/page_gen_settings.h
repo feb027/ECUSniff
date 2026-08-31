@@ -22,20 +22,16 @@ public:
                         EcuEngine::EngineRuntimeState& state,
                         EcuEngine::ParametricWheel& wheel);
 
-    uint8_t getCurrentPage() const { return _currentPage; }
-    void setCurrentPage(uint8_t p) { _currentPage = p; }
-
 private:
     LovyanGFX* _gfx;
-    uint8_t  _currentPage{0};
-    uint8_t  _lastDrawnPage{0xFF};
     uint8_t  _lastEditRow{0xFF};
     uint32_t _lastRpmStep{0};
-    uint32_t _lastCrankDur{0};
-    uint32_t _lastCrankRpm{0};
-    uint32_t _lastSweepRate{0};
     uint32_t _lastSweepMin{0};
     uint32_t _lastSweepMax{0};
+    uint32_t _lastSweepRate{0};
+    uint32_t _lastCrankRpm{0};
+    uint32_t _lastCrankDur{0};
+    bool     _lastFastFlare{false};
     bool     _lastInverted{false};
 
     void _drawPanel(int32_t x, int32_t y, int32_t w, int32_t h, bool isSel);

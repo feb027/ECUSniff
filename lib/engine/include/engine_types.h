@@ -15,7 +15,8 @@ struct CrankingConfig {
     uint32_t crankingRpm{200};
     uint32_t runRpm{850};
     uint32_t crankDurationMs{3000};
-    uint32_t rampDurationMs{800};
+    uint32_t rampDurationMs{500};
+    bool     fastFlare{true};
 };
 
 struct SweepConfig {

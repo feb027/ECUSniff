@@ -55,7 +55,7 @@ uint32_t RpmController::update(EngineRuntimeState& state, uint32_t deltaMs) {
             _elapsedCrankMs += deltaMs;
             constexpr uint32_t SPINUP_MS = 400;
             uint32_t crankHoldMs = (state.cranking.crankDurationMs > 0) ? state.cranking.crankDurationMs : 3000;
-            uint32_t rampUpMs = (state.cranking.rampDurationMs > 0) ? state.cranking.rampDurationMs : 800;
+            uint32_t rampUpMs = state.cranking.fastFlare ? 500 : 2500;
 
             if (_crankStage == CrankingStage::SpinUp) {
                 float prog = (float)_elapsedCrankMs / (float)SPINUP_MS;
