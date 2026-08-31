@@ -10,6 +10,12 @@ void saveSettings(const EcuEngine::EngineRuntimeState& engineState,
                   const EcuEngine::CamEventTable& camCfg) {
     pref.begin("ecu_conf", false);
     pref.putUInt("rpm", engineState.targetRpm);
+    pref.putUInt("step", engineState.rpmStep);
+    pref.putUChar("mode", static_cast<uint8_t>(engineState.runMode));
+    pref.putUInt("sw_min", engineState.sweep.minRpm);
+    pref.putUInt("sw_max", engineState.sweep.maxRpm);
+    pref.putUInt("sw_rate", engineState.sweep.sweepRateRpmPerSec);
+    pref.putUInt("crk_rpm", engineState.cranking.crankingRpm);
     pref.putString("wname", engineState.activeWheelName);
     pref.putUShort("teeth", wheelCfg.totalTeeth);
     pref.putUChar("mteeth", wheelCfg.missingTeeth);
@@ -55,6 +61,13 @@ void loadSettings(EcuEngine::EngineRuntimeState& engineState,
                   EcuEngine::CamEventTable& camCfg) {
     pref.begin("ecu_conf", true);
     engineState.targetRpm = pref.getUInt("rpm", 850);
+    engineState.rpmStep = pref.getUInt("step", 50);
+    engineState.runMode = static_cast<EcuEngine::EngineRunMode>(pref.getUChar("mode", 0));
+    engineState.sweep.minRpm = pref.getUInt("sw_min", 800);
+    engineState.sweep.maxRpm = pref.getUInt("sw_max", 6000);
+    engineState.sweep.sweepRateRpmPerSec = pref.getUInt("sw_rate", 500);
+    engineState.cranking.crankingRpm = pref.getUInt("crk_rpm", 200);
+
     String wn = pref.getString("wname", "Honda / Ford 36-1");
     strncpy(engineState.activeWheelName, wn.c_str(), sizeof(engineState.activeWheelName));
     wheelCfg.totalTeeth = pref.getUShort("teeth", 36);

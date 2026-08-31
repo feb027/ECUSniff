@@ -38,8 +38,8 @@ static EcuEngine::CamEventTable      camCfg;
 
 void taskCore0UiWeb(void *pvParameters) {
     uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, lastEps = 0, lastSpeedo = 0;
-    uint32_t btnTime = 0, relTime = 0;
-    uint8_t clickCount = 0; bool btnDown = false, longHandled = false;
+    uint32_t btnTime = 0, relTime = 0, lastSettingChange = 0;
+    uint8_t clickCount = 0; bool btnDown = false, longHandled = false, pendingSave = false;
 
     for (;;) {
         uint32_t now = millis();
@@ -48,6 +48,7 @@ void taskCore0UiWeb(void *pvParameters) {
             menuMgr->onJoystickAction(joyAct, engineState, wheelCfg, camCfg);
             signalGen.setPattern(wheelCfg, camCfg);
             if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
+            lastSettingChange = now; pendingSave = true;
         }
 
         encoder.read();
@@ -56,6 +57,7 @@ void taskCore0UiWeb(void *pvParameters) {
             menuMgr->onEncoderTurn(delta, engineState, wheelCfg, camCfg);
             signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm);
             if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
+            lastSettingChange = now; pendingSave = true;
         }
 
         bool isDown = (digitalRead(PinConfig::ENC_SW) == LOW);
@@ -79,7 +81,7 @@ void taskCore0UiWeb(void *pvParameters) {
                 menuMgr->onEncoderClick(engineState, wheelCfg, camCfg);
                 signalGen.setPattern(wheelCfg, camCfg);
                 if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
-                EcuApp::saveSettings(engineState, wheelCfg, camCfg);
+                lastSettingChange = now; pendingSave = true;
             } else if (clickCount >= 2 && menuMgr) {
                 menuMgr->onEncoderDoubleClick(wheelCfg, camCfg);
                 const auto& cr = menuMgr->getPageCapture().getLastResult();
@@ -94,8 +96,14 @@ void taskCore0UiWeb(void *pvParameters) {
                 const auto* saved = EcuUi::PageDashboard::getCustomPreset(slot);
                 if (saved) strncpy(engineState.activeWheelName, saved->name, sizeof(engineState.activeWheelName));
                 EcuApp::saveSettings(engineState, wheelCfg, camCfg);
+                pendingSave = false;
             }
             clickCount = 0;
+        }
+
+        if (pendingSave && (now - lastSettingChange >= 2000)) {
+            EcuApp::saveSettings(engineState, wheelCfg, camCfg);
+            pendingSave = false;
         }
 
         captureDriver.update();
@@ -159,7 +167,7 @@ static void handleWebCommand(const JsonDocument& doc) {
         signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
     } else if (cmd == "stop") {
         engineState.isRunning = false; signalGen.stop();
-    } else if (cmd == "set_rpm" && val >= 100 && val <= 12000) {
+    } else if (cmd == "set_rpm" && val <= 12000) {
         engineState.targetRpm = val; signalGen.setRpm(val);
         EcuApp::saveSettings(engineState, wheelCfg, camCfg);
     } else if (cmd == "set_pattern") {

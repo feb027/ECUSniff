@@ -183,6 +183,7 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
 
     if (rpmChanged || isRunningChanged || fullRedraw) {
         _drawRpmBar(activeRpm, fullRedraw);
+        _gfx->fillRect(24, 172, 134, 38, 0x0841);
         char rpmStr[8]; snprintf(rpmStr, sizeof(rpmStr), "%04u", (unsigned)activeRpm);
         _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(4); _gfx->drawString(rpmStr, 26, 174);
         _gfx->setTextSize(2); _gfx->setTextColor(0x07FF, 0x0841); _gfx->drawString("RPM", 162, 186);
