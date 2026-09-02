@@ -427,6 +427,28 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
                 } else if (action == EcuHal::JoyAction::Click) {
                     onEncoderClick(state, wheel, cam);
                 }
+            } else if (curCat == 4) { // VVT-i: 4 items (Row 0: Enable, Row 1: Start RPM / Row 2: Max Adv, Row 3: Full RPM)
+                if (action == EcuHal::JoyAction::Up) {
+                    if (_editRow <= 1) {
+                        _pageGenSettings.setFocusSubNav(true);
+                        _needsFullRedraw = true;
+                    } else if (_editRow == 2) {
+                        _editRow = 0;
+                    } else if (_editRow == 3) {
+                        _editRow = 1;
+                    }
+                } else if (action == EcuHal::JoyAction::Down) {
+                    if (_editRow == 0) _editRow = 2;
+                    else if (_editRow == 1) _editRow = 3;
+                } else if (action == EcuHal::JoyAction::Left) {
+                    if (_editRow == 1) _editRow = 0;
+                    else if (_editRow == 3) _editRow = 2;
+                } else if (action == EcuHal::JoyAction::Right) {
+                    if (_editRow == 0) _editRow = 1;
+                    else if (_editRow == 2) _editRow = 3;
+                } else if (action == EcuHal::JoyAction::Click) {
+                    onEncoderClick(state, wheel, cam);
+                }
             } else { // Hardware: 1 item (Row 0)
                 if (action == EcuHal::JoyAction::Up) {
                     _pageGenSettings.setFocusSubNav(true);
