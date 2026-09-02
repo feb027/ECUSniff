@@ -23,9 +23,9 @@ public:
                         EcuEngine::ParametricWheel& wheel);
 
     uint8_t getSubCategory() const { return _subCategory; }
-    void setSubCategory(uint8_t cat) { _subCategory = (cat % 5); }
-    void nextSubCategory() { _subCategory = (_subCategory + 1) % 5; }
-    void prevSubCategory() { _subCategory = (_subCategory > 0) ? (_subCategory - 1) : 4; }
+    void setSubCategory(uint8_t cat) { _subCategory = (cat % 6); }
+    void nextSubCategory() { _subCategory = (_subCategory + 1) % 6; }
+    void prevSubCategory() { _subCategory = (_subCategory > 0) ? (_subCategory - 1) : 5; }
 
     bool isFocusSubNav() const { return _focusSubNav; }
     void setFocusSubNav(bool focus) { _focusSubNav = focus; }
@@ -35,12 +35,13 @@ public:
         if (cat == 1) return 3; // Fix Encoder (3 items: Step, Min, Max)
         if (cat == 2) return 3; // Potensio (3 items: Step/Quantization, Min, Max)
         if (cat == 3) return 4; // Auto Sweep (4 items: Step, Min, Max, Rate)
+        if (cat == 4) return 4; // VVT-i (4 items: Enable, Start RPM, Max Adv, Full RPM)
         return 1;               // Hardware: Polarity (1 item)
     }
 
 private:
     LovyanGFX* _gfx;
-    uint8_t  _subCategory{0}; // 0: Cranking, 1: Fix Enc, 2: Potensio, 3: Sweep, 4: Hardware
+    uint8_t  _subCategory{0}; // 0: Crank, 1: Fix Enc, 2: Pot, 3: Sweep, 4: VVT-i, 5: Hardware
     bool     _focusSubNav{true}; // true: cursor is on category bar, false: cursor is on items
     uint8_t  _lastSubCategory{0xFF};
     bool     _lastFocusSubNav{false};
@@ -61,6 +62,10 @@ private:
     uint32_t _lastRampDur{0};
     bool     _lastFastFlare{false};
     bool     _lastInverted{false};
+    bool     _lastVvtEnabled{false};
+    uint32_t _lastVvtStart{0};
+    uint32_t _lastVvtFull{0};
+    uint8_t  _lastVvtAdv{0};
 
     void _drawSubNav(bool fullRedraw);
     void _drawPanel(int32_t x, int32_t y, int32_t w, int32_t h, bool isSel);

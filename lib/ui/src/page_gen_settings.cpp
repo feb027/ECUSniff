@@ -49,10 +49,10 @@ void PageGenSettings::_drawPanel(int32_t x, int32_t y, int32_t w, int32_t h, boo
 void PageGenSettings::_drawSubNav(bool fullRedraw) {
     if (_subCategory == _lastSubCategory && _focusSubNav == _lastFocusSubNav && !fullRedraw) return;
 
-    const char* catNames[5] = { "1. CRANK", "2. FIX ENC", "3. POTENSIO", "4. SWEEP", "5. HARDWARE" };
-    int32_t tabW = 86;
-    for (uint8_t i = 0; i < 5; ++i) {
-        int32_t x = 16 + (i * 90);
+    const char* catNames[6] = { "1. CRANK", "2. FIX", "3. POT", "4. SWEEP", "5. VVT-i", "6. HARDWARE" };
+    int32_t tabW = 72;
+    for (uint8_t i = 0; i < 6; ++i) {
+        int32_t x = 14 + (i * 76);
         int32_t y = 48;
         bool isActive = (_subCategory == i);
         uint16_t bg = isActive ? 0x2945 : 0x0841;
@@ -90,6 +90,7 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
         _lastPotStep = 0; _lastPotMin = 0xFFFFFFFF; _lastPotMax = 0xFFFFFFFF;
         _lastSweepStep = 0; _lastSweepMin = 0; _lastSweepMax = 0; _lastSweepRate = 0;
         _lastCrankRpm = 0; _lastCrankDur = 0; _lastSpinUpDur = 0; _lastRampDur = 0;
+        _lastVvtEnabled = !state.vvt.enabled; _lastVvtStart = 0; _lastVvtFull = 0; _lastVvtAdv = 0;
     } else {
         _drawSubNav(false);
     }
@@ -106,15 +107,15 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
 
             _gfx->fillRoundRect(16, 154, 220, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("3. 0 -> CRANK SPIN-UP:", 24, 159);
+            _gfx->drawString("3. SPIN-UP TIME:", 24, 159);
 
             _gfx->fillRoundRect(244, 154, 220, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("4. CRANK TRANSITION:", 252, 159);
+            _gfx->drawString("4. FAST FLARE:", 252, 159);
 
             _gfx->fillRoundRect(16, 230, 448, 72, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("5. GRADUAL RAMP DURATION (SETELAH CRANK SELESAI):", 24, 235);
+            _gfx->drawString("5. RAMP TO TARGET DURATION:", 24, 235);
         }
 
         if (state.cranking.crankingRpm != _lastCrankRpm || needFull) {
@@ -122,17 +123,16 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
             _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 24, 101);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("RPM Awal Starter Mesin", 24, 127);
+            _gfx->drawString("Putaran starter dinamo", 24, 127);
             _lastCrankRpm = state.cranking.crankingRpm;
         }
 
         if (state.cranking.crankDurationMs != _lastCrankDur || needFull) {
-            char buf[16]; float sec = state.cranking.crankDurationMs / 1000.0f;
-            snprintf(buf, sizeof(buf), "%.1f DETIK   ", sec);
+            char buf[16]; snprintf(buf, sizeof(buf), "%.1f DETIK ", state.cranking.crankDurationMs / 1000.0f);
             _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 252, 101);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("Lama Tahan Starter", 252, 127);
+            _gfx->drawString("Durasi tahanan starter", 252, 127);
             _lastCrankDur = state.cranking.crankDurationMs;
         }
 
@@ -141,29 +141,26 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
             _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 24, 177);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("Waktu dari 0 ke Crank RPM", 24, 203);
+            _gfx->drawString("Waktu akselerasi awal", 24, 203);
             _lastSpinUpDur = state.cranking.spinUpDurationMs;
         }
 
         if (state.cranking.fastFlare != _lastFastFlare || needFull) {
-            const char* tStr = state.cranking.fastFlare ? "MELESAT (Direct)" : "GRADUAL (Ramp)  ";
-            uint16_t col = state.cranking.fastFlare ? 0x07E0 : 0xFFE0;
+            const char* fStr = state.cranking.fastFlare ? "[ AKTIF ] " : "[ MATI ]  ";
+            uint16_t col = state.cranking.fastFlare ? 0x07E0 : 0xF800;
             _gfx->setTextColor(col, 0x0841); _gfx->setTextSize(2);
-            _gfx->drawString(tStr, 252, 177);
+            _gfx->drawString(fStr, 252, 177);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString(state.cranking.fastFlare ? "Langsung loncat (0ms ke Fix)" : "Naik halus bertahap", 252, 203);
+            _gfx->drawString("Lonjakan RPM saat nyala", 252, 203);
             _lastFastFlare = state.cranking.fastFlare;
         }
 
-        if (state.cranking.rampDurationMs != _lastRampDur || state.cranking.fastFlare != _lastFastFlare || needFull) {
-            char buf[32]; float sec = state.cranking.rampDurationMs / 1000.0f;
-            snprintf(buf, sizeof(buf), "%.2f DETIK (%u ms)       ", sec, (unsigned)state.cranking.rampDurationMs);
-            uint16_t valCol = state.cranking.fastFlare ? 0x8410 : 0x07E0;
-            _gfx->setTextColor(valCol, 0x0841); _gfx->setTextSize(2);
+        if (state.cranking.rampDurationMs != _lastRampDur || needFull) {
+            char buf[16]; snprintf(buf, sizeof(buf), "%.1f DETIK ", state.cranking.rampDurationMs / 1000.0f);
+            _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 24, 253);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString(state.cranking.fastFlare ? "Nonaktif pada transisi Melesat (Hanya saat GRADUAL) " : 
-                                                      "Lama akselerasi dari Crank RPM ke running RPM      ", 24, 279);
+            _gfx->drawString("Waktu transisi halus menuju target RPM operasional", 24, 279);
             _lastRampDur = state.cranking.rampDurationMs;
         }
 
@@ -179,25 +176,25 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
         if (needFull) {
             _gfx->fillRoundRect(16, 78, 448, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("1. RPM STEP (KENAIKAN PER KLIK ENCODER):", 24, 83);
+            _gfx->drawString("1. FIX ENCODER STEP (KENAIKAN / KLIK ROTARY):", 24, 83);
 
             _gfx->fillRoundRect(16, 154, 220, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("2. MIN RPM (BATAS BAWAH ENCODER):", 24, 159);
+            _gfx->drawString("2. MIN RPM (BATAS BAWAH):", 24, 159);
 
             _gfx->fillRoundRect(244, 154, 220, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("3. MAX RPM (BATAS ATAS ENCODER):", 252, 159);
+            _gfx->drawString("3. MAX RPM (BATAS ATAS):", 252, 159);
         }
 
-        uint32_t stepVal = (state.fixEnc.rpmStep > 0) ? state.fixEnc.rpmStep : 50;
-        if (stepVal != _lastRpmStep || needFull) {
-            char buf[20]; snprintf(buf, sizeof(buf), "+/-%u RPM        ", (unsigned)stepVal);
+        uint32_t encStepVal = (state.fixEnc.rpmStep > 0) ? state.fixEnc.rpmStep : 50;
+        if (encStepVal != _lastRpmStep || needFull) {
+            char buf[20]; snprintf(buf, sizeof(buf), "+/-%u RPM        ", (unsigned)encStepVal);
             _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 24, 101);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
             _gfx->drawString("Pilihan: 1, 5, 10, 25, 50, 100, 250, 500, 1000 RPM", 24, 127);
-            _lastRpmStep = stepVal;
+            _lastRpmStep = encStepVal;
         }
 
         if (state.fixEnc.minRpm != _lastEncMin || needFull) {
@@ -205,7 +202,7 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
             _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 24, 177);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("Batas Bawah Mode FIX", 24, 203);
+            _gfx->drawString("Batas putaran RPM minimum", 24, 203);
             _lastEncMin = state.fixEnc.minRpm;
         }
 
@@ -214,7 +211,7 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
             _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 252, 177);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("Batas Atas Mode FIX", 252, 203);
+            _gfx->drawString("Batas putaran RPM maksimum", 252, 203);
             _lastEncMax = state.fixEnc.maxRpm;
         }
 
@@ -228,15 +225,15 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
         if (needFull) {
             _gfx->fillRoundRect(16, 78, 448, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("1. POT RPM STEP (RESOLUSI / STEP QUANTIZATION):", 24, 83);
+            _gfx->drawString("1. POT STEP (KUANTISASI RESOLUSI POTENSIO):", 24, 83);
 
             _gfx->fillRoundRect(16, 154, 220, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("2. MIN RPM (MENTOK KIRI / 0%):", 24, 159);
+            _gfx->drawString("2. POT MIN RPM (KNOB 0%):", 24, 159);
 
             _gfx->fillRoundRect(244, 154, 220, 70, 6, 0x0841);
             _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("3. MAX RPM (MENTOK KANAN / 100%):", 252, 159);
+            _gfx->drawString("3. POT MAX RPM (KNOB 100%):", 252, 159);
 
             _gfx->fillRoundRect(16, 230, 448, 72, 6, 0x0841);
             _gfx->drawRoundRect(16, 230, 448, 72, 6, 0x07E0);
@@ -244,9 +241,9 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
             _gfx->drawString("KARAKTER MODE POTENSIOMETER (FINE-TUNING):", 24, 236);
         }
 
-        uint32_t potStepVal = (state.potCfg.rpmStep > 0) ? state.potCfg.rpmStep : 1;
+        uint32_t potStepVal = (state.potCfg.rpmStep > 0) ? state.potCfg.rpmStep : 10;
         if (potStepVal != _lastPotStep || needFull) {
-            char buf[32];
+            char buf[40];
             if (potStepVal <= 1) {
                 snprintf(buf, sizeof(buf), "1 RPM (KONTINU / SUPER HALUS)  ");
             } else {
@@ -293,6 +290,7 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
             _drawPanel(16, 78, 448, 70, editRow == 0);
             _drawPanel(16, 154, 220, 70, editRow == 1);
             _drawPanel(244, 154, 220, 70, editRow == 2);
+            _drawPanel(16, 230, 448, 72, editRow == 3);
             _lastEditRow = editRow;
         }
     } else if (_subCategory == 3) {
@@ -356,6 +354,75 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
             _drawPanel(16, 154, 220, 70, editRow == 1);
             _drawPanel(244, 154, 220, 70, editRow == 2);
             _drawPanel(16, 230, 448, 72, editRow == 3);
+            _lastEditRow = editRow;
+        }
+    } else if (_subCategory == 4) {
+        if (needFull) {
+            _gfx->fillRoundRect(16, 78, 220, 70, 6, 0x0841);
+            _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("1. VVT-i SIMULATION:", 24, 83);
+
+            _gfx->fillRoundRect(244, 78, 220, 70, 6, 0x0841);
+            _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("2. START ADVANCE RPM:", 252, 83);
+
+            _gfx->fillRoundRect(16, 154, 220, 70, 6, 0x0841);
+            _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("3. MAX ADVANCE ANGLE:", 24, 159);
+
+            _gfx->fillRoundRect(244, 154, 220, 70, 6, 0x0841);
+            _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("4. FULL ADVANCE RPM:", 252, 159);
+
+            _gfx->fillRoundRect(16, 230, 448, 72, 6, 0x0841);
+            _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("Simulasi pergeseran fasa noken as otomatis untuk Avanza, Vios, dsb.", 24, 235);
+            _gfx->drawString("Mencegah ECU fuel cut / kehilangan sinkronisasi di atas 2800 RPM.", 24, 253);
+            _gfx->drawString("Joy-Y / Putar: Atur Nilai | Joy-X: Pindah Tab | Klik: Toggle On/Off", 24, 275);
+        }
+
+        if (state.vvt.enabled != _lastVvtEnabled || needFull) {
+            const char* eStr = state.vvt.enabled ? "[ AKTIF (ENABLED) ] " : "[ MATI (DISABLED) ] ";
+            uint16_t col = state.vvt.enabled ? 0x07E0 : 0xF800;
+            _gfx->setTextColor(col, 0x0841); _gfx->setTextSize(2);
+            _gfx->drawString(eStr, 24, 101);
+            _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("Geser dinamis pulsa CAM", 24, 127);
+            _lastVvtEnabled = state.vvt.enabled;
+        }
+
+        if (state.vvt.startRpm != _lastVvtStart || needFull) {
+            char buf[16]; snprintf(buf, sizeof(buf), "%u RPM    ", (unsigned)state.vvt.startRpm);
+            _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
+            _gfx->drawString(buf, 252, 101);
+            _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("RPM awal mulai noken as maju", 252, 127);
+            _lastVvtStart = state.vvt.startRpm;
+        }
+
+        if (state.vvt.maxAdvanceDeg != _lastVvtAdv || needFull) {
+            char buf[16]; snprintf(buf, sizeof(buf), "+%u DEG    ", (unsigned)state.vvt.maxAdvanceDeg);
+            _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(2);
+            _gfx->drawString(buf, 24, 177);
+            _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("Derajat kemajuan maksimal kruk as", 24, 203);
+            _lastVvtAdv = state.vvt.maxAdvanceDeg;
+        }
+
+        if (state.vvt.fullRpm != _lastVvtFull || needFull) {
+            char buf[16]; snprintf(buf, sizeof(buf), "%u RPM    ", (unsigned)state.vvt.fullRpm);
+            _gfx->setTextColor(0x07E0, 0x0841); _gfx->setTextSize(2);
+            _gfx->drawString(buf, 252, 177);
+            _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("Titik RPM kemajuan penuh", 252, 203);
+            _lastVvtFull = state.vvt.fullRpm;
+        }
+
+        if (editRow != _lastEditRow || needFull) {
+            _drawPanel(16, 78, 220, 70, editRow == 0);
+            _drawPanel(244, 78, 220, 70, editRow == 1);
+            _drawPanel(16, 154, 220, 70, editRow == 2);
+            _drawPanel(244, 154, 220, 70, editRow == 3);
             _lastEditRow = editRow;
         }
     } else {
@@ -454,6 +521,23 @@ void PageGenSettings::onEncoderTurn(int32_t delta, uint8_t editRow,
             int32_t val = (int32_t)state.sweep.sweepRateRpmPerSec + (delta * (int32_t)step);
             state.sweep.sweepRateRpmPerSec = (uint32_t)constrain(val, 50, 3000);
         }
+    } else if (_subCategory == 4) {
+        if (editRow == 0 && delta != 0) {
+            state.vvt.enabled = !state.vvt.enabled;
+        } else if (editRow == 1) {
+            int32_t val = (int32_t)state.vvt.startRpm + (delta * 50);
+            state.vvt.startRpm = (uint32_t)constrain(val, 1000, 3500);
+            if (state.vvt.fullRpm <= state.vvt.startRpm + 500) {
+                state.vvt.fullRpm = state.vvt.startRpm + 500;
+            }
+        } else if (editRow == 2) {
+            int32_t val = (int32_t)state.vvt.maxAdvanceDeg + (delta * 1);
+            state.vvt.maxAdvanceDeg = (uint8_t)constrain(val, 5, 55);
+        } else if (editRow == 3) {
+            int32_t val = (int32_t)state.vvt.fullRpm + (delta * 100);
+            uint32_t minAllowed = state.vvt.startRpm + 500;
+            state.vvt.fullRpm = (uint32_t)constrain(val, (int32_t)minAllowed, 7000);
+        }
     } else {
         if (editRow == 0 && delta != 0) {
             wheel.inverted = !wheel.inverted;
@@ -481,6 +565,10 @@ void PageGenSettings::onEncoderClick(uint8_t editRow,
             onEncoderTurn(1, editRow, state, wheel);
         }
     } else if (_subCategory == 4) {
+        if (editRow == 0) {
+            state.vvt.enabled = !state.vvt.enabled;
+        }
+    } else if (_subCategory == 5) {
         if (editRow == 0) {
             wheel.inverted = !wheel.inverted;
         }

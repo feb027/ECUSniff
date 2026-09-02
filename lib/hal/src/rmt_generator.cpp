@@ -132,6 +132,11 @@ void RmtGenerator::setRpm(uint32_t targetRpm) {
     }
 }
 
+void RmtGenerator::setVvtConfig(const EcuEngine::VvtConfig& config) {
+    _vvtConfig = config;
+    _needsUpdate = true;
+}
+
 size_t RmtGenerator::compileBitArrayToRmt(
     const uint8_t* bitArray,
     uint16_t totalEdges,
@@ -140,6 +145,7 @@ size_t RmtGenerator::compileBitArrayToRmt(
     uint8_t channelBitMask,
     bool isEnabled,
     bool isInverted,
+    int16_t phaseAdvanceDeg,
     rmt_item32_t* outItems,
     size_t maxItems
 ) {
@@ -170,18 +176,30 @@ size_t RmtGenerator::compileBitArrayToRmt(
         return count + 1;
     }
 
+    // Calculate segment advance offset
+    int32_t advSegs = 0;
+    if (phaseAdvanceDeg != 0 && totalEdges > 0 && cycleDegrees > 0) {
+        advSegs = ((int32_t)phaseAdvanceDeg * (int32_t)totalEdges) / (int32_t)cycleDegrees;
+    }
+
+    auto getLvlAt = [&](uint16_t s) -> uint8_t {
+        int32_t srcIdx = (int32_t)s + advSegs;
+        while (srcIdx < 0) srcIdx += totalEdges;
+        srcIdx = srcIdx % totalEdges;
+        uint8_t lvl = (bitArray[srcIdx] & channelBitMask) ? 1 : 0;
+        return isInverted ? (1 - lvl) : lvl;
+    };
+
     // Temporary flat phase buffer for sliced pulses
     const size_t maxPhases = (maxItems > 1) ? (maxItems - 1) * 2 : 0;
     static FlatPhase s_compilePhases[EcuEngine::MAX_CYCLE_PULSES * 2];
     size_t phaseCount = 0;
 
-    uint8_t currLvl = (bitArray[0] & channelBitMask) ? 1 : 0;
-    if (isInverted) currLvl = 1 - currLvl;
+    uint8_t currLvl = getLvlAt(0);
     uint16_t runStartSeg = 0;
 
     for (uint16_t s = 1; s < totalEdges; ++s) {
-        uint8_t lvl = (bitArray[s] & channelBitMask) ? 1 : 0;
-        if (isInverted) lvl = 1 - lvl;
+        uint8_t lvl = getLvlAt(s);
         if (lvl != currLvl) {
             uint64_t tStartUs = ((uint64_t)runStartSeg * cycleTotalUs) / (uint64_t)totalEdges;
             uint64_t tEndUs   = ((uint64_t)s * cycleTotalUs) / (uint64_t)totalEdges;
@@ -242,6 +260,19 @@ size_t RmtGenerator::compileBitArrayToRmt(
 void RmtGenerator::prepareBitArrayCycle() {
     if (_activeWheel == nullptr || _pendingRpm == 0) return;
 
+    // Calculate dynamic VVT advance based on pending RPM
+    if (_vvtConfig.enabled && _pendingRpm > _vvtConfig.startRpm) {
+        if (_pendingRpm >= _vvtConfig.fullRpm) {
+            _currentVvtAdvance = _vvtConfig.maxAdvanceDeg;
+        } else {
+            uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
+            uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
+            _currentVvtAdvance = (uint8_t)((diff * (uint32_t)_vvtConfig.maxAdvanceDeg) / span);
+        }
+    } else {
+        _currentVvtAdvance = 0;
+    }
+
     rmt_item32_t* targetCkp  = (_activeBufferIdx == 0) ? _ckpBufferB  : _ckpBufferA;
     rmt_item32_t* targetCmp1 = (_activeBufferIdx == 0) ? _cmpBufferB  : _cmpBufferA;
     rmt_item32_t* targetCmp2 = (_activeBufferIdx == 0) ? _cmp2BufferB : _cmp2BufferA;
@@ -263,28 +294,29 @@ void RmtGenerator::prepareBitArrayCycle() {
         cycleDegrees = 720;
     }
 
-    // 1. Compile CKP (Channel 0 / Primary Trigger)
+    // 1. Compile CKP (Channel 0 / Primary Trigger - No Phase Shift)
     ckpSize = compileBitArrayToRmt(
         bitArray, totalEdges, cycleDegrees, _pendingRpm,
-        EcuEngine::SIGNAL_BIT_CKP, _ckpEnabled, _inverted, targetCkp, EcuEngine::MAX_CYCLE_PULSES
+        EcuEngine::SIGNAL_BIT_CKP, _ckpEnabled, _inverted, 0, targetCkp, EcuEngine::MAX_CYCLE_PULSES
     );
 
-    // 2. Compile CMP1 (Channel 2 / Secondary Trigger)
+    // 2. Compile CMP1 (Channel 2 / Secondary Trigger - VVT Intake Cam Advance)
     if (_activeWheel->hasCmp1) {
         cmp1Size = compileBitArrayToRmt(
             bitArray, totalEdges, cycleDegrees, _pendingRpm,
-            EcuEngine::SIGNAL_BIT_CMP1, _cmp1Enabled, _inverted, targetCmp1, EcuEngine::MAX_CYCLE_PULSES
+            EcuEngine::SIGNAL_BIT_CMP1, _cmp1Enabled, _inverted, _currentVvtAdvance, targetCmp1, EcuEngine::MAX_CYCLE_PULSES
         );
     } else {
         targetCmp1[0] = rmt_item32_t{0, 0, 0, 0};
         cmp1Size = 0;
     }
 
-    // 3. Compile CMP2 (Channel 3 / Tertiary Trigger / Dual VVT)
+    // 3. Compile CMP2 (Channel 3 / Tertiary Trigger / Dual VVT Exhaust Cam Retard)
     if (_activeWheel->hasCmp2) {
+        int16_t cmp2Shift = -(int16_t)((_currentVvtAdvance * 5) / 8); // Retard on exhaust cam
         cmp2Size = compileBitArrayToRmt(
             bitArray, totalEdges, cycleDegrees, _pendingRpm,
-            EcuEngine::SIGNAL_BIT_CMP2, _cmp2Enabled, _inverted, targetCmp2, EcuEngine::MAX_CYCLE_PULSES
+            EcuEngine::SIGNAL_BIT_CMP2, _cmp2Enabled, _inverted, cmp2Shift, targetCmp2, EcuEngine::MAX_CYCLE_PULSES
         );
     } else {
         targetCmp2[0] = rmt_item32_t{0, 0, 0, 0};
@@ -354,9 +386,33 @@ void RmtGenerator::prepareNextCycle() {
         else _ckpSizeA = outCkp + 1;
     }
 
-    // 2. Generate CMP (720 deg)
+    // 2. Generate CMP (720 deg) with VVT phase shift
+    EcuEngine::CamEventTable shiftedCam = _cam;
+    if (_vvtConfig.enabled && _pendingRpm > _vvtConfig.startRpm) {
+        if (_pendingRpm >= _vvtConfig.fullRpm) {
+            _currentVvtAdvance = _vvtConfig.maxAdvanceDeg;
+        } else {
+            uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
+            uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
+            _currentVvtAdvance = (uint8_t)((diff * (uint32_t)_vvtConfig.maxAdvanceDeg) / span);
+        }
+        if (_currentVvtAdvance > 0) {
+            shiftedCam.clear();
+            uint8_t count = _cam.getEventCount();
+            const auto* evs = _cam.getEvents();
+            for (uint8_t i = 0; i < count; ++i) {
+                float newAngle = evs[i].angleDeg - (float)_currentVvtAdvance;
+                while (newAngle < 0.0f) newAngle += 720.0f;
+                while (newAngle >= 720.0f) newAngle -= 720.0f;
+                shiftedCam.addEvent(newAngle, evs[i].levelHigh);
+            }
+        }
+    } else {
+        _currentVvtAdvance = 0;
+    }
+
     size_t cmpCount = EcuEngine::ParametricEngine::generateCmpCycle(
-        _cam, _pendingRpm, s_segments, EcuEngine::MAX_CYCLE_PULSES);
+        shiftedCam, _pendingRpm, s_segments, EcuEngine::MAX_CYCLE_PULSES);
 
     if (cmpCount > 0) {
         size_t phaseCount = 0;

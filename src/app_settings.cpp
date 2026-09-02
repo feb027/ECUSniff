@@ -35,6 +35,10 @@ void saveSettings(const EcuEngine::EngineRuntimeState& engineState,
     pref.putBool("ckp_en", engineState.ckpEnabled);
     pref.putBool("cmp1_en", engineState.cmp1Enabled);
     pref.putBool("cmp2_en", engineState.cmp2Enabled);
+    pref.putBool("vvt_en", engineState.vvt.enabled);
+    pref.putUInt("vvt_start", engineState.vvt.startRpm);
+    pref.putUInt("vvt_full", engineState.vvt.fullRpm);
+    pref.putUChar("vvt_adv", engineState.vvt.maxAdvanceDeg);
 
     uint8_t c = camCfg.getEventCount();
     pref.putUChar("ccnt", c);
@@ -102,6 +106,10 @@ void loadSettings(EcuEngine::EngineRuntimeState& engineState,
     engineState.ckpEnabled = pref.getBool("ckp_en", true);
     engineState.cmp1Enabled = pref.getBool("cmp1_en", true);
     engineState.cmp2Enabled = pref.getBool("cmp2_en", true);
+    engineState.vvt.enabled = pref.getBool("vvt_en", true);
+    engineState.vvt.startRpm = pref.getUInt("vvt_start", 2000);
+    engineState.vvt.fullRpm = pref.getUInt("vvt_full", 4500);
+    engineState.vvt.maxAdvanceDeg = pref.getUChar("vvt_adv", 40);
 
     uint8_t c = pref.getUChar("ccnt", 4);
     camCfg.clear();

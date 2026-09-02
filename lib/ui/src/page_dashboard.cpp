@@ -318,11 +318,14 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     static bool s_lastChg = false;
     static char s_lastWheelName[48]{""};
     static uint8_t s_lastCamCount = 0xFF;
+    static uint8_t s_lastVvtAdv = 0xFF;
+    static bool s_lastVvtEn = false;
 
     bool staChanged = (state.staActive != s_lastSta);
     bool chgChanged = (state.chgLampOn != s_lastChg);
     bool nameChanged = (strcmp(state.activeWheelName, s_lastWheelName) != 0);
     bool camChanged = (cam.getEventCount() != s_lastCamCount);
+    bool vvtChanged = (state.vvt.currentAdvanceDeg != s_lastVvtAdv || state.vvt.enabled != s_lastVvtEn);
 
     s_lastSta = state.staActive;
     s_lastChg = state.chgLampOn;
@@ -332,7 +335,7 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     s_lastCamCount = cam.getEventCount();
 
     if (wheel.totalTeeth != _lastTotalTeeth || wheel.missingTeeth != _lastMissingTeeth || 
-        nameChanged || camChanged || staChanged || chgChanged || fullRedraw) {
+        nameChanged || camChanged || staChanged || chgChanged || vvtChanged || fullRedraw) {
         const char* name = (state.activeWheelName[0] != '\0') ? state.activeWheelName : "Pola Kustom";
         
         // Hapus area teks nama preset sebelah kiri (X: 22 s/d 362)
@@ -373,25 +376,46 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _gfx->drawString(detailBuf, 24, 278);
 
         // ====================================================================
-        // 2 BADGE STATUS HARDWARE DI POJOK KANAN BAWAH (RINGKAS & RAPI)
+        // BADGE STATUS HARDWARE DI POJOK KANAN BAWAH (CRK, ALT, & VVT-i)
         // ====================================================================
-        // 1. Badge CRK (Starter Crank) X: 366, Y: 248, W: 90, H: 24
+        // 1. Badge CRK (Starter Crank) X: 366, Y: 248, W: 43, H: 24
         uint16_t staBg = state.staActive ? 0xFFE0 : 0x18C3;
         uint16_t staBorder = state.staActive ? 0xFFE0 : 0x3186;
         uint16_t staFg = state.staActive ? TFT_BLACK : 0x8410;
-        _gfx->fillRoundRect(366, 248, 90, 24, 4, staBg);
-        _gfx->drawRoundRect(366, 248, 90, 24, 4, staBorder);
+        _gfx->fillRoundRect(366, 248, 43, 24, 4, staBg);
+        _gfx->drawRoundRect(366, 248, 43, 24, 4, staBorder);
         _gfx->setTextColor(staFg, staBg); _gfx->setTextSize(1);
-        _gfx->drawCenterString(state.staActive ? "CRK: STA" : "CRK: OFF", 411, 256);
+        _gfx->drawCenterString(state.staActive ? "STA" : "CRK", 387, 256);
 
-        // 2. Badge ALT (Alternator Charging) X: 366, Y: 276, W: 90, H: 24
+        // 2. Badge ALT (Alternator Charging) X: 413, Y: 248, W: 43, H: 24
         uint16_t altBg = state.chgLampOn ? 0xF800 : 0x03E0;
         uint16_t altBorder = state.chgLampOn ? 0xFDE0 : 0x07E0;
         uint16_t altFg = state.chgLampOn ? TFT_WHITE : 0x07E0;
-        _gfx->fillRoundRect(366, 276, 90, 24, 4, altBg);
-        _gfx->drawRoundRect(366, 276, 90, 24, 4, altBorder);
+        _gfx->fillRoundRect(413, 248, 43, 24, 4, altBg);
+        _gfx->drawRoundRect(413, 248, 43, 24, 4, altBorder);
         _gfx->setTextColor(altFg, altBg); _gfx->setTextSize(1);
-        _gfx->drawCenterString(state.chgLampOn ? "ALT: BATT" : "ALT: CHG", 411, 284);
+        _gfx->drawCenterString(state.chgLampOn ? "BAT" : "CHG", 434, 256);
+
+        // 3. Dynamic VVT-i Advance Badge X: 366, Y: 276, W: 90, H: 24
+        char vvtBuf[16];
+        uint16_t vvtBg, vvtBorder, vvtFg;
+        if (!state.vvt.enabled) {
+            snprintf(vvtBuf, sizeof(vvtBuf), "VVT: OFF");
+            vvtBg = 0x18C3; vvtBorder = 0x3186; vvtFg = 0x8410;
+        } else if (state.vvt.currentAdvanceDeg > 0) {
+            snprintf(vvtBuf, sizeof(vvtBuf), "VVT: +%udeg", (unsigned)state.vvt.currentAdvanceDeg);
+            vvtBg = 0x03E0; vvtBorder = 0xFFE0; vvtFg = 0xFFE0;
+        } else {
+            snprintf(vvtBuf, sizeof(vvtBuf), "VVT: 0deg");
+            vvtBg = 0x18C3; vvtBorder = 0x07E0; vvtFg = 0x07FF;
+        }
+        _gfx->fillRoundRect(366, 276, 90, 24, 4, vvtBg);
+        _gfx->drawRoundRect(366, 276, 90, 24, 4, vvtBorder);
+        _gfx->setTextColor(vvtFg, vvtBg); _gfx->setTextSize(1);
+        _gfx->drawCenterString(vvtBuf, 411, 284);
+
+        s_lastVvtAdv = state.vvt.currentAdvanceDeg;
+        s_lastVvtEn = state.vvt.enabled;
 
         _lastTotalTeeth = wheel.totalTeeth; _lastMissingTeeth = wheel.missingTeeth;
         if (!fullRedraw) {

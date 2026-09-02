@@ -45,6 +45,7 @@ static EcuEngine::CamEventTable      camCfg;
 
 static void syncSignalGenPattern() {
     signalGen.setChannelEnables(engineState.ckpEnabled, engineState.cmp1Enabled, engineState.cmp2Enabled, wheelCfg.inverted);
+    signalGen.setVvtConfig(engineState.vvt);
     if (!menuMgr) {
         signalGen.setPattern(wheelCfg, camCfg);
         return;
@@ -153,8 +154,12 @@ void taskCore0UiWeb(void *pvParameters) {
             }
 
             if (engineState.isRunning) {
+                signalGen.setVvtConfig(engineState.vvt);
                 signalGen.setRpm(rpmController.update(engineState, dt));
                 signalGen.prepareNextCycle(); signalGen.swapBuffer();
+                engineState.vvt.currentAdvanceDeg = signalGen.getCurrentVvtAdvance();
+            } else {
+                engineState.vvt.currentAdvanceDeg = 0;
             }
 
             // ================================================================

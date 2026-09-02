@@ -70,6 +70,14 @@ struct SignalHealthStatus {
     char     diagnosticMsg[48]{"Menunggu Sinyal..."};
 };
 
+struct VvtConfig {
+    bool     enabled{true};
+    uint32_t startRpm{2000};
+    uint32_t fullRpm{4500};
+    uint8_t  maxAdvanceDeg{40};    ///< Maximum cam advance in crank degrees (10 - 50 deg)
+    uint8_t  currentAdvanceDeg{0}; ///< Current real-time advance in crank degrees
+};
+
 struct EngineRuntimeState {
     EngineRunMode runMode{EngineRunMode::FixedRpm};
     uint32_t targetRpm{850};
@@ -87,6 +95,7 @@ struct EngineRuntimeState {
     FixEncoderConfig    fixEnc{};
     PotentiometerConfig potCfg{};
     SweepConfig         sweep{};
+    VvtConfig           vvt{};
     uint32_t            rpmStep{50};
 
     // Bi-directional UI & Sniffer sync fields
