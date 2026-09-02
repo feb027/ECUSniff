@@ -23,27 +23,35 @@ public:
                         EcuEngine::ParametricWheel& wheel);
 
     uint8_t getSubCategory() const { return _subCategory; }
-    void setSubCategory(uint8_t cat) { _subCategory = (cat % 3); }
-    void nextSubCategory() { _subCategory = (_subCategory + 1) % 3; }
-    void prevSubCategory() { _subCategory = (_subCategory > 0) ? (_subCategory - 1) : 2; }
+    void setSubCategory(uint8_t cat) { _subCategory = (cat % 5); }
+    void nextSubCategory() { _subCategory = (_subCategory + 1) % 5; }
+    void prevSubCategory() { _subCategory = (_subCategory > 0) ? (_subCategory - 1) : 4; }
 
     bool isFocusSubNav() const { return _focusSubNav; }
     void setFocusSubNav(bool focus) { _focusSubNav = focus; }
 
     uint8_t getItemCountForCategory(uint8_t cat) const {
-        if (cat == 0) return 5; // Cranking: Crank RPM, Crank Duration, Spin-Up, Transition, Gradual Duration
-        if (cat == 1) return 4; // Sweep: Step, Min, Max, Rate
-        return 1;               // Hardware: Polarity
+        if (cat == 0) return 5; // Cranking (5 items)
+        if (cat == 1) return 3; // Fix Encoder (3 items: Step, Min, Max)
+        if (cat == 2) return 3; // Potensio (3 items: Step/Quantization, Min, Max)
+        if (cat == 3) return 4; // Auto Sweep (4 items: Step, Min, Max, Rate)
+        return 1;               // Hardware: Polarity (1 item)
     }
 
 private:
     LovyanGFX* _gfx;
-    uint8_t  _subCategory{0}; // 0: Cranking, 1: Auto Sweep, 2: Hardware
+    uint8_t  _subCategory{0}; // 0: Cranking, 1: Fix Enc, 2: Potensio, 3: Sweep, 4: Hardware
     bool     _focusSubNav{true}; // true: cursor is on category bar, false: cursor is on items
     uint8_t  _lastSubCategory{0xFF};
     bool     _lastFocusSubNav{false};
     uint8_t  _lastEditRow{0xFF};
     uint32_t _lastRpmStep{0};
+    uint32_t _lastEncMin{0};
+    uint32_t _lastEncMax{0};
+    uint32_t _lastPotStep{0};
+    uint32_t _lastPotMin{0};
+    uint32_t _lastPotMax{0};
+    uint32_t _lastSweepStep{0};
     uint32_t _lastSweepMin{0};
     uint32_t _lastSweepMax{0};
     uint32_t _lastSweepRate{0};

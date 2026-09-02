@@ -12,8 +12,14 @@ void saveSettings(const EcuEngine::EngineRuntimeState& engineState,
     pref.putUInt("rpm", engineState.targetRpm);
     pref.putUInt("step", engineState.rpmStep);
     pref.putUChar("mode", static_cast<uint8_t>(engineState.runMode));
+    pref.putUInt("enc_min", engineState.fixEnc.minRpm);
+    pref.putUInt("enc_max", engineState.fixEnc.maxRpm);
+    pref.putUInt("pot_min", engineState.potCfg.minRpm);
+    pref.putUInt("pot_max", engineState.potCfg.maxRpm);
+    pref.putUInt("pot_step", engineState.potCfg.rpmStep);
     pref.putUInt("sw_min", engineState.sweep.minRpm);
     pref.putUInt("sw_max", engineState.sweep.maxRpm);
+    pref.putUInt("sw_step", engineState.sweep.rpmStep);
     pref.putUInt("sw_rate", engineState.sweep.sweepRateRpmPerSec);
     pref.putUInt("crk_rpm", engineState.cranking.crankingRpm);
     pref.putUInt("crk_dur", engineState.cranking.crankDurationMs);
@@ -26,6 +32,9 @@ void saveSettings(const EcuEngine::EngineRuntimeState& engineState,
     pref.putUChar("mpos", wheelCfg.missingPosition);
     pref.putFloat("duty", wheelCfg.dutyCycle);
     pref.putBool("inv", wheelCfg.inverted);
+    pref.putBool("ckp_en", engineState.ckpEnabled);
+    pref.putBool("cmp1_en", engineState.cmp1Enabled);
+    pref.putBool("cmp2_en", engineState.cmp2Enabled);
 
     uint8_t c = camCfg.getEventCount();
     pref.putUChar("ccnt", c);
@@ -66,9 +75,16 @@ void loadSettings(EcuEngine::EngineRuntimeState& engineState,
     pref.begin("ecu_conf", true);
     engineState.targetRpm = pref.getUInt("rpm", 850);
     engineState.rpmStep = pref.getUInt("step", 50);
+    engineState.fixEnc.rpmStep = engineState.rpmStep;
     engineState.runMode = static_cast<EcuEngine::EngineRunMode>(pref.getUChar("mode", 0));
+    engineState.fixEnc.minRpm = pref.getUInt("enc_min", 0);
+    engineState.fixEnc.maxRpm = pref.getUInt("enc_max", 12000);
+    engineState.potCfg.minRpm = pref.getUInt("pot_min", 800);
+    engineState.potCfg.maxRpm = pref.getUInt("pot_max", 6000);
+    engineState.potCfg.rpmStep = pref.getUInt("pot_step", 10);
     engineState.sweep.minRpm = pref.getUInt("sw_min", 800);
     engineState.sweep.maxRpm = pref.getUInt("sw_max", 6000);
+    engineState.sweep.rpmStep = pref.getUInt("sw_step", 50);
     engineState.sweep.sweepRateRpmPerSec = pref.getUInt("sw_rate", 500);
     engineState.cranking.crankingRpm = pref.getUInt("crk_rpm", 200);
     engineState.cranking.crankDurationMs = pref.getUInt("crk_dur", 3000);
@@ -83,6 +99,9 @@ void loadSettings(EcuEngine::EngineRuntimeState& engineState,
     wheelCfg.missingPosition = pref.getUChar("mpos", 0);
     wheelCfg.dutyCycle = pref.getFloat("duty", 0.5f);
     wheelCfg.inverted = pref.getBool("inv", false);
+    engineState.ckpEnabled = pref.getBool("ckp_en", true);
+    engineState.cmp1Enabled = pref.getBool("cmp1_en", true);
+    engineState.cmp2Enabled = pref.getBool("cmp2_en", true);
 
     uint8_t c = pref.getUChar("ccnt", 4);
     camCfg.clear();

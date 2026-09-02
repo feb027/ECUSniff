@@ -44,6 +44,7 @@ static EcuEngine::ParametricWheel    wheelCfg;
 static EcuEngine::CamEventTable      camCfg;
 
 static void syncSignalGenPattern() {
+    signalGen.setChannelEnables(engineState.ckpEnabled, engineState.cmp1Enabled, engineState.cmp2Enabled, wheelCfg.inverted);
     if (!menuMgr) {
         signalGen.setPattern(wheelCfg, camCfg);
         return;
@@ -146,10 +147,9 @@ void taskCore0UiWeb(void *pvParameters) {
             // PEMBACAAN POTENSIOMETER ANALOG (Hanya Aktif Saat Mode POT)
             // ================================================================
             if (engineState.runMode == EcuEngine::EngineRunMode::Potentiometer) {
-                if (adsAdc.isFound()) {
-                    float voltage = adsAdc.readVoltageA0();
-                    rpmController.updatePotentiometer(voltage, engineState);
-                }
+                float voltage = adsAdc.readVoltageA0();
+                rpmController.updatePotentiometer(voltage, engineState);
+                engineState.adsFound = adsAdc.isFound();
             }
 
             if (engineState.isRunning) {
@@ -378,6 +378,18 @@ void setup() {
     webManager.setSpeedoController(&speedoController);
     webManager.init();
 
+    display.init();
+    powerCycleController.init();
+    menuMgr = new EcuUi::MenuManager(&display.getGfx());
+    menuMgr->init(&captureDriver, &sniffer, &epsController, &speedoController, &powerCycleController);
+
+    // Inisialisasi Bus I2C Utama dengan internal pull-up aman
+    pinMode(PinConfig::I2C_SDA, INPUT_PULLUP);
+    pinMode(PinConfig::I2C_SCL, INPUT_PULLUP);
+    Wire.begin(PinConfig::I2C_SDA, PinConfig::I2C_SCL);
+    Wire.setClock(100000);
+    Wire.setTimeOut(2);
+
     encoder.init(); joystick.init(); captureDriver.init(); signalGen.init();
     epsDriver.init(); speedoDriver.init();
     bool dacFuel = false, dacTemp = false;
@@ -386,24 +398,9 @@ void setup() {
 
     // Inisialisasi MCP23017 (I/O Expander untuk sinyal STA & CHG)
     engineState.mcpFound = mcpExpander.init(EcuHal::Mcp23017Driver::DEFAULT_I2C_ADDR);
-    if (engineState.mcpFound) {
-        Serial.println("[MCP23017] Terdeteksi pada alamat 0x20 (STA & CHG Siap)");
-    } else {
-        Serial.println("[MCP23017] Tidak terdeteksi pada 0x20 (Simulasi Standalone)");
-    }
 
     // Inisialisasi ADS1115 (16-bit I2C ADC untuk Potensiometer RPM)
     engineState.adsFound = adsAdc.init(EcuHal::Ads1115Driver::DEFAULT_I2C_ADDR);
-    if (engineState.adsFound) {
-        Serial.println("[ADS1115] Terdeteksi pada alamat 0x48 (Potensiometer Analog Siap)");
-    } else {
-        Serial.println("[ADS1115] Tidak terdeteksi pada 0x48 (Potensiometer Standby)");
-    }
-
-    display.init();
-    powerCycleController.init();
-    menuMgr = new EcuUi::MenuManager(&display.getGfx());
-    menuMgr->init(&captureDriver, &sniffer, &epsController, &speedoController, &powerCycleController);
 
     syncSignalGenPattern();
     signalGen.setRpm(engineState.targetRpm);

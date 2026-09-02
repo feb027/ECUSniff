@@ -39,15 +39,15 @@ void PageMainHub::render(bool fullRedraw, uint8_t selectedIndex) {
             _gfx->fillScreen(TFT_BLACK);
             // Header bar (Hitam Pekat Murni)
             _gfx->fillRect(0, 0, 480, 42, TFT_BLACK);
-            _gfx->drawFastHLine(0, 42, 480, TFT_WHITE);
+            _gfx->drawFastHLine(0, 42, 480, 0x52AA);
             _gfx->setTextColor(TFT_WHITE, TFT_BLACK);
             _gfx->setTextSize(2);
             _gfx->drawString("ECUSniff — MASTER HUB", 16, 12);
 
             // Bottom status bar
-            _gfx->drawFastHLine(0, 286, 480, TFT_WHITE);
+            _gfx->drawFastHLine(0, 286, 480, 0x52AA);
             _gfx->fillRect(0, 287, 480, 33, TFT_BLACK);
-            _gfx->setTextColor(TFT_WHITE, TFT_BLACK);
+            _gfx->setTextColor(0x8410, TFT_BLACK);
             _gfx->setTextSize(1);
             _gfx->drawString("Putar / Joy-Y: Pilih Modul  |  Klik: Masuk Modul", 70, 298);
         }
@@ -63,12 +63,6 @@ void PageMainHub::render(bool fullRedraw, uint8_t selectedIndex) {
                 _drawCard(modIdx, y, modIdx == selectedIndex);
             }
         }
-
-        // Scrollbar indikator di sebelah kanan layar (X: 474)
-        _gfx->fillRect(474, 48, 4, 230, 0x39E7); // Abu-abu
-        int32_t thumbH = (4 * 230) / TOTAL_MODULES; // ~184px
-        int32_t thumbY = 48 + ((_scrollOffset * (230 - thumbH)) / (TOTAL_MODULES - 4));
-        _gfx->fillRoundRect(473, thumbY, 5, thumbH, 2, TFT_YELLOW);
 
         _lastSelectedIndex = selectedIndex;
         _lastScrollOffset = _scrollOffset;

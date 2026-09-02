@@ -87,19 +87,42 @@ bool RmtGenerator::init() {
 
 void RmtGenerator::setPattern(const EcuEngine::ParametricWheel& wheel, 
                              const EcuEngine::CamEventTable& cam) {
+    if (!_isBitArrayMode && _activeWheel == nullptr &&
+        _wheel.totalTeeth == wheel.totalTeeth &&
+        _wheel.missingTeeth == wheel.missingTeeth &&
+        _wheel.missingPosition == wheel.missingPosition &&
+        _wheel.dutyCycle == wheel.dutyCycle) {
+        return; // Pola parametrik sama, tidak perlu reload RMT
+    }
     _wheel = wheel;
     _cam = cam;
     _activeWheel = nullptr;
     _isBitArrayMode = false;
+    _patternChanged = true;
     _needsUpdate = true;
 }
 
 bool RmtGenerator::setWheelPattern(const WheelDefinition* wheel) {
     if (wheel == nullptr) return false;
+    if (_isBitArrayMode && _activeWheel == wheel) {
+        return true; // Pola preset sama persis, jangan reset RMT
+    }
     _activeWheel = wheel;
     _isBitArrayMode = true;
+    _patternChanged = true;
     _needsUpdate = true;
     return true;
+}
+
+void RmtGenerator::setChannelEnables(bool ckp, bool cmp1, bool cmp2, bool inverted) {
+    if (_ckpEnabled != ckp || _cmp1Enabled != cmp1 || _cmp2Enabled != cmp2 || _inverted != inverted) {
+        _ckpEnabled = ckp;
+        _cmp1Enabled = cmp1;
+        _cmp2Enabled = cmp2;
+        _inverted = inverted;
+        _patternChanged = true;
+        _needsUpdate = true;
+    }
 }
 
 void RmtGenerator::setRpm(uint32_t targetRpm) {
@@ -115,6 +138,8 @@ size_t RmtGenerator::compileBitArrayToRmt(
     uint16_t cycleDegrees,
     uint32_t rpm,
     uint8_t channelBitMask,
+    bool isEnabled,
+    bool isInverted,
     rmt_item32_t* outItems,
     size_t maxItems
 ) {
@@ -133,16 +158,30 @@ size_t RmtGenerator::compileBitArrayToRmt(
         cycleTotalUs = 1;
     }
 
+    if (!isEnabled) {
+        uint32_t rem = (uint32_t)cycleTotalUs;
+        size_t count = 0;
+        while (rem > MAX_RMT_DURATION_CHUNK && count < (maxItems - 2)) {
+            outItems[count++] = rmt_item32_t{MAX_RMT_DURATION_CHUNK, 0, 0, 0};
+            rem -= MAX_RMT_DURATION_CHUNK;
+        }
+        outItems[count++] = rmt_item32_t{static_cast<uint16_t>(rem), 0, 0, 0};
+        outItems[count++] = rmt_item32_t{0, 0, 0, 0};
+        return count + 1;
+    }
+
     // Temporary flat phase buffer for sliced pulses
     const size_t maxPhases = (maxItems > 1) ? (maxItems - 1) * 2 : 0;
     static FlatPhase s_compilePhases[EcuEngine::MAX_CYCLE_PULSES * 2];
     size_t phaseCount = 0;
 
     uint8_t currLvl = (bitArray[0] & channelBitMask) ? 1 : 0;
+    if (isInverted) currLvl = 1 - currLvl;
     uint16_t runStartSeg = 0;
 
     for (uint16_t s = 1; s < totalEdges; ++s) {
         uint8_t lvl = (bitArray[s] & channelBitMask) ? 1 : 0;
+        if (isInverted) lvl = 1 - lvl;
         if (lvl != currLvl) {
             uint64_t tStartUs = ((uint64_t)runStartSeg * cycleTotalUs) / (uint64_t)totalEdges;
             uint64_t tEndUs   = ((uint64_t)s * cycleTotalUs) / (uint64_t)totalEdges;
@@ -227,14 +266,14 @@ void RmtGenerator::prepareBitArrayCycle() {
     // 1. Compile CKP (Channel 0 / Primary Trigger)
     ckpSize = compileBitArrayToRmt(
         bitArray, totalEdges, cycleDegrees, _pendingRpm,
-        EcuEngine::SIGNAL_BIT_CKP, targetCkp, EcuEngine::MAX_CYCLE_PULSES
+        EcuEngine::SIGNAL_BIT_CKP, _ckpEnabled, _inverted, targetCkp, EcuEngine::MAX_CYCLE_PULSES
     );
 
     // 2. Compile CMP1 (Channel 2 / Secondary Trigger)
     if (_activeWheel->hasCmp1) {
         cmp1Size = compileBitArrayToRmt(
             bitArray, totalEdges, cycleDegrees, _pendingRpm,
-            EcuEngine::SIGNAL_BIT_CMP1, targetCmp1, EcuEngine::MAX_CYCLE_PULSES
+            EcuEngine::SIGNAL_BIT_CMP1, _cmp1Enabled, _inverted, targetCmp1, EcuEngine::MAX_CYCLE_PULSES
         );
     } else {
         targetCmp1[0] = rmt_item32_t{0, 0, 0, 0};
@@ -245,7 +284,7 @@ void RmtGenerator::prepareBitArrayCycle() {
     if (_activeWheel->hasCmp2) {
         cmp2Size = compileBitArrayToRmt(
             bitArray, totalEdges, cycleDegrees, _pendingRpm,
-            EcuEngine::SIGNAL_BIT_CMP2, targetCmp2, EcuEngine::MAX_CYCLE_PULSES
+            EcuEngine::SIGNAL_BIT_CMP2, _cmp2Enabled, _inverted, targetCmp2, EcuEngine::MAX_CYCLE_PULSES
         );
     } else {
         targetCmp2[0] = rmt_item32_t{0, 0, 0, 0};
@@ -371,51 +410,55 @@ void RmtGenerator::prepareNextCycle() {
 void RmtGenerator::swapBuffer() {
     if (!_needsUpdate) return;
 
+    uint8_t nextIdx = (_activeBufferIdx == 0) ? 1 : 0;
+    rmt_item32_t* activeCkp  = (nextIdx == 1) ? _ckpBufferB  : _ckpBufferA;
+    size_t activeCkpSize    = (nextIdx == 1) ? _ckpSizeB    : _ckpSizeA;
+
+    rmt_item32_t* activeCmp1 = (nextIdx == 1) ? _cmpBufferB  : _cmpBufferA;
+    size_t activeCmp1Size   = (nextIdx == 1) ? _cmpSizeB    : _cmpSizeA;
+
+    rmt_item32_t* activeCmp2 = (nextIdx == 1) ? _cmp2BufferB : _cmp2BufferA;
+    size_t activeCmp2Size   = (nextIdx == 1) ? _cmp2SizeB   : _cmp2SizeA;
+
     if (_running) {
-        uint32_t nowUs = micros();
-        uint32_t elapsedUs = nowUs - _cycleStartUs;
+        if (_patternChanged) {
+            // Pola preset/tipe roda baru dipilih: restart kanal hardware secara bersih
+            rmt_tx_stop(CH_CKP);
+            rmt_tx_stop(CH_CMP);
+            rmt_tx_stop(CH_CMP2);
 
-        // If the current cycle has not finished yet, do NOT abort/interrupt transmission!
-        // Let the current rotation finish completely to prevent half-pulses or sync loss.
-        if (elapsedUs < _activeCycleUs) {
-            return;
+            if (activeCkpSize > 0) {
+                rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
+                rmt_set_tx_loop_mode(CH_CKP, true);
+                rmt_tx_start(CH_CKP, true);
+            }
+            if (activeCmp1Size > 0) {
+                rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
+                rmt_set_tx_loop_mode(CH_CMP, true);
+                rmt_tx_start(CH_CMP, true);
+            }
+            if (activeCmp2Size > 0) {
+                rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
+                rmt_set_tx_loop_mode(CH_CMP2, true);
+                rmt_tx_start(CH_CMP2, true);
+            }
+            _patternChanged = false;
+        } else {
+            // Perubahan RPM saja: update memori RMT secara live instan tanpa mematikan hardware
+            if (activeCkpSize > 0) {
+                rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
+            }
+            if (activeCmp1Size > 0) {
+                rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
+            }
+            if (activeCmp2Size > 0) {
+                rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
+            }
         }
-
-        uint8_t nextIdx = (_activeBufferIdx == 0) ? 1 : 0;
-        rmt_item32_t* activeCkp  = (nextIdx == 1) ? _ckpBufferB  : _ckpBufferA;
-        size_t activeCkpSize    = (nextIdx == 1) ? _ckpSizeB    : _ckpSizeA;
-
-        rmt_item32_t* activeCmp1 = (nextIdx == 1) ? _cmpBufferB  : _cmpBufferA;
-        size_t activeCmp1Size   = (nextIdx == 1) ? _cmpSizeB    : _cmpSizeA;
-
-        rmt_item32_t* activeCmp2 = (nextIdx == 1) ? _cmp2BufferB : _cmp2BufferA;
-        size_t activeCmp2Size   = (nextIdx == 1) ? _cmp2SizeB   : _cmp2SizeA;
-
-        // Synchronously re-load RMT right at the natural end of the 720 deg rotation
-        rmt_tx_stop(CH_CKP);
-        rmt_tx_stop(CH_CMP);
-        rmt_tx_stop(CH_CMP2);
-
-        if (activeCkpSize > 0) {
-            rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
-            rmt_set_tx_loop_mode(CH_CKP, true);
-        }
-        if (activeCmp1Size > 0) {
-            rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
-            rmt_set_tx_loop_mode(CH_CMP, true);
-        }
-        if (activeCmp2Size > 0) {
-            rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
-            rmt_set_tx_loop_mode(CH_CMP2, true);
-        }
-
-        if (activeCkpSize > 0)  rmt_tx_start(CH_CKP, true);
-        if (activeCmp1Size > 0) rmt_tx_start(CH_CMP, true);
-        if (activeCmp2Size > 0) rmt_tx_start(CH_CMP2, true);
 
         _activeBufferIdx = nextIdx;
         _activeRpm = _pendingRpm;
-        _cycleStartUs = nowUs;
+        _cycleStartUs = micros();
         _activeCycleUs = (_activeRpm > 0) ? (120000000ULL / _activeRpm) : 120000;
         _needsUpdate = false;
     } else {
@@ -424,6 +467,7 @@ void RmtGenerator::swapBuffer() {
         _activeRpm = _pendingRpm;
         _activeCycleUs = (_activeRpm > 0) ? (120000000ULL / _activeRpm) : 120000;
         _needsUpdate = false;
+        _patternChanged = false;
     }
 }
 

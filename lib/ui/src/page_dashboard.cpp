@@ -110,9 +110,20 @@ void PageDashboard::_applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel,
     }
 }
 
-void PageDashboard::_drawRpmBar(uint32_t activeRpm, bool fullRedraw) {
-    constexpr uint32_t MAX_SCALE_RPM = 12000;
-    int32_t targetW = (int32_t)(((uint64_t)activeRpm * 444) / MAX_SCALE_RPM);
+void PageDashboard::_drawRpmBar(uint32_t activeRpm, uint32_t minRpm, uint32_t maxRpm, bool fullRedraw) {
+    if (maxRpm <= minRpm) {
+        minRpm = 0;
+        maxRpm = 12000;
+    }
+
+    int32_t targetW = 0;
+    if (activeRpm <= minRpm) {
+        targetW = 0;
+    } else if (activeRpm >= maxRpm) {
+        targetW = 444;
+    } else {
+        targetW = (int32_t)(((uint64_t)(activeRpm - minRpm) * 444ULL) / (uint64_t)(maxRpm - minRpm));
+    }
     if (targetW > 444) targetW = 444;
 
     if (fullRedraw) {
@@ -152,8 +163,14 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
                          (state.isRunning ? state.currentRpm : state.targetRpm);
     uint8_t curMode = static_cast<uint8_t>(state.runMode);
 
+    uint32_t modeMinRpm = (state.runMode == EcuEngine::EngineRunMode::Potentiometer) ? state.potCfg.minRpm :
+                          ((state.runMode == EcuEngine::EngineRunMode::FixedRpm) ? state.fixEnc.minRpm : state.sweep.minRpm);
+    uint32_t modeMaxRpm = (state.runMode == EcuEngine::EngineRunMode::Potentiometer) ? state.potCfg.maxRpm :
+                          ((state.runMode == EcuEngine::EngineRunMode::FixedRpm) ? state.fixEnc.maxRpm : state.sweep.maxRpm);
+
     if (fullRedraw) {
-        _gfx->fillRect(8, 44, 464, 268, 0x10A2);
+        _gfx->fillRect(0, 40, 480, 280, 0x0841);
+        _gfx->fillRoundRect(8, 44, 464, 268, 8, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
         if (_activePresetIdx < WheelDatabase::getWheelCount()) {
             const WheelDefinition* def = WheelDatabase::getWheel(_activePresetIdx);
@@ -163,26 +180,29 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
             _canvas.render(wheel, cam, 16, 48);
         }
 
-        _drawRpmBar(activeRpm, true);
+        _drawRpmBar(activeRpm, modeMinRpm, modeMaxRpm, true);
 
-        _gfx->fillRoundRect(16, 150, 220, 76, 6, 0x0841);
-        _gfx->drawRoundRect(16, 150, 220, 76, 6, 0x52AA);
+        // Quadrant 1: Target RPM (Ambil 1/2 Layar Kiri: W = 220 px)
+        _gfx->fillRoundRect(16, 148, 220, 78, 6, 0x0841);
+        _gfx->drawRoundRect(16, 148, 220, 78, 6, 0x52AA);
         _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("TARGET RPM MESIN:", 26, 156);
+        _gfx->drawString("TARGET RPM MESIN:", 26, 154);
 
-        _gfx->fillRoundRect(244, 150, 220, 76, 6, 0x0841);
-        _gfx->drawRoundRect(244, 150, 220, 76, 6, 0x52AA);
-        _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("SIMULATION MODE:", 254, 156);
+        // Quadrant 2: Master Control Panel (Ambil sisa 1/2 Layar Kanan: W = 220 px)
+        _gfx->fillRoundRect(244, 148, 220, 78, 6, 0x0841);
+        _gfx->drawRoundRect(244, 148, 220, 78, 6, 0x52AA);
 
-        _gfx->fillRoundRect(16, 230, 448, 76, 6, 0x0841);
-        _gfx->drawRoundRect(16, 230, 448, 76, 6, 0x52AA);
+        // Quadrant 3: Full-Width Pola Roda / Preset Card
+        _gfx->fillRoundRect(16, 232, 448, 76, 6, 0x0841);
+        _gfx->drawRoundRect(16, 232, 448, 76, 6, 0x52AA);
         _gfx->setTextColor(TFT_WHITE, 0x0841); _gfx->setTextSize(1);
-        _gfx->drawString("POLA RODA & PROFIL MESIN AKTIF:", 26, 236);
+        _gfx->drawString("POLA RODA & PROFIL MESIN AKTIF (KLIK UNTUK BROWSER):", 24, 236);
 
         _lastRpm = 0xFFFFFFFF; _lastMode = 0xFF;
         _lastIsRunning = !state.isRunning; _lastIsEditMode = !isEditMode;
         _lastEditRow = 0xFF; _lastTotalTeeth = 0xFFFF;
+        _lastCkpEn = !state.ckpEnabled; _lastCmp1En = !state.cmp1Enabled;
+        _lastCmp2En = !state.cmp2Enabled; _lastInverted = !wheel.inverted;
     }
 
     bool isRunningChanged = (state.isRunning != _lastIsRunning);
@@ -190,30 +210,110 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     bool modeChanged = (curMode != _lastMode);
     bool editChanged = (editRow != _lastEditRow);
 
-    if (rpmChanged || isRunningChanged || fullRedraw) {
-        _drawRpmBar(activeRpm, fullRedraw);
-        _gfx->fillRect(24, 172, 134, 38, 0x0841);
-        char rpmStr[8]; snprintf(rpmStr, sizeof(rpmStr), "%04u", (unsigned)activeRpm);
-        _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(4); _gfx->drawString(rpmStr, 26, 174);
-        _gfx->setTextSize(2); _gfx->setTextColor(0x07FF, 0x0841); _gfx->drawString("RPM", 162, 186);
+    if (rpmChanged || isRunningChanged || modeChanged || fullRedraw) {
+        _drawRpmBar(activeRpm, modeMinRpm, modeMaxRpm, fullRedraw || modeChanged);
+        _gfx->fillRect(22, 166, 208, 52, 0x0841);
+        char rpmStr[8]; snprintf(rpmStr, sizeof(rpmStr), "%u", (unsigned)activeRpm);
+        _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(4); 
+        _gfx->drawRightString(rpmStr, 166, 172);
+        _gfx->setTextSize(2); _gfx->setTextColor(0x07FF, 0x0841); 
+        _gfx->drawString("RPM", 174, 184);
     }
 
-    if (modeChanged || isRunningChanged || fullRedraw) {
-        const char* modeNames[] = { "FIX", "POT", "SWEEP", "CRK>FIX", "CRK>SWP" };
-        _gfx->setTextColor((curMode == 1) ? 0xFFE0 : 0x07E0, 0x0841); 
-        _gfx->setTextSize((curMode >= 3) ? 2 : 3);
-        _gfx->drawString("          ", 254, 178);
-        _gfx->drawString(modeNames[curMode % 5], 254, (curMode >= 3) ? 182 : 178);
+    // ====================================================================
+    // PANEL KANAN (1/2 LAYAR): MASTER POT/STOPPED (BESAR) + 4 TOMBOL SINYAL
+    // ====================================================================
+    bool sigChanged = (state.ckpEnabled != _lastCkpEn || 
+                       state.cmp1Enabled != _lastCmp1En || 
+                       state.cmp2Enabled != _lastCmp2En || 
+                       wheel.inverted != _lastInverted ||
+                       modeChanged || isRunningChanged ||
+                       editChanged || fullRedraw);
 
-        if (state.isRunning) {
-            _gfx->fillRoundRect(354, 166, 98, 44, 4, 0x03E0); _gfx->drawRoundRect(354, 166, 98, 44, 4, 0x07E0);
-            _gfx->setTextColor(0x07E0, 0x03E0); _gfx->setTextSize(2); _gfx->drawCenterString("RUNNING", 403, 180);
+    if (sigChanged) {
+        // --- BARIS ATAS (MODE & MASTER RUN/STOP LEBIH BESAR, Y: 154, H: 34) ---
+        // 1. Tombol Mode (Row 1, X: 248, Y: 154, W: 82, H: 34)
+        bool modeSel = (editRow == 1);
+        const char* modeNames[] = { "FIX", "POT", "SWEEP", "CRK FIX", "CRK SWP" };
+        const char* curModeName = modeNames[curMode % 5];
+        uint16_t modeBg = modeSel ? 0xFFE0 : ((curMode == 1) ? 0x2104 : 0x18C3);
+        uint16_t modeBorder = modeSel ? 0xFFE0 : ((curMode == 1) ? 0x07E0 : 0x52AA);
+        uint16_t modeFg = modeSel ? TFT_BLACK : ((curMode == 1) ? 0xFFE0 : 0x07E0);
+        _gfx->fillRoundRect(248, 154, 82, 34, 5, modeBg);
+        _gfx->drawRoundRect(248, 154, 82, 34, 5, modeBorder);
+        if (modeSel) _gfx->drawRoundRect(249, 155, 80, 32, 4, 0xFFE0);
+        _gfx->setTextColor(modeFg, modeBg);
+        if (strlen(curModeName) > 5) {
+            _gfx->setTextSize(1);
+            _gfx->drawCenterString(curModeName, 289, 167);
         } else {
-            _gfx->fillRoundRect(354, 166, 98, 44, 4, 0xF800); _gfx->drawRoundRect(354, 166, 98, 44, 4, 0xF800);
-            _gfx->setTextColor(TFT_WHITE, 0xF800); _gfx->setTextSize(2); _gfx->drawCenterString("STOPPED", 403, 180);
+            _gfx->setTextSize(2);
+            _gfx->drawCenterString(curModeName, 289, 163);
         }
+
+        // 2. Tombol Master RUN / STOP (Row 2, X: 334, Y: 154, W: 126, H: 34)
+        bool mtrSel = (editRow == 2);
+        uint16_t mtrBg = state.isRunning ? 0x03E0 : 0xF800;
+        uint16_t mtrBorder = mtrSel ? 0xFFE0 : (state.isRunning ? 0x07E0 : 0xF800);
+        _gfx->fillRoundRect(334, 154, 126, 34, 5, mtrBg);
+        _gfx->drawRoundRect(334, 154, 126, 34, 5, mtrBorder);
+        if (mtrSel) _gfx->drawRoundRect(335, 155, 124, 32, 4, 0xFFE0);
+        _gfx->setTextColor(TFT_WHITE, mtrBg); _gfx->setTextSize(2);
+        _gfx->drawCenterString(state.isRunning ? "RUNNING" : "STOP", 397, 163);
+
+        // --- BARIS BAWAH: 4 TOMBOL (CKP, CMP, CMP2, POL) DI BAWAH KOTAK MASTER (Y: 194, H: 26) ---
+        // 3. Tombol CKP (Row 3, X: 248, Y: 194, W: 50, H: 26)
+        bool ckpSel = (editRow == 3);
+        uint16_t ckpBg = ckpSel ? 0xFFE0 : (state.ckpEnabled ? 0x03E0 : 0x2104);
+        uint16_t ckpBorder = ckpSel ? 0xFFE0 : (state.ckpEnabled ? 0x07E0 : 0x52AA);
+        uint16_t ckpFg = ckpSel ? TFT_BLACK : (state.ckpEnabled ? TFT_WHITE : 0x8410);
+        _gfx->fillRoundRect(248, 194, 50, 26, 4, ckpBg);
+        _gfx->drawRoundRect(248, 194, 50, 26, 4, ckpBorder);
+        if (ckpSel) _gfx->drawRoundRect(249, 195, 48, 24, 3, 0xFFE0);
+        _gfx->setTextColor(ckpFg, ckpBg); _gfx->setTextSize(1);
+        _gfx->drawCenterString(state.ckpEnabled ? "CKP:ON" : "CKP:OFF", 273, 202);
+
+        // 4. Tombol CMP1 (Row 4, X: 301, Y: 194, W: 52, H: 26)
+        bool cmp1Sel = (editRow == 4);
+        uint16_t cmp1Bg = cmp1Sel ? 0xFFE0 : (state.cmp1Enabled ? 0x03E0 : 0x2104);
+        uint16_t cmp1Border = cmp1Sel ? 0xFFE0 : (state.cmp1Enabled ? 0x07E0 : 0x52AA);
+        uint16_t cmp1Fg = cmp1Sel ? TFT_BLACK : (state.cmp1Enabled ? TFT_WHITE : 0x8410);
+        _gfx->fillRoundRect(301, 194, 52, 26, 4, cmp1Bg);
+        _gfx->drawRoundRect(301, 194, 52, 26, 4, cmp1Border);
+        if (cmp1Sel) _gfx->drawRoundRect(302, 195, 50, 24, 3, 0xFFE0);
+        _gfx->setTextColor(cmp1Fg, cmp1Bg); _gfx->setTextSize(1);
+        _gfx->drawCenterString(state.cmp1Enabled ? "CMP:ON" : "CMP:OFF", 327, 202);
+
+        // 5. Tombol CMP2 (Row 5, X: 356, Y: 194, W: 54, H: 26)
+        bool cmp2Sel = (editRow == 5);
+        uint16_t cmp2Bg = cmp2Sel ? 0xFFE0 : (state.cmp2Enabled ? 0x03E0 : 0x2104);
+        uint16_t cmp2Border = cmp2Sel ? 0xFFE0 : (state.cmp2Enabled ? 0x07E0 : 0x52AA);
+        uint16_t cmp2Fg = cmp2Sel ? TFT_BLACK : (state.cmp2Enabled ? TFT_WHITE : 0x8410);
+        _gfx->fillRoundRect(356, 194, 54, 26, 4, cmp2Bg);
+        _gfx->drawRoundRect(356, 194, 54, 26, 4, cmp2Border);
+        if (cmp2Sel) _gfx->drawRoundRect(357, 195, 52, 24, 3, 0xFFE0);
+        _gfx->setTextColor(cmp2Fg, cmp2Bg); _gfx->setTextSize(1);
+        _gfx->drawCenterString(state.cmp2Enabled ? "CM2:ON" : "CM2:OFF", 383, 202);
+
+        // 6. Tombol POL (Row 6, X: 413, Y: 194, W: 47, H: 26)
+        bool polSel = (editRow == 6);
+        uint16_t polBg = wheel.inverted ? 0xF800 : 0x07E0;
+        uint16_t polBorder = polSel ? 0xFFE0 : (wheel.inverted ? 0xFDE0 : 0x03E0);
+        _gfx->fillRoundRect(413, 194, 47, 26, 4, polBg);
+        _gfx->drawRoundRect(413, 194, 47, 26, 4, polBorder);
+        if (polSel) _gfx->drawRoundRect(414, 195, 45, 24, 3, 0xFFE0);
+        _gfx->setTextColor(wheel.inverted ? TFT_WHITE : TFT_BLACK, polBg); _gfx->setTextSize(1);
+        _gfx->drawCenterString(wheel.inverted ? "INV" : "NORM", 436, 202);
+
+        _lastCkpEn = state.ckpEnabled;
+        _lastCmp1En = state.cmp1Enabled;
+        _lastCmp2En = state.cmp2Enabled;
+        _lastInverted = wheel.inverted;
     }
 
+    // ====================================================================
+    // PANEL BAWAH: POLA RODA MEMANJANG & BADGE HARDWARE MEMANJANG
+    // ====================================================================
     static bool s_lastSta = false;
     static bool s_lastChg = false;
     static char s_lastWheelName[48]{""};
@@ -235,16 +335,15 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         nameChanged || camChanged || staChanged || chgChanged || fullRedraw) {
         const char* name = (state.activeWheelName[0] != '\0') ? state.activeWheelName : "Pola Kustom";
         
-        // Hapus total area teks sebelah kiri (X: 24 s/d 296) agar tidak ada bayangan teks lama
-        _gfx->fillRect(22, 248, 274, 52, 0x0841);
+        // Hapus area teks nama preset sebelah kiri (X: 22 s/d 362)
+        _gfx->fillRect(22, 248, 340, 54, 0x0841);
 
-        // Batasi teks maksimal 22 karakter agar tidak menabrak / masuk ke belakang kartu STA & CHG
-        char displayTitle[26];
-        if (strlen(name) > 22) {
-            strncpy(displayTitle, name, 20);
-            displayTitle[20] = '.';
-            displayTitle[21] = '.';
-            displayTitle[22] = '\0';
+        char displayTitle[36];
+        if (strlen(name) > 28) {
+            strncpy(displayTitle, name, 26);
+            displayTitle[26] = '.';
+            displayTitle[27] = '.';
+            displayTitle[28] = '\0';
         } else {
             strncpy(displayTitle, name, sizeof(displayTitle) - 1);
             displayTitle[sizeof(displayTitle) - 1] = '\0';
@@ -252,9 +351,9 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
 
         _gfx->setTextColor(0x07E0, 0x0841); 
         _gfx->setTextSize(2);
-        _gfx->drawString(displayTitle, 26, 254);
+        _gfx->drawString(displayTitle, 24, 252);
 
-        char detailBuf[48];
+        char detailBuf[54];
         if (_activePresetIdx < WheelDatabase::getWheelCount()) {
             const WheelDefinition* def = WheelDatabase::getWheel(_activePresetIdx);
             if (def) {
@@ -262,44 +361,37 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
                 const char* cycleStr = (def->cycleDegrees == WheelCycleDegrees::CRANK_360) ? "360d" : "720d";
                 snprintf(detailBuf, sizeof(detailBuf), "(%s | %u Edges | %s)", cycleStr, def->totalEdges, channelStr);
             } else {
-                snprintf(detailBuf, sizeof(detailBuf), "(%u-%u CKP | %u Pulsa Cam)",
+                snprintf(detailBuf, sizeof(detailBuf), "(%u-%u CKP | %u Cam)",
                          (unsigned)wheel.totalTeeth, (unsigned)wheel.missingTeeth, (unsigned)cam.getEventCount());
             }
         } else {
-            snprintf(detailBuf, sizeof(detailBuf), "(%u-%u CKP | %u Pulsa Cam)",
+            snprintf(detailBuf, sizeof(detailBuf), "(%u-%u CKP | %u Cam)",
                      (unsigned)wheel.totalTeeth, (unsigned)wheel.missingTeeth, (unsigned)cam.getEventCount());
         }
         _gfx->setTextColor(0x07FF, 0x0841); 
         _gfx->setTextSize(1);
-        _gfx->drawString(detailBuf, 26, 280);
+        _gfx->drawString(detailBuf, 24, 278);
 
         // ====================================================================
-        // 2 BADGE BESAR INDIKATOR HARDWARE (SEBELAH KANAN)
-        // Kotak 1: STA (Starter Crank)
-        // Kotak 2: ALT (Alternator Charging)
+        // 2 BADGE STATUS HARDWARE DI POJOK KANAN BAWAH (RINGKAS & RAPI)
         // ====================================================================
-        // 1. Badge STA (X: 300, Y: 242, W: 76, H: 52)
-        uint16_t staBg = state.staActive ? 0xFFE0 : 0x18C3;    // Kuning terang saat aktif, Gelap saat mati
-        uint16_t staFg = state.staActive ? TFT_BLACK : 0x8410; // Teks hitam kontras saat aktif
-        _gfx->fillRoundRect(300, 242, 76, 52, 6, staBg);
-        _gfx->drawRoundRect(300, 242, 76, 52, 6, state.staActive ? 0xFFFF : 0x3186);
+        // 1. Badge CRK (Starter Crank) X: 366, Y: 248, W: 90, H: 24
+        uint16_t staBg = state.staActive ? 0xFFE0 : 0x18C3;
+        uint16_t staBorder = state.staActive ? 0xFFE0 : 0x3186;
+        uint16_t staFg = state.staActive ? TFT_BLACK : 0x8410;
+        _gfx->fillRoundRect(366, 248, 90, 24, 4, staBg);
+        _gfx->drawRoundRect(366, 248, 90, 24, 4, staBorder);
         _gfx->setTextColor(staFg, staBg); _gfx->setTextSize(1);
-        _gfx->drawCenterString("CRANK", 338, 248);
-        _gfx->setTextSize(2);
-        _gfx->drawCenterString(state.staActive ? "STA" : "OFF", 338, 266);
+        _gfx->drawCenterString(state.staActive ? "CRK: STA" : "CRK: OFF", 411, 256);
 
-        // 2. Badge ALT (X: 382, Y: 242, W: 76, H: 52)
-        // state.chgLampOn == true -> Lampu Aki MENYALA (Belum mengisi, Merah)
-        // state.chgLampOn == false -> Lampu Aki PADAM (Pengisian Normal / Hijau)
-        uint16_t altBg = state.chgLampOn ? 0xF800 : 0x03E0;    // Merah jika BATT, Hijau gelap jika CHG normal
+        // 2. Badge ALT (Alternator Charging) X: 366, Y: 276, W: 90, H: 24
+        uint16_t altBg = state.chgLampOn ? 0xF800 : 0x03E0;
         uint16_t altBorder = state.chgLampOn ? 0xFDE0 : 0x07E0;
         uint16_t altFg = state.chgLampOn ? TFT_WHITE : 0x07E0;
-        _gfx->fillRoundRect(382, 242, 76, 52, 6, altBg);
-        _gfx->drawRoundRect(382, 242, 76, 52, 6, altBorder);
-        _gfx->setTextColor(TFT_WHITE, altBg); _gfx->setTextSize(1);
-        _gfx->drawCenterString("CHARGING", 420, 248);
-        _gfx->setTextColor(altFg, altBg); _gfx->setTextSize(2);
-        _gfx->drawCenterString(state.chgLampOn ? "BATT" : "CHG", 420, 266);
+        _gfx->fillRoundRect(366, 276, 90, 24, 4, altBg);
+        _gfx->drawRoundRect(366, 276, 90, 24, 4, altBorder);
+        _gfx->setTextColor(altFg, altBg); _gfx->setTextSize(1);
+        _gfx->drawCenterString(state.chgLampOn ? "ALT: BATT" : "ALT: CHG", 411, 284);
 
         _lastTotalTeeth = wheel.totalTeeth; _lastMissingTeeth = wheel.missingTeeth;
         if (!fullRedraw) {
@@ -322,14 +414,48 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
 }
 
 void PageDashboard::_drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel) {
-    _gfx->drawRoundRect(16, 150, 220, 76, 6, (editRow == 0) ? 0xFFE0 : 0x52AA);
-    _gfx->drawRoundRect(17, 151, 218, 74, 5, (editRow == 0) ? 0xFFE0 : 0x0841);
+    // Frame 0: Target RPM Box (1/2 Layar Kiri: W = 220 px)
+    _gfx->drawRoundRect(16, 148, 220, 78, 6, (editRow == 0) ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(17, 149, 218, 76, 5, (editRow == 0) ? 0xFFE0 : 0x0841);
 
-    _gfx->drawRoundRect(244, 150, 220, 76, 6, (editRow == 1) ? 0xFFE0 : 0x52AA);
-    _gfx->drawRoundRect(245, 151, 218, 74, 5, (editRow == 1) ? 0xFFE0 : 0x0841);
+    // Frame Outer Master Panel (1/2 Layar Kanan: W = 220 px) - MENYALA BERSAMAAN SAAT EDITROW 1 s/d 6 DIPILIH!
+    bool rightSel = (editRow >= 1 && editRow <= 6);
+    _gfx->drawRoundRect(244, 148, 220, 78, 6, rightSel ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(245, 149, 218, 76, 5, rightSel ? 0xFFE0 : 0x0841);
 
-    _gfx->drawRoundRect(16, 230, 448, 76, 6, (editRow == 2) ? 0xFFE0 : 0x52AA);
-    _gfx->drawRoundRect(17, 231, 446, 74, 5, (editRow == 2) ? 0xFFE0 : 0x0841);
+    // Frame 1: Mode Button
+    bool modeSel = (editRow == 1);
+    _gfx->drawRoundRect(248, 154, 82, 34, 5, modeSel ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(249, 155, 80, 32, 4, modeSel ? 0xFFE0 : 0x18C3);
+
+    // Frame 2: Master Button
+    bool mtrSel = (editRow == 2);
+    _gfx->drawRoundRect(334, 154, 126, 34, 5, mtrSel ? 0xFFE0 : (isRunning ? 0x07E0 : 0xF800));
+    _gfx->drawRoundRect(335, 155, 124, 32, 4, mtrSel ? 0xFFE0 : (isRunning ? 0x03E0 : 0x9800));
+
+    // Frame 3: CKP Button
+    bool ckpSel = (editRow == 3);
+    _gfx->drawRoundRect(248, 194, 50, 26, 4, ckpSel ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(249, 195, 48, 24, 3, ckpSel ? 0xFFE0 : 0x2104);
+
+    // Frame 4: CMP1 Button
+    bool cmp1Sel = (editRow == 4);
+    _gfx->drawRoundRect(301, 194, 52, 26, 4, cmp1Sel ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(302, 195, 50, 24, 3, cmp1Sel ? 0xFFE0 : 0x2104);
+
+    // Frame 5: CMP2 Button
+    bool cmp2Sel = (editRow == 5);
+    _gfx->drawRoundRect(356, 194, 54, 26, 4, cmp2Sel ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(357, 195, 52, 24, 3, cmp2Sel ? 0xFFE0 : 0x2104);
+
+    // Frame 6: POL Button
+    bool polSel = (editRow == 6);
+    _gfx->drawRoundRect(413, 194, 47, 26, 4, polSel ? 0xFFE0 : (wheel.inverted ? 0xF800 : 0x07E0));
+    _gfx->drawRoundRect(414, 195, 45, 24, 3, polSel ? 0xFFE0 : (wheel.inverted ? 0x9800 : 0x03E0));
+
+    // Frame 7: Pola Wheel (Full-Width Bottom Card)
+    _gfx->drawRoundRect(16, 232, 448, 76, 6, (editRow == 7) ? 0xFFE0 : 0x52AA);
+    _gfx->drawRoundRect(17, 233, 446, 74, 5, (editRow == 7) ? 0xFFE0 : 0x0841);
 }
 
 void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
@@ -337,19 +463,30 @@ void PageDashboard::onEncoderTurn(int32_t delta, uint8_t editRow,
                                   EcuEngine::ParametricWheel& wheel,
                                   EcuEngine::CamEventTable& cam) {
     if (editRow == 0) {
-        // Jika sedang dalam mode POT (Analog Potensio), RPM dikendalikan oleh potensio fisik
         if (state.runMode == EcuEngine::EngineRunMode::Potentiometer) {
             return;
         }
-        uint32_t step = (state.rpmStep > 0) ? state.rpmStep : 50;
+        uint32_t step = (state.fixEnc.rpmStep > 0) ? state.fixEnc.rpmStep : ((state.rpmStep > 0) ? state.rpmStep : 50);
         int32_t newRpm = static_cast<int32_t>(state.targetRpm) + (delta * (int32_t)step);
-        state.targetRpm = constrain(newRpm, 0, 12000);
+        uint32_t minLimit = state.fixEnc.minRpm;
+        uint32_t maxLimit = (state.fixEnc.maxRpm > minLimit) ? state.fixEnc.maxRpm : (minLimit + 500);
+        state.targetRpm = constrain(newRpm, (int32_t)minLimit, (int32_t)maxLimit);
     } else if (editRow == 1) {
         int32_t m = static_cast<int32_t>(state.runMode) + (delta > 0 ? 1 : -1);
         if (m < 0) m = 4;
         if (m > 4) m = 0;
         state.runMode = static_cast<EcuEngine::EngineRunMode>(m);
     } else if (editRow == 2) {
+        state.isRunning = !state.isRunning;
+    } else if (editRow == 3 && delta != 0) {
+        state.ckpEnabled = !state.ckpEnabled;
+    } else if (editRow == 4 && delta != 0) {
+        state.cmp1Enabled = !state.cmp1Enabled;
+    } else if (editRow == 5 && delta != 0) {
+        state.cmp2Enabled = !state.cmp2Enabled;
+    } else if (editRow == 6 && delta != 0) {
+        wheel.inverted = !wheel.inverted;
+    } else if (editRow == 7) {
         _activePresetIdx = _getNextPresetInCategory(_activePresetIdx, delta > 0 ? 1 : -1, _activeCategory);
         _applyPreset(_activePresetIdx, wheel, cam);
         const char* pName = (_activePresetIdx < (int32_t)BASE_PRESET_COUNT) ? 

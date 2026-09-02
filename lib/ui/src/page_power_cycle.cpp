@@ -1,4 +1,4 @@
-﻿#include "page_power_cycle.h"
+#include "page_power_cycle.h"
 
 namespace EcuUi {
 
@@ -19,7 +19,8 @@ void PagePowerCycle::render(bool fullRedraw, uint8_t editRow,
                             const EcuEngine::PowerCycleState& state,
                             bool mcpFound) {
     if (fullRedraw) {
-        _gfx->fillRect(8, 44, 464, 268, 0x10A2);
+        _gfx->fillRect(0, 40, 480, 280, 0x0841);
+        _gfx->fillRoundRect(8, 44, 464, 268, 8, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
 
         // Header Modul

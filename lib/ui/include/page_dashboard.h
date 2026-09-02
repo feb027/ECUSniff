@@ -64,12 +64,16 @@ private:
     uint16_t _lastTotalTeeth{0xFFFF};
     uint8_t  _lastMissingTeeth{0xFF};
     int32_t  _lastBarW{-1};
+    bool     _lastCkpEn{false};
+    bool     _lastCmp1En{false};
+    bool     _lastCmp2En{false};
+    bool     _lastInverted{false};
 
     static WheelPresetItem s_customSlots[MAX_CUSTOM_PRESETS];
     static uint8_t         s_customCount;
 
     void _drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel);
-    void _drawRpmBar(uint32_t activeRpm, bool fullRedraw);
+    void _drawRpmBar(uint32_t activeRpm, uint32_t minRpm, uint32_t maxRpm, bool fullRedraw);
     void _applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam);
     int32_t _getNextPresetInCategory(int32_t currentIdx, int32_t direction, uint8_t category);
 };

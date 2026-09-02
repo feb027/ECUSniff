@@ -17,10 +17,11 @@ public:
     RmtGenerator();
     bool init();
     
-    // Pattern selection
+    // Pattern & Channel selection
     void setPattern(const EcuEngine::ParametricWheel& wheel, 
                     const EcuEngine::CamEventTable& cam);
     bool setWheelPattern(const WheelDefinition* wheel);
+    void setChannelEnables(bool ckp, bool cmp1, bool cmp2, bool inverted);
     void setRpm(uint32_t targetRpm);
     
     void prepareNextCycle();
@@ -35,23 +36,14 @@ public:
     const WheelDefinition* getActiveWheel() const { return _activeWheel; }
     bool isBitArrayMode() const { return _isBitArrayMode; }
 
-    /**
-     * @brief Converts an arbitrary bit-array sequence into RMT symbols with RLE compression and duration slicing.
-     * @param bitArray Pointer to PROGMEM or RAM bit-array (bit0=CKP, bit1=CMP1, bit2=CMP2).
-     * @param totalEdges Number of segments in the bit-array.
-     * @param cycleDegrees Engine cycle degrees (360 or 720).
-     * @param rpm Engine speed in RPM.
-     * @param channelBitMask Bitmask to extract (0x01 for CKP, 0x02 for CMP1, 0x04 for CMP2).
-     * @param outItems Output array of rmt_item32_t symbols.
-     * @param maxItems Maximum capacity of outItems array.
-     * @return Number of rmt_item32_t symbols written (including EOT {0,0,0,0}), or 0 on error.
-     */
     static size_t compileBitArrayToRmt(
         const uint8_t* bitArray,
         uint16_t totalEdges,
         uint16_t cycleDegrees,
         uint32_t rpm,
         uint8_t channelBitMask,
+        bool isEnabled,
+        bool isInverted,
         rmt_item32_t* outItems,
         size_t maxItems
     );
@@ -63,6 +55,7 @@ private:
     uint32_t _activeRpm{850};
     uint32_t _pendingRpm{850};
     bool _needsUpdate{false};
+    bool _patternChanged{false};
     bool _isBitArrayMode{false};
     uint32_t _cycleStartUs{0};
     uint32_t _activeCycleUs{141176}; // 720 deg @ 850 RPM (~141.176 ms)
@@ -70,6 +63,10 @@ private:
     const WheelDefinition*     _activeWheel{nullptr};
     EcuEngine::ParametricWheel _wheel;
     EcuEngine::CamEventTable   _cam;
+    bool _ckpEnabled{true};
+    bool _cmp1Enabled{true};
+    bool _cmp2Enabled{true};
+    bool _inverted{false};
 
     // Buffer CKP (Channel 0 / Primary Trigger)
     rmt_item32_t _ckpBufferA[EcuEngine::MAX_CYCLE_PULSES]{};

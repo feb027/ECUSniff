@@ -27,7 +27,7 @@ void PageSpeedoTester::_drawPanelFrame(int32_t x, int32_t y, int32_t w, int32_t 
 void PageSpeedoTester::render(uint8_t currentTab, bool fullRedraw, uint8_t editRow,
                              const EcuEngine::SpeedoController& controller) {
     if (currentTab != _lastTab || fullRedraw) {
-        _gfx->fillRect(0, 42, 480, 278, TFT_BLACK);
+        _gfx->fillRect(0, 40, 480, 280, TFT_BLACK);
         _lastTab = currentTab; fullRedraw = true;
         _lastEditRow = 0xFF; _lastKmh = -1; _lastRpm = -1; _lastTemp = -1; _lastFuel = -1;
         for (uint8_t i = 0; i < 6; ++i) _lastCalVals[i] = -99;

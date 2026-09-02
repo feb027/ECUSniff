@@ -44,17 +44,9 @@ uint32_t RpmController::update(EngineRuntimeState& state, uint32_t deltaMs) {
         }
 
         case EngineRunMode::Potentiometer: {
-            float target = (float)state.potRpm;
-            if (_slewedRpm <= 0.0f) _slewedRpm = target;
-            float maxStep = (_slewRateRpmPerSec * (float)deltaMs) / 1000.0f;
-            if (fabsf(target - _slewedRpm) <= maxStep) {
-                _slewedRpm = target;
-            } else if (target > _slewedRpm) {
-                _slewedRpm += maxStep;
-            } else {
-                _slewedRpm -= maxStep;
-            }
-            _currentDynamicRpm = (uint32_t)(_slewedRpm + 0.5f);
+            // Mode Potensio merespon langsung putaran fisik tanpa delay inersia lambat
+            _slewedRpm = (float)state.potRpm;
+            _currentDynamicRpm = state.potRpm;
             break;
         }
 
@@ -165,34 +157,56 @@ uint32_t RpmController::update(EngineRuntimeState& state, uint32_t deltaMs) {
 }
 
 void RpmController::updatePotentiometer(float voltage, EngineRuntimeState& state) {
-    // 1. Zero-Clamp Threshold: Di bawah 0.03V (< 1% dari 3.3V), kunci solid pada 0 RPM
-    if (voltage < 0.03f) {
-        _smoothedPotRpm = 0.0f;
-        _lastRawPotRpm = 0;
-        state.potRpm = 0;
+    uint32_t minLimit = state.potCfg.minRpm;
+    uint32_t maxLimit = (state.potCfg.maxRpm > minLimit) ? state.potCfg.maxRpm : (minLimit + 500);
+
+    // 1. Zero-Clamp: Di bawah 0.04V (< 1.2% dari 3.3V), kunci pada batas bawah (minLimit)
+    if (voltage < 0.04f) {
+        _smoothedPotRpm = (float)minLimit;
+        _lastRawPotRpm = minLimit;
+        state.potRpm = minLimit;
         return;
     }
 
-    // 2. Mapping Tegangan 0.03V - 3.3V ke 50 - 10000 RPM
-    float ratio = (voltage - 0.03f) / (3.3f - 0.03f);
+    // 2. Mapping Tegangan 0.04V - 3.25V ke rentang batas [minLimit s/d maxLimit]
+    // Langkah fisik potensiometer menjadi sangat lebar, halus, dan presisi
+    float ratio = (voltage - 0.04f) / (3.25f - 0.04f);
     if (ratio < 0.0f) ratio = 0.0f;
     if (ratio > 1.0f) ratio = 1.0f;
 
-    uint32_t rawRpm = (uint32_t)(50.0f + (ratio * 9950.0f));
+    float targetRawRpm = (float)minLimit + (ratio * (float)(maxLimit - minLimit));
 
-    // 3. Deadband Filter: Jika perubahan nilai mentah <= 4 RPM, abaikan untuk cegah getaran diam
-    int32_t diff = (int32_t)rawRpm - (int32_t)_lastRawPotRpm;
-    if (abs(diff) <= 4) {
-        rawRpm = _lastRawPotRpm;
+    // 3. Adaptive Dual-Rate Filter:
+    // Jika putaran bergerak cepat (|diff| > 60 RPM): respons INSTAN (alpha = 0.90) tanpa delay
+    // Jika putaran lambat/diam: filter lembut (alpha = 0.20) untuk meredam noise ADC
+    float diff = fabsf(targetRawRpm - _smoothedPotRpm);
+    float alpha = (diff > 60.0f) ? 0.90f : 0.20f;
+
+    _smoothedPotRpm = (alpha * targetRawRpm) + ((1.0f - alpha) * _smoothedPotRpm);
+
+    // 4. Schmidt-Trigger / Hysteresis Lock Window:
+    float hystWindow = (float)(maxLimit - minLimit) * 0.003f; // ~0.3% span
+    if (hystWindow < 6.0f) hystWindow = 6.0f;
+    if (hystWindow > 20.0f) hystWindow = 20.0f;
+
+    uint32_t potStep = (state.potCfg.rpmStep > 0) ? state.potCfg.rpmStep : 1;
+    float halfStep = (float)potStep * 0.5f;
+
+    if (state.potRpm < minLimit || state.potRpm > maxLimit) {
+        uint32_t initRpm = (potStep <= 1) ? 
+                           static_cast<uint32_t>(_smoothedPotRpm + 0.5f) :
+                           (static_cast<uint32_t>((_smoothedPotRpm + halfStep) / potStep) * potStep);
+        state.potRpm = (initRpm < minLimit) ? minLimit : (initRpm > maxLimit ? maxLimit : initRpm);
     } else {
-        _lastRawPotRpm = rawRpm;
+        float deltaFromLocked = fabsf(_smoothedPotRpm - static_cast<float>(state.potRpm));
+        float minHyst = (potStep <= 1) ? hystWindow : (float)potStep * 0.5f;
+        if (deltaFromLocked >= minHyst) {
+            uint32_t newRpm = (potStep <= 1) ? 
+                              static_cast<uint32_t>(_smoothedPotRpm + 0.5f) :
+                              (static_cast<uint32_t>((_smoothedPotRpm + halfStep) / potStep) * potStep);
+            state.potRpm = (newRpm < minLimit) ? minLimit : (newRpm > maxLimit ? maxLimit : newRpm);
+        }
     }
-
-    // 4. Exponential Moving Average (EMA) Filter (Alpha = 0.18f untuk kehalusan maksimal)
-    _smoothedPotRpm = (0.18f * (float)rawRpm) + (0.82f * _smoothedPotRpm);
-
-    // 5. Simpan ke runtime state
-    state.potRpm = (uint32_t)(_smoothedPotRpm + 0.5f);
 }
 
 } // namespace EcuEngine

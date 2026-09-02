@@ -21,10 +21,23 @@ struct CrankingConfig {
     bool     fastFlare{false};        // true: MELESAT (instant 0ms ke fix, ~150ms ke sweep), false: GRADUAL
 };
 
+struct FixEncoderConfig {
+    uint32_t minRpm{0};
+    uint32_t maxRpm{12000};
+    uint32_t rpmStep{50}; // 1, 5, 10, 25, 50, 100, 250, 500, 1000
+};
+
+struct PotentiometerConfig {
+    uint32_t minRpm{800};
+    uint32_t maxRpm{6000};
+    uint32_t rpmStep{10}; // 1 (Halus/Continuous), 5, 10, 25, 50, 100, 250, 500, 1000
+};
+
 struct SweepConfig {
     uint32_t minRpm{800};
     uint32_t maxRpm{6000};
     uint32_t sweepRateRpmPerSec{500};
+    uint32_t rpmStep{50}; // 1, 5, 10, 25, 50, 100, 250, 500, 1000
 };
 
 constexpr size_t MAX_CMP_EVENTS = 16;
@@ -63,13 +76,18 @@ struct EngineRuntimeState {
     uint32_t currentRpm{0};
     float currentAngleDeg{0.0f};
     bool isRunning{false};
+    bool ckpEnabled{true};
+    bool cmp1Enabled{true};
+    bool cmp2Enabled{true};
     bool ckpActive{false};
     bool cmp1Active{false};
     bool cmp2Active{false};
     
-    CrankingConfig cranking{};
-    SweepConfig    sweep{};
-    uint32_t       rpmStep{50};
+    CrankingConfig      cranking{};
+    FixEncoderConfig    fixEnc{};
+    PotentiometerConfig potCfg{};
+    SweepConfig         sweep{};
+    uint32_t            rpmStep{50};
 
     // Bi-directional UI & Sniffer sync fields
     char     activeWheelName[48]{"Honda / Ford 36-1"};

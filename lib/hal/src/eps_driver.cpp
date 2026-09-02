@@ -10,12 +10,12 @@ void EpsDriver::init() {
     if (_initialized) return;
 
     // 1. Channel VSS (LEDC Timer for dynamic frequency, 50% duty square wave)
-    ledcSetup(LEDC_CH_VSS, 100, 8); // 8-bit resolution
+    ledcSetup(LEDC_CH_VSS, 1000, 8); // 8-bit resolution
     ledcAttachPin(PinConfig::EPS_VSS, LEDC_CH_VSS);
     ledcWrite(LEDC_CH_VSS, 0);
 
     // 2. Channel RPM Tachometer
-    ledcSetup(LEDC_CH_RPM, 100, 8);
+    ledcSetup(LEDC_CH_RPM, 1000, 8);
     ledcAttachPin(PinConfig::EPS_RPM, LEDC_CH_RPM);
     ledcWrite(LEDC_CH_RPM, 0);
 

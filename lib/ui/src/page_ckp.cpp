@@ -36,7 +36,8 @@ void PageCkp::render(uint8_t activePresetIdx, const EcuEngine::ParametricWheel& 
     const WheelDefinition* def = dbPreset ? WheelDatabase::getWheel(activePresetIdx) : nullptr;
 
     if (fullRedraw) {
-        _gfx->fillRect(8, 44, 464, 268, 0x10A2);
+        _gfx->fillRect(0, 40, 480, 280, 0x0841);
+        _gfx->fillRoundRect(8, 44, 464, 268, 8, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
 
         _gfx->setTextSize(2);

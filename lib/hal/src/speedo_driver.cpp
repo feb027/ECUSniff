@@ -35,8 +35,6 @@ void SpeedoDriver::_writeDac(uint8_t addr, float volts) {
 void SpeedoDriver::init() {
     if (_initialized) return;
 
-    Wire.begin(PinConfig::I2C_SDA, PinConfig::I2C_SCL);
-    Wire.setClock(400000);
     Wire.setTimeOut(2);
     bool f, t;
     detectDacs(f, t);
@@ -50,12 +48,12 @@ void SpeedoDriver::init() {
     ledcAttachPin(PinConfig::SPEEDO_FUEL, LEDC_CH_FUEL);
     ledcWrite(LEDC_CH_FUEL, 0);
 
-    // 2. RPM & KMH Frequency Pulse Channels (Timer 0 & 1, 10-bit)
-    ledcSetup(LEDC_CH_RPM, 50, 10);
+    // 2. RPM & KMH Frequency Pulse Channels (Timer 0 & 1, 8-bit, 100 Hz default)
+    ledcSetup(LEDC_CH_RPM, 100, 8);
     ledcAttachPin(PinConfig::SPEEDO_RPM, LEDC_CH_RPM);
     ledcWrite(LEDC_CH_RPM, 0);
 
-    ledcSetup(LEDC_CH_KMH, 50, 10);
+    ledcSetup(LEDC_CH_KMH, 100, 8);
     ledcAttachPin(PinConfig::SPEEDO_KMH, LEDC_CH_KMH);
     ledcWrite(LEDC_CH_KMH, 0);
 

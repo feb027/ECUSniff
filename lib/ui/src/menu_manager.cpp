@@ -18,6 +18,7 @@ void MenuManager::init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffe
 }
 
 void MenuManager::returnToMainHub() {
+    _gfx->fillScreen(TFT_BLACK);
     _uiLevel = UiLevel::MainHub; _needsFullRedraw = true;
     _lastTab = 0xFF; _lastDrawnTab = 0xFF; _isEditMode = false; _focusTabBar = true;
     _pageBrowser.close();
@@ -25,6 +26,7 @@ void MenuManager::returnToMainHub() {
 
 void MenuManager::setUiLevel(UiLevel level) {
     if (_uiLevel != level) {
+        _gfx->fillScreen(TFT_BLACK);
         _uiLevel = level; _genTab = 1; _editRow = 0;
         _isEditMode = false; _focusTabBar = true; _needsFullRedraw = true;
         _pageBrowser.close();
@@ -47,26 +49,75 @@ void MenuManager::_drawGeneratorTabBar(bool force) {
     const char* tabsSpeedo[]   = { "< MENU", "SPEEDO COCKPIT", "3-PT CAL", "HARDWARE" };
     const char* tabsPwrCycle[] = { "< MENU", "POWER CYCLE TESTER" };
 
+    struct TabTheme {
+        uint16_t activeBg;
+        uint16_t activeFg;
+        uint16_t inactiveBg;
+        uint16_t inactiveBorder;
+        uint16_t inactiveFg;
+    };
+
+    static const TabTheme genThemes[5] = {
+        { 0xF800, TFT_WHITE, 0x5800, 0xF800, TFT_WHITE }, // 0: < MENU (Crimson Red)
+        { 0x07E0, TFT_BLACK, 0x0300, 0x07E0, TFT_WHITE }, // 1: DASHBOARD (Emerald Green)
+        { 0xFD20, TFT_BLACK, 0x6280, 0xFD20, TFT_WHITE }, // 2: CKP WHEEL (Amber / Orange)
+        { 0xD81F, TFT_WHITE, 0x4810, 0xD81F, TFT_WHITE }, // 3: CMP CAM (Magenta / Purple)
+        { 0x07FF, TFT_BLACK, 0x0250, 0x07FF, TFT_WHITE }  // 4: SETTINGS (Electric Cyan)
+    };
+
+    static const TabTheme capThemes[4] = {
+        { 0xF800, TFT_WHITE, 0x5800, 0xF800, TFT_WHITE }, // 0: < MENU
+        { 0x07E0, TFT_BLACK, 0x0300, 0x07E0, TFT_WHITE }, // 1: LIVE CAPTURE
+        { 0x07FF, TFT_BLACK, 0x0250, 0x07FF, TFT_WHITE }, // 2: DECODE DATA
+        { 0xD81F, TFT_WHITE, 0x4810, 0xD81F, TFT_WHITE }  // 3: CAM EVENTS
+    };
+
+    static const TabTheme epsThemes[4] = {
+        { 0xF800, TFT_WHITE, 0x5800, 0xF800, TFT_WHITE }, // 0: < MENU
+        { 0xFD20, TFT_BLACK, 0x6280, 0xFD20, TFT_WHITE }, // 1: EPS BENCH
+        { 0x07E0, TFT_BLACK, 0x0300, 0x07E0, TFT_WHITE }, // 2: OEM PRESET
+        { 0x07FF, TFT_BLACK, 0x0250, 0x07FF, TFT_WHITE }  // 3: AUTO SWEEP
+    };
+
+    static const TabTheme speedoThemes[4] = {
+        { 0xF800, TFT_WHITE, 0x5800, 0xF800, TFT_WHITE }, // 0: < MENU
+        { 0x07E0, TFT_BLACK, 0x0300, 0x07E0, TFT_WHITE }, // 1: SPEEDO COCKPIT
+        { 0xFFE0, TFT_BLACK, 0x6300, 0xFFE0, TFT_WHITE }, // 2: 3-PT CAL
+        { 0x07FF, TFT_BLACK, 0x0250, 0x07FF, TFT_WHITE }  // 3: HARDWARE
+    };
+
+    static const TabTheme pwrThemes[2] = {
+        { 0xF800, TFT_WHITE, 0x5800, 0xF800, TFT_WHITE }, // 0: < MENU
+        { 0x07E0, TFT_BLACK, 0x0300, 0x07E0, TFT_WHITE }  // 1: POWER CYCLE TESTER
+    };
+
     uint8_t totalTabs = (_uiLevel == UiLevel::Generator) ? 5 : ((_uiLevel == UiLevel::PowerCycle) ? 2 : 4);
     const char** tabs = (_uiLevel == UiLevel::Capture) ? tabsCap : 
                         ((_uiLevel == UiLevel::EpsTester) ? tabsEps : 
                         ((_uiLevel == UiLevel::SpeedoTester) ? tabsSpeedo : 
                         ((_uiLevel == UiLevel::PowerCycle) ? tabsPwrCycle : tabsGen)));
 
+    const TabTheme* currentThemes = (_uiLevel == UiLevel::Capture) ? capThemes :
+                                    ((_uiLevel == UiLevel::EpsTester) ? epsThemes :
+                                    ((_uiLevel == UiLevel::SpeedoTester) ? speedoThemes :
+                                    ((_uiLevel == UiLevel::PowerCycle) ? pwrThemes : genThemes)));
+
     for (uint8_t i = 0; i < totalTabs; ++i) {
         int32_t w = (totalTabs == 5) ? 88 : ((totalTabs == 2) ? 220 : 110);
         int32_t x = (totalTabs == 5) ? (6 + (i * 94)) : ((totalTabs == 2) ? (16 + (i * 232)) : (8 + (i * 118)));
         bool isActive = (_genTab == i);
-        uint32_t bg = isActive ? ((_genTab == 0) ? 0xF800 : 0x07E0) : 0x18C3;
+        const TabTheme& th = currentThemes[i];
+
+        uint16_t bg = isActive ? th.activeBg : th.inactiveBg;
+        uint16_t border = isActive ? 0xFFE0 : th.inactiveBorder;
+        uint16_t fg = isActive ? th.activeFg : th.inactiveFg;
 
         _gfx->fillRoundRect(x, 4, w, 32, 6, bg);
+        _gfx->drawRoundRect(x, 4, w, 32, 6, border);
         if (isActive && (_focusTabBar || _genTab == 0)) {
-            _gfx->drawRoundRect(x, 4, w, 32, 6, 0xFFE0);
             _gfx->drawRoundRect(x + 1, 5, w - 2, 30, 5, 0xFFE0);
-        } else {
-            _gfx->drawRoundRect(x, 4, w, 32, 6, isActive ? bg : 0x52AA);
         }
-        _gfx->setTextColor(isActive ? ((_genTab == 0) ? TFT_WHITE : TFT_BLACK) : TFT_WHITE, bg);
+        _gfx->setTextColor(fg, bg);
         _gfx->setTextSize(1);
         int32_t tw = _gfx->textWidth(tabs[i]);
         _gfx->drawString(tabs[i], x + (w - tw) / 2, 14);
@@ -85,7 +136,8 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
 
     if (_genTab == 0) {
         if (isRedraw) {
-            _gfx->fillRect(8, 44, 464, 268, 0x10A2);
+            _gfx->fillRect(0, 40, 480, 280, 0x0841);
+            _gfx->fillRoundRect(8, 44, 464, 268, 8, 0x10A2);
             _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
             _gfx->fillRoundRect(40, 100, 400, 130, 8, 0x0841);
             _gfx->drawRoundRect(40, 100, 400, 130, 8, 0xF800);
@@ -240,11 +292,31 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
 
     if (_uiLevel == UiLevel::Generator) {
         if (_genTab == 1) {
-            if (action == EcuHal::JoyAction::Up) { if (_editRow <= 1) { _focusTabBar = true; _needsFullRedraw = true; } else _editRow = 0; }
-            else if (action == EcuHal::JoyAction::Down && _editRow <= 1) _editRow = 2;
-            else if (action == EcuHal::JoyAction::Left && _editRow == 1) _editRow = 0;
-            else if (action == EcuHal::JoyAction::Right && _editRow == 0) _editRow = 1;
-            else if (action == EcuHal::JoyAction::Click) onEncoderClick(state, wheel, cam);
+            if (action == EcuHal::JoyAction::Up) {
+                if (_editRow <= 2) { _focusTabBar = true; _needsFullRedraw = true; }
+                else if (_editRow == 3 || _editRow == 4) _editRow = 1;
+                else if (_editRow == 5 || _editRow == 6) _editRow = 2;
+                else if (_editRow == 7) _editRow = 0;
+            } else if (action == EcuHal::JoyAction::Down) {
+                if (_editRow == 0) _editRow = 7;
+                else if (_editRow == 1) _editRow = 3;
+                else if (_editRow == 2) _editRow = 5;
+                else if (_editRow >= 3 && _editRow <= 6) _editRow = 7;
+            } else if (action == EcuHal::JoyAction::Left) {
+                if (_editRow == 1 || _editRow == 3) _editRow = 0;
+                else if (_editRow == 2) _editRow = 1;
+                else if (_editRow == 4) _editRow = 3;
+                else if (_editRow == 5) _editRow = 4;
+                else if (_editRow == 6) _editRow = 5;
+            } else if (action == EcuHal::JoyAction::Right) {
+                if (_editRow == 0) _editRow = 1;
+                else if (_editRow == 1) _editRow = 2;
+                else if (_editRow == 3) _editRow = 4;
+                else if (_editRow == 4) _editRow = 5;
+                else if (_editRow == 5) _editRow = 6;
+            } else if (action == EcuHal::JoyAction::Click) {
+                onEncoderClick(state, wheel, cam);
+            }
         } else if (_genTab == 2) {
             if (action == EcuHal::JoyAction::Up) { if (_editRow == 0) { _focusTabBar = true; _needsFullRedraw = true; } else _editRow--; }
             else if (action == EcuHal::JoyAction::Down && _editRow < 4) _editRow++;
@@ -301,20 +373,57 @@ void MenuManager::onJoystickAction(EcuHal::JoyAction action,
                 } else if (action == EcuHal::JoyAction::Click) {
                     onEncoderClick(state, wheel, cam);
                 }
-            } else if (curCat == 1) { // Sweep: 4 items (Row 0, 1 / Row 2, 3)
+            } else if (curCat == 1) { // Fix Encoder: 3 items (Row 0: Step / Row 1: Min, Row 2: Max)
                 if (action == EcuHal::JoyAction::Up) {
-                    if (_editRow <= 1) {
+                    if (_editRow == 0) {
                         _pageGenSettings.setFocusSubNav(true);
                         _needsFullRedraw = true;
                     } else {
-                        _editRow -= 2;
+                        _editRow = 0;
                     }
                 } else if (action == EcuHal::JoyAction::Down) {
-                    if (_editRow <= 1) { _editRow += 2; }
+                    if (_editRow == 0) _editRow = 1;
                 } else if (action == EcuHal::JoyAction::Left) {
-                    if (_editRow % 2 == 1) _editRow--;
+                    if (_editRow == 2) _editRow = 1;
                 } else if (action == EcuHal::JoyAction::Right) {
-                    if (_editRow % 2 == 0) _editRow++;
+                    if (_editRow == 1) _editRow = 2;
+                } else if (action == EcuHal::JoyAction::Click) {
+                    onEncoderClick(state, wheel, cam);
+                }
+            } else if (curCat == 2) { // Potensio: 3 items (Row 0: Step / Row 1: Min, Row 2: Max)
+                if (action == EcuHal::JoyAction::Up) {
+                    if (_editRow == 0) {
+                        _pageGenSettings.setFocusSubNav(true);
+                        _needsFullRedraw = true;
+                    } else {
+                        _editRow = 0;
+                    }
+                } else if (action == EcuHal::JoyAction::Down) {
+                    if (_editRow == 0) _editRow = 1;
+                } else if (action == EcuHal::JoyAction::Left) {
+                    if (_editRow == 2) _editRow = 1;
+                } else if (action == EcuHal::JoyAction::Right) {
+                    if (_editRow == 1) _editRow = 2;
+                } else if (action == EcuHal::JoyAction::Click) {
+                    onEncoderClick(state, wheel, cam);
+                }
+            } else if (curCat == 3) { // Auto Sweep: 4 items (Row 0: Step / Row 1: Min, Row 2: Max / Row 3: Rate)
+                if (action == EcuHal::JoyAction::Up) {
+                    if (_editRow == 0) {
+                        _pageGenSettings.setFocusSubNav(true);
+                        _needsFullRedraw = true;
+                    } else if (_editRow <= 2) {
+                        _editRow = 0;
+                    } else {
+                        _editRow = 1;
+                    }
+                } else if (action == EcuHal::JoyAction::Down) {
+                    if (_editRow == 0) _editRow = 1;
+                    else if (_editRow <= 2) _editRow = 3;
+                } else if (action == EcuHal::JoyAction::Left) {
+                    if (_editRow == 2) _editRow = 1;
+                } else if (action == EcuHal::JoyAction::Right) {
+                    if (_editRow == 1) _editRow = 2;
                 } else if (action == EcuHal::JoyAction::Click) {
                     onEncoderClick(state, wheel, cam);
                 }
@@ -387,10 +496,36 @@ void MenuManager::onEncoderClick(EcuEngine::EngineRuntimeState& state,
     if (_uiLevel == UiLevel::Capture) { _pageCapture.onEncoderClick(_genTab); return; }
     if (_uiLevel == UiLevel::Generator) {
         if (_genTab == 1) {
-            if (_editRow == 2) { 
+            if (_editRow == 7) { 
                 _pageBrowser.open(_pageDash.getActivePresetIdx(), static_cast<WheelCategory>(_pageDash.getActiveCategory())); 
                 _needsFullRedraw = true; 
                 return; 
+            } else if (_editRow == 1) {
+                int32_t m = static_cast<int32_t>(state.runMode) + 1;
+                if (m > 4) m = 0;
+                state.runMode = static_cast<EcuEngine::EngineRunMode>(m);
+                _needsFullRedraw = true;
+                return;
+            } else if (_editRow == 2) {
+                state.isRunning = !state.isRunning;
+                _needsFullRedraw = true;
+                return;
+            } else if (_editRow == 3) {
+                state.ckpEnabled = !state.ckpEnabled;
+                _needsFullRedraw = true;
+                return;
+            } else if (_editRow == 4) {
+                state.cmp1Enabled = !state.cmp1Enabled;
+                _needsFullRedraw = true;
+                return;
+            } else if (_editRow == 5) {
+                state.cmp2Enabled = !state.cmp2Enabled;
+                _needsFullRedraw = true;
+                return;
+            } else if (_editRow == 6) {
+                wheel.inverted = !wheel.inverted;
+                _needsFullRedraw = true;
+                return;
             }
             state.isRunning = !state.isRunning; _needsFullRedraw = true;
         } else if (_genTab == 4) {

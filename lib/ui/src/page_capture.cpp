@@ -56,7 +56,8 @@ void PageCapture::render(uint8_t subTab, bool fullRedraw, bool isEditMode) {
 
 void PageCapture::_renderLiveTab(bool fullRedraw) {
     if (fullRedraw) {
-        _gfx->fillRect(8, 44, 464, 268, 0x10A2);
+        _gfx->fillRect(0, 40, 480, 280, 0x0841);
+        _gfx->fillRoundRect(8, 44, 464, 268, 8, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
 
         if (_lastResult.success) {
@@ -109,14 +110,13 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
                      _lastResult.wheel.dutyCycle * 100.0f);
             _gfx->drawString(patBuf, 24, 206);
 
-            _gfx->setTextColor(0x07FF, 0x0841);
-            char vehBuf[64]; snprintf(vehBuf, sizeof(vehBuf), "Match: %s", _lastResult.matchedVehicle);
-            _gfx->drawString(vehBuf, 24, 230);
+            _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+            char matchBuf[64]; snprintf(matchBuf, sizeof(matchBuf), "Deteksi Profil: %s", _lastResult.matchedVehicle);
+            _gfx->drawString(matchBuf, 24, 234);
         } else {
-            _gfx->setTextColor(0xF800, 0x0841);
-            _gfx->drawString("Belum ada data sniffer yang valid.", 24, 195);
-            _gfx->setTextColor(0x52AA, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("Tekan tombol encoder untuk ARM Sniffer trigger.", 24, 225);
+            _gfx->setTextColor(0x52AA, 0x0841); _gfx->drawString("Status: Menunggu Sinyal Trigger CKP/CMP...", 24, 196);
+            _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
+            _gfx->drawString("Hubungkan probe sniffer ke pin CKP (GPIO 15) & CMP (GPIO 16)", 24, 230);
         }
     }
 
@@ -128,7 +128,8 @@ void PageCapture::_renderLiveTab(bool fullRedraw) {
 
 void PageCapture::_renderDataTab(bool fullRedraw) {
     if (fullRedraw) {
-        _gfx->fillRect(8, 44, 464, 268, 0x10A2);
+        _gfx->fillRect(0, 40, 480, 280, 0x0841);
+        _gfx->fillRoundRect(8, 44, 464, 268, 8, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
         _gfx->setTextColor(0x07E0, 0x10A2); _gfx->setTextSize(2);
         _gfx->drawString("DECODE DATA TELEMETRY", 20, 52);
@@ -152,7 +153,8 @@ void PageCapture::_renderDataTab(bool fullRedraw) {
 
 void PageCapture::_renderCamTab(bool fullRedraw) {
     if (fullRedraw) {
-        _gfx->fillRect(8, 44, 464, 268, 0x10A2);
+        _gfx->fillRect(0, 40, 480, 280, 0x0841);
+        _gfx->fillRoundRect(8, 44, 464, 268, 8, 0x10A2);
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
         _gfx->setTextColor(0x07FF, 0x10A2); _gfx->setTextSize(2);
         _gfx->drawString("CAM EVENT DECODER (0-720 DEG)", 20, 52);

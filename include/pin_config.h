@@ -41,7 +41,7 @@ constexpr int8_t SIG_CMP2 = 6;   ///< Camshaft Signal 2 OUT (RMT Ch 2)
 // 5. Engine Signal Inputs (Isolated Capture IN / Sniffer)
 constexpr int8_t CAP_CKP  = 7;   ///< Crankshaft Capture IN (Interrupt Pin 7)
 constexpr int8_t CAP_CMP  = 8;   ///< Camshaft Capture 1 IN (Interrupt Pin 8)
-constexpr int8_t CAP_CMP2 = 21;  ///< Camshaft Capture 2 IN (Interrupt Pin 21)
+constexpr int8_t CAP_CMP2 = 43;  ///< Camshaft Capture 2 IN (GPIO 43)
 
 // 6. Dedicated EPS / VSS Tester Outputs
 constexpr int8_t EPS_VSS  = 38;  ///< Vehicle Speed Sensor (VSS) Pulse OUT
@@ -54,8 +54,8 @@ constexpr int8_t SPEEDO_KMH  = 47; ///< Speedometer Pulse OUT
 constexpr int8_t SPEEDO_RPM  = 48; ///< Tachometer Pulse OUT
 constexpr int8_t SPEEDO_TEMP = 45; ///< Temperature Gauge PWM OUT
 constexpr int8_t SPEEDO_FUEL = 46; ///< Fuel Gauge PWM OUT
-constexpr int8_t I2C_SDA     = 13; ///< I2C SDA for MCP4725 Dual DAC
-constexpr int8_t I2C_SCL     = 20; ///< I2C SCL for MCP4725 Dual DAC
+constexpr int8_t I2C_SDA     = 13; ///< I2C SDA for MCP4725 / MCP23017 / ADS1115 (Pin 13)
+constexpr int8_t I2C_SCL     = 21; ///< I2C SCL for MCP4725 / MCP23017 / ADS1115 (Pin 21)
 
 #else
 
