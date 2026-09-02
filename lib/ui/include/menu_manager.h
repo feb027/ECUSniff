@@ -13,8 +13,10 @@
 #include "page_speedo_tester.h"
 #include "page_wheel_browser.h"
 #include "page_gen_settings.h"
+#include "page_power_cycle.h"
 #include "eps_controller.h"
 #include "speedo_controller.h"
+#include "power_cycle_controller.h"
 
 namespace EcuUi {
 
@@ -23,7 +25,8 @@ enum class UiLevel : uint8_t {
     Generator = 1,
     Capture = 2,
     EpsTester = 3,
-    SpeedoTester = 4
+    SpeedoTester = 4,
+    PowerCycle = 5
 };
 
 class MenuManager {
@@ -31,7 +34,8 @@ public:
     explicit MenuManager(LovyanGFX* gfx);
 
     void init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffer* sniffer,
-              EcuEngine::EpsController* eps, EcuEngine::SpeedoController* speedo);
+              EcuEngine::EpsController* eps, EcuEngine::SpeedoController* speedo,
+              EcuEngine::PowerCycleController* pwrCycle);
     void render(const EcuEngine::EngineRuntimeState& state,
                 const EcuEngine::ParametricWheel& wheel,
                 const EcuEngine::CamEventTable& cam);
@@ -55,6 +59,8 @@ public:
     uint8_t getUiLevel() const { return static_cast<uint8_t>(_uiLevel); }
     uint8_t getActiveTab() const { return _genTab; }
     const PageCapture& getPageCapture() const { return _pageCapture; }
+    PageDashboard& getPageDashboard() { return _pageDash; }
+    const PageDashboard& getPageDashboard() const { return _pageDash; }
     PageEpsTester& getPageEps() { return _pageEps; }
     PageSpeedoTester& getPageSpeedo() { return _pageSpeedo; }
 
@@ -87,9 +93,11 @@ private:
     PageEpsTester      _pageEps;
     PageSpeedoTester   _pageSpeedo;
     PageWheelBrowser   _pageBrowser;
+    PagePowerCycle     _pagePwrCycle;
 
-    EcuEngine::EpsController*    _epsController{nullptr};
-    EcuEngine::SpeedoController* _speedoController{nullptr};
+    EcuEngine::EpsController*        _epsController{nullptr};
+    EcuEngine::SpeedoController*     _speedoController{nullptr};
+    EcuEngine::PowerCycleController* _powerCycleController{nullptr};
 
     void _drawGeneratorTabBar(bool force);
 };

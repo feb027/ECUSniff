@@ -15,26 +15,49 @@
 #include "eps_driver.h"
 #include "speedo_controller.h"
 #include "speedo_driver.h"
+#include "mcp23017_driver.h"
+#include "ads1115_driver.h"
+#include "power_cycle_controller.h"
 #include "web_server_manager.h"
 #include "menu_manager.h"
+#include "wheel_database.h"
 
-static EcuHal::DisplayDriver        display;
-static EcuHal::EncoderDriver        encoder;
-static EcuHal::JoystickDriver       joystick;
-static EcuHal::RmtGenerator         signalGen;
-static EcuHal::CaptureDriver        captureDriver;
-static EcuEngine::SignalSniffer     sniffer;
-static EcuEngine::EpsController     epsController;
-static EcuHal::EpsDriver            epsDriver;
-static EcuEngine::SpeedoController  speedoController;
-static EcuHal::SpeedoDriver         speedoDriver;
-static EcuWebApi::WebServerManager  webManager;
-static EcuEngine::RpmController     rpmController;
-static EcuUi::MenuManager*          menuMgr = nullptr;
+static EcuHal::DisplayDriver             display;
+static EcuHal::EncoderDriver             encoder;
+static EcuHal::JoystickDriver            joystick;
+static EcuHal::RmtGenerator              signalGen;
+static EcuHal::CaptureDriver             captureDriver;
+static EcuEngine::SignalSniffer          sniffer;
+static EcuEngine::EpsController          epsController;
+static EcuHal::EpsDriver                 epsDriver;
+static EcuEngine::SpeedoController       speedoController;
+static EcuHal::SpeedoDriver              speedoDriver;
+static EcuHal::Mcp23017Driver            mcpExpander;
+static EcuHal::Ads1115Driver             adsAdc;
+static EcuEngine::PowerCycleController   powerCycleController;
+static EcuWebApi::WebServerManager       webManager;
+static EcuEngine::RpmController          rpmController;
+static EcuUi::MenuManager*               menuMgr = nullptr;
 
 static EcuEngine::EngineRuntimeState engineState;
 static EcuEngine::ParametricWheel    wheelCfg;
 static EcuEngine::CamEventTable      camCfg;
+
+static void syncSignalGenPattern() {
+    if (!menuMgr) {
+        signalGen.setPattern(wheelCfg, camCfg);
+        return;
+    }
+    uint8_t activeIdx = menuMgr->getPageDashboard().getActivePresetIdx();
+    if (activeIdx < WheelDatabase::getWheelCount()) {
+        const WheelDefinition* def = WheelDatabase::getWheel(activeIdx);
+        if (def) {
+            signalGen.setWheelPattern(def);
+            return;
+        }
+    }
+    signalGen.setPattern(wheelCfg, camCfg);
+}
 
 void taskCore0UiWeb(void *pvParameters) {
     uint32_t lastWeb = 0, lastRpm = 0, lastRender = 0, lastEps = 0, lastSpeedo = 0;
@@ -47,7 +70,7 @@ void taskCore0UiWeb(void *pvParameters) {
         EcuHal::JoyAction joyAct = joystick.update();
         if (joyAct != EcuHal::JoyAction::None && menuMgr) {
             menuMgr->onJoystickAction(joyAct, engineState, wheelCfg, camCfg);
-            signalGen.setPattern(wheelCfg, camCfg);
+            syncSignalGenPattern();
             if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
             lastSettingChange = now; pendingSave = true;
         }
@@ -56,7 +79,7 @@ void taskCore0UiWeb(void *pvParameters) {
         int32_t delta = encoder.getDelta();
         if (delta != 0 && menuMgr) {
             menuMgr->onEncoderTurn(delta, engineState, wheelCfg, camCfg);
-            signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm);
+            syncSignalGenPattern(); signalGen.setRpm(engineState.targetRpm);
             if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
             lastSettingChange = now; pendingSave = true;
         }
@@ -76,7 +99,7 @@ void taskCore0UiWeb(void *pvParameters) {
         if (clickCount > 0 && !isDown && (now - relTime >= 180)) {
             if (clickCount == 1 && menuMgr) {
                 menuMgr->onEncoderClick(engineState, wheelCfg, camCfg);
-                signalGen.setPattern(wheelCfg, camCfg);
+                syncSignalGenPattern();
                 if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
                 lastSettingChange = now; pendingSave = true;
             } else if (clickCount >= 2 && menuMgr) {
@@ -104,7 +127,7 @@ void taskCore0UiWeb(void *pvParameters) {
                 if (engineState.runMode == EcuEngine::EngineRunMode::CrankToFix || engineState.runMode == EcuEngine::EngineRunMode::CrankToSweep) {
                     rpmController.startCranking(engineState.cranking);
                 }
-                signalGen.setPattern(wheelCfg, camCfg); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
+                syncSignalGenPattern(); signalGen.prepareNextCycle(); signalGen.swapBuffer(); signalGen.start();
             } else {
                 signalGen.stop();
             }
@@ -118,9 +141,50 @@ void taskCore0UiWeb(void *pvParameters) {
         captureDriver.update();
         if (now - lastRpm >= 20) {
             uint32_t dt = now - lastRpm; lastRpm = now;
+
+            // ================================================================
+            // PEMBACAAN POTENSIOMETER ANALOG (Hanya Aktif Saat Mode POT)
+            // ================================================================
+            if (engineState.runMode == EcuEngine::EngineRunMode::Potentiometer) {
+                if (adsAdc.isFound()) {
+                    float voltage = adsAdc.readVoltageA0();
+                    rpmController.updatePotentiometer(voltage, engineState);
+                }
+            }
+
             if (engineState.isRunning) {
                 signalGen.setRpm(rpmController.update(engineState, dt));
                 signalGen.prepareNextCycle(); signalGen.swapBuffer();
+            }
+
+            // ================================================================
+            // SINKRONISASI SINYAL STA (Crank +12V) & CHG (Lampu Alternator)
+            // ================================================================
+            bool isCrankingStage = false;
+            if (engineState.isRunning) {
+                if (engineState.runMode == EcuEngine::EngineRunMode::CrankToFix || 
+                    engineState.runMode == EcuEngine::EngineRunMode::CrankToSweep) {
+                    auto stage = rpmController.getCrankingStage();
+                    isCrankingStage = (stage == EcuEngine::CrankingStage::SpinUp || 
+                                       stage == EcuEngine::CrankingStage::Cranking);
+                }
+            }
+
+            // Sinyal STA: Aktif (+12V) HANYA saat mesin berada dalam tahap cranking
+            bool newSta = isCrankingStage;
+
+            // Sinyal CHG:
+            // - Jika mesin STOPPED atau sedang Cranking: Lampu Aki MENYALA (GND aktif / true)
+            // - Jika mesin RUNNING mandiri (RPM >= 400): Lampu Aki PADAM (GND dilepas / false)
+            bool newChg = (!engineState.isRunning || isCrankingStage || engineState.currentRpm < 400);
+
+            if (newSta != engineState.staActive || newChg != engineState.chgLampOn) {
+                engineState.staActive = newSta;
+                engineState.chgLampOn = newChg;
+                if (mcpExpander.isFound()) {
+                    mcpExpander.setSta(newSta);
+                    mcpExpander.setChg(newChg);
+                }
             }
         }
 
@@ -134,6 +198,37 @@ void taskCore0UiWeb(void *pvParameters) {
             float dtSec = (now - lastSpeedo) / 1000.0f; lastSpeedo = now;
             speedoController.update(dtSec);
             speedoDriver.updateOutputs(speedoController.getConfig(), speedoController.getState());
+        }
+
+        // ====================================================================
+        // UPDATE SIKLUS POWER CYCLE / STRESS TESTER (IGSW & M-REL)
+        // ====================================================================
+        static uint32_t lastPwrCycle = 0;
+        if (now - lastPwrCycle >= 20) {
+            uint32_t dt = now - lastPwrCycle; lastPwrCycle = now;
+            bool mrelInput = mcpExpander.isFound() ? mcpExpander.readMrel() : false;
+            powerCycleController.update(dt, mrelInput);
+
+            if (powerCycleController.getState().isRunning) {
+                // Terapkan status IGSW ke pin GPA2 MCP23017
+                if (mcpExpander.isFound()) {
+                    mcpExpander.setIgsw(powerCycleController.getState().igswState);
+                }
+
+                // Jika dikonfigurasi menghasilkan pulsa CKP/CMP saat fase ON:
+                if (powerCycleController.getConfig().genPulseDuringOn) {
+                    bool shouldGen = (powerCycleController.getState().phase == EcuEngine::CyclePhase::PhaseOn);
+                    if (shouldGen && !engineState.isRunning) {
+                        engineState.isRunning = true;
+                        syncSignalGenPattern();
+                        signalGen.prepareNextCycle(); signalGen.swapBuffer();
+                        signalGen.start();
+                    } else if (!shouldGen && engineState.isRunning) {
+                        engineState.isRunning = false;
+                        signalGen.stop();
+                    }
+                }
+            }
         }
 
         if (now - lastWeb >= 100) {
@@ -164,6 +259,11 @@ void taskCore0UiWeb(void *pvParameters) {
             lastRender = now;
             menuMgr->render(engineState, wheelCfg, camCfg);
         }
+
+        if (engineState.isRunning) {
+            signalGen.swapBuffer();
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -190,7 +290,7 @@ static void handleWebCommand(const JsonDocument& doc) {
             camCfg.clear();
             for (JsonObjectConst ev : doc["cmp"].as<JsonArrayConst>()) camCfg.addEvent(ev["angle"] | 0.0f, ev["high"] | false);
         }
-        signalGen.setPattern(wheelCfg, camCfg);
+        syncSignalGenPattern();
         if (engineState.isRunning) { signalGen.prepareNextCycle(); signalGen.swapBuffer(); }
         if (menuMgr) menuMgr->markNeedsRedraw();
         EcuApp::saveSettings(engineState, wheelCfg, camCfg);
@@ -207,6 +307,14 @@ static void handleWebCommand(const JsonDocument& doc) {
     } else if (cmd == "set_mode" && val <= 3) {
         engineState.runMode = static_cast<EcuEngine::EngineRunMode>(val);
         if (menuMgr) menuMgr->markNeedsRedraw();
+    } else if (cmd == "set_cranking") {
+        if (doc["rpm"].is<uint32_t>()) engineState.cranking.crankingRpm = doc["rpm"].as<uint32_t>();
+        if (doc["duration"].is<uint32_t>()) engineState.cranking.crankDurationMs = doc["duration"].as<uint32_t>();
+        if (doc["spinUp"].is<uint32_t>()) engineState.cranking.spinUpDurationMs = doc["spinUp"].as<uint32_t>();
+        if (doc["ramp"].is<uint32_t>()) engineState.cranking.rampDurationMs = doc["ramp"].as<uint32_t>();
+        if (doc["fastFlare"].is<bool>()) engineState.cranking.fastFlare = doc["fastFlare"].as<bool>();
+        if (menuMgr) menuMgr->markNeedsRedraw();
+        EcuApp::saveSettings(engineState, wheelCfg, camCfg);
     } else if (cmd == "set_ui_level") {
         if (menuMgr) menuMgr->setUiLevel(static_cast<EcuUi::UiLevel>(val));
     } else if (cmd == "set_tab") {
@@ -276,10 +384,30 @@ void setup() {
     speedoDriver.detectDacs(dacFuel, dacTemp);
     speedoController.setDacFound(dacFuel, dacTemp);
 
-    signalGen.setPattern(wheelCfg, camCfg); signalGen.setRpm(engineState.targetRpm); signalGen.stop();
+    // Inisialisasi MCP23017 (I/O Expander untuk sinyal STA & CHG)
+    engineState.mcpFound = mcpExpander.init(EcuHal::Mcp23017Driver::DEFAULT_I2C_ADDR);
+    if (engineState.mcpFound) {
+        Serial.println("[MCP23017] Terdeteksi pada alamat 0x20 (STA & CHG Siap)");
+    } else {
+        Serial.println("[MCP23017] Tidak terdeteksi pada 0x20 (Simulasi Standalone)");
+    }
+
+    // Inisialisasi ADS1115 (16-bit I2C ADC untuk Potensiometer RPM)
+    engineState.adsFound = adsAdc.init(EcuHal::Ads1115Driver::DEFAULT_I2C_ADDR);
+    if (engineState.adsFound) {
+        Serial.println("[ADS1115] Terdeteksi pada alamat 0x48 (Potensiometer Analog Siap)");
+    } else {
+        Serial.println("[ADS1115] Tidak terdeteksi pada 0x48 (Potensiometer Standby)");
+    }
+
     display.init();
+    powerCycleController.init();
     menuMgr = new EcuUi::MenuManager(&display.getGfx());
-    menuMgr->init(&captureDriver, &sniffer, &epsController, &speedoController);
+    menuMgr->init(&captureDriver, &sniffer, &epsController, &speedoController, &powerCycleController);
+
+    syncSignalGenPattern();
+    signalGen.setRpm(engineState.targetRpm);
+    signalGen.stop();
 
     xTaskCreatePinnedToCore(taskCore0UiWeb, "UiWebTask", 12288, NULL, 1, NULL, 0);
 }

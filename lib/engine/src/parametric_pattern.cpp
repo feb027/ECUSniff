@@ -1,5 +1,6 @@
 #include "parametric_pattern.h"
 #include "timing_math.h"
+#include "../include/wheel_database.h"
 #include <algorithm>
 
 namespace EcuEngine {
@@ -136,6 +137,60 @@ size_t ParametricEngine::generateCmpCycle(const CamEventTable& cam,
             outSegments[outIdx].level1     = events[i].levelHigh ? 1 : 0;
             outIdx++;
         }
+    }
+
+    return outIdx;
+}
+
+size_t ParametricEngine::generateBitArrayCycle(const WheelDefinition* wheel,
+                                              uint32_t rpm,
+                                              uint8_t channelBitMask,
+                                              PulseSegment* outSegments,
+                                              size_t maxSegments) {
+    if (wheel == nullptr || wheel->bitArray == nullptr || wheel->totalEdges == 0 || rpm == 0 || outSegments == nullptr || maxSegments == 0) {
+        return 0;
+    }
+
+    uint16_t cycleDeg = (wheel->cycleDegrees == WheelCycleDegrees::CRANK_360) ? 360 : 720;
+    uint32_t cycleTotalUs = TimingMath::calculateCyclePeriodUs(rpm);
+    
+    // For 360-degree wheels in 720-degree engine cycle, replicate 2x
+    uint16_t totalEdges = (cycleDeg == 360) ? (wheel->totalEdges * 2) : wheel->totalEdges;
+
+    // Run-Length Encoding across the cycle
+    size_t outIdx = 0;
+    uint8_t currLvl = (wheel->bitArray[0] & channelBitMask) ? 1 : 0;
+    uint16_t runStartSeg = 0;
+
+    for (uint16_t s = 1; s < totalEdges && outIdx < maxSegments; ++s) {
+        uint8_t lvl = (wheel->bitArray[s % wheel->totalEdges] & channelBitMask) ? 1 : 0;
+        if (lvl != currLvl) {
+            uint32_t tStartUs = (uint32_t)(((uint64_t)runStartSeg * cycleTotalUs) / totalEdges);
+            uint32_t tEndUs   = (uint32_t)(((uint64_t)s * cycleTotalUs) / totalEdges);
+            uint32_t runDurUs = tEndUs - tStartUs;
+
+            outSegments[outIdx].duration0Us = runDurUs;
+            outSegments[outIdx].level0     = currLvl;
+            outSegments[outIdx].duration1Us = 0;
+            outSegments[outIdx].level1     = currLvl;
+            outIdx++;
+
+            currLvl = lvl;
+            runStartSeg = s;
+        }
+    }
+
+    // Final run
+    if (outIdx < maxSegments) {
+        uint32_t tStartUs = (uint32_t)(((uint64_t)runStartSeg * cycleTotalUs) / totalEdges);
+        uint32_t tEndUs   = cycleTotalUs;
+        uint32_t runDurUs = tEndUs - tStartUs;
+
+        outSegments[outIdx].duration0Us = runDurUs;
+        outSegments[outIdx].level0     = currLvl;
+        outSegments[outIdx].duration1Us = 0;
+        outSegments[outIdx].level1     = currLvl;
+        outIdx++;
     }
 
     return outIdx;

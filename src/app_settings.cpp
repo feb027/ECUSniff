@@ -17,6 +17,8 @@ void saveSettings(const EcuEngine::EngineRuntimeState& engineState,
     pref.putUInt("sw_rate", engineState.sweep.sweepRateRpmPerSec);
     pref.putUInt("crk_rpm", engineState.cranking.crankingRpm);
     pref.putUInt("crk_dur", engineState.cranking.crankDurationMs);
+    pref.putUInt("crk_spn", engineState.cranking.spinUpDurationMs);
+    pref.putUInt("crk_rmp", engineState.cranking.rampDurationMs);
     pref.putBool("crk_flr", engineState.cranking.fastFlare);
     pref.putString("wname", engineState.activeWheelName);
     pref.putUShort("teeth", wheelCfg.totalTeeth);
@@ -70,8 +72,9 @@ void loadSettings(EcuEngine::EngineRuntimeState& engineState,
     engineState.sweep.sweepRateRpmPerSec = pref.getUInt("sw_rate", 500);
     engineState.cranking.crankingRpm = pref.getUInt("crk_rpm", 200);
     engineState.cranking.crankDurationMs = pref.getUInt("crk_dur", 3000);
-    engineState.cranking.fastFlare = pref.getBool("crk_flr", true);
-    engineState.cranking.rampDurationMs = engineState.cranking.fastFlare ? 500 : 2500;
+    engineState.cranking.spinUpDurationMs = pref.getUInt("crk_spn", 400);
+    engineState.cranking.rampDurationMs = pref.getUInt("crk_rmp", 2500);
+    engineState.cranking.fastFlare = pref.getBool("crk_flr", false);
 
     String wn = pref.getString("wname", "Honda / Ford 36-1");
     strncpy(engineState.activeWheelName, wn.c_str(), sizeof(engineState.activeWheelName));

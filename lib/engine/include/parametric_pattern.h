@@ -3,6 +3,9 @@
 #include <stddef.h>
 #include "engine_types.h"
 
+// Forward declaration for global WheelDefinition
+struct WheelDefinition;
+
 namespace EcuEngine {
 
 /**
@@ -47,7 +50,7 @@ struct PulseSegment {
     uint8_t  level1{0};
 };
 
-constexpr size_t MAX_CYCLE_PULSES = 256;
+constexpr size_t MAX_CYCLE_PULSES = 512;
 
 class ParametricEngine {
 public:
@@ -78,6 +81,21 @@ public:
                                   uint32_t rpm, 
                                   PulseSegment* outSegments, 
                                   size_t maxSegments);
+
+    /**
+     * @brief Mengompilasi bit-array (WheelDefinition) menjadi urutan PulseSegment untuk siklus 720 derajat.
+     * @param wheel Definisi roda ArduStim.
+     * @param rpm Kecepatan putaran mesin.
+     * @param channelBitMask Mask kanal sinyal (0x01 CKP, 0x02 CMP1, 0x04 CMP2).
+     * @param outSegments Buffer output array segmen pulsa.
+     * @param maxSegments Kapasitas maksimum buffer output.
+     * @return Jumlah segmen pulsa yang dihasilkan.
+     */
+    static size_t generateBitArrayCycle(const WheelDefinition* wheel,
+                                        uint32_t rpm,
+                                        uint8_t channelBitMask,
+                                        PulseSegment* outSegments,
+                                        size_t maxSegments);
 };
 
 } // namespace EcuEngine

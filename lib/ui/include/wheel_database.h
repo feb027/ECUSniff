@@ -1,14 +1,20 @@
-#ifndef ECU_ENGINE_WHEEL_DATABASE_H
-#define ECU_ENGINE_WHEEL_DATABASE_H
-
+#pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include "../../engine/include/wheel_database.h"
 #include "page_dashboard.h"
 
 namespace EcuUi {
 
-constexpr size_t OEM_DATABASE_COUNT = 70;
+// Alias master engine database types and functions for UI subsystem
+using BrandCategory = ::BrandCategory;
+using WheelCycleDegrees = ::WheelCycleDegrees;
+using WheelDefinition = ::WheelDefinition;
+namespace WheelDatabase = ::WheelDatabase;
 
+constexpr size_t OEM_DATABASE_COUNT = ::WheelDatabase::TOTAL_WHEELS;
+
+// Legacy preset item array maintained for backward compatibility with PageDashboard
 const WheelPresetItem OEM_DATABASE_PRESETS[OEM_DATABASE_COUNT] = {
     { "4 cylinder dizzy", 2, 0, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
     { "6 cylinder dizzy", 3, 0, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
@@ -28,11 +34,11 @@ const WheelPresetItem OEM_DATABASE_PRESETS[OEM_DATABASE_COUNT] = {
     { "GM OptiSpark LT1 360 and 8", 180, 0, 0, 0.50f, false, 4, {86.0f, 100.0f, 176.0f, 180.0f}, {true, false, true, false} },
     { "12-3 oddball", 12, 3, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
     { "36-2-2-2 H4 Crank only", 32, 2, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
-    { "Toyota Avanza 1.3 K3-VE", 31, 2, 0, 0.50f, false, 4, {185.0f, 245.0f, 365.0f, 425.0f}, {true, false, true, false} },
-    { "Toyota Avanza 1.5 3SZ-VE", 31, 2, 0, 0.50f, false, 2, {365.0f, 425.0f, 0.0f, 0.0f}, {true, false, false, false} },
+    { "Toyota Avanza Old 1.3", 31, 2, 0, 0.50f, false, 4, {185.0f, 245.0f, 365.0f, 425.0f}, {true, false, true, false} },
+    { "Toyota Avanza New 1.5", 31, 2, 0, 0.50f, false, 2, {365.0f, 425.0f, 0.0f, 0.0f}, {true, false, false, false} },
     { "Toyota Avanza/Xenia/Rush", 31, 2, 0, 0.50f, false, 4, {65.0f, 125.0f, 245.0f, 305.0f}, {true, false, true, false} },
     { "36-2-2-2 H6 Crank only", 32, 2, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
-    { "36-2-2-2 Crank and cam", 31, 2, 0, 0.50f, false, 4, {15.0f, 20.0f, 225.0f, 230.0f}, {true, false, true, false} },
+    { "Toyota 36-2-2-2 (K3/3SZ)", 31, 2, 0, 0.50f, false, 4, {15.0f, 20.0f, 225.0f, 230.0f}, {true, false, true, false} },
     { "GM 4200 crank wheel", 13, 6, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
     { "Mazda FE3 36-1 with cam", 36, 1, 0, 0.50f, false, 4, {90.0f, 105.0f, 420.0f, 435.0f}, {true, false, true, false} },
     { "Mitsubishi 6g72 with cam", 15, 23, 0, 0.50f, false, 4, {0.0f, 70.0f, 150.0f, 190.0f}, {true, false, true, false} },
@@ -45,12 +51,12 @@ const WheelPresetItem OEM_DATABASE_PRESETS[OEM_DATABASE_COUNT] = {
     { "Chrysler NGC 36+2-2 crank, NGC 4-cyl cam", 33, 2, 0, 0.50f, false, 4, {25.0f, 61.0f, 97.0f, 133.0f}, {true, false, true, false} },
     { "Chrysler NGC 36-2+2 crank, NGC 6-cyl cam", 33, 2, 0, 0.50f, false, 4, {0.0f, 2.0f, 13.0f, 23.0f}, {true, false, true, false} },
     { "Chrysler NGC 36-2+2 crank, NGC 8-cyl cam", 33, 2, 0, 0.50f, false, 4, {77.0f, 85.0f, 167.0f, 175.0f}, {true, false, true, false} },
-    { "Nissan Livina/Juke HR15DE", 33, 2, 0, 0.50f, false, 4, {17.0f, 40.0f, 197.0f, 220.0f}, {true, false, true, false} },
+    { "Nissan Livina Juke crank and cam", 33, 2, 0, 0.50f, false, 4, {17.0f, 40.0f, 197.0f, 220.0f}, {true, false, true, false} },
     { "Weber-Marelli 8 crank+2 cam pattern", 4, 0, 0, 0.50f, false, 4, {110.0f, 130.0f, 290.0f, 310.0f}, {true, false, true, false} },
     { "Fiat 1.8 16V crank and cam", 7, 2, 0, 0.50f, false, 4, {0.0f, 40.0f, 60.0f, 230.0f}, {true, false, true, false} },
     { "Nissan 360 CAS with 6 slots", 180, 0, 0, 0.50f, false, 4, {0.0f, 1.0f, 9.0f, 121.0f}, {true, false, true, false} },
     { "Mazda CAS 24-2 with single pulse outer ring", 12, 1, 0, 0.50f, false, 2, {300.0f, 370.0f, 0.0f, 0.0f}, {true, false, false, false} },
-    { "Yamaha 2002-03 R1 8 even-tooth crank with 1 too", 8, 0, 0, 0.50f, false, 2, {371.2f, 416.2f, 0.0f, 0.0f}, {true, false, false, false} },
+    { "Yamaha 02-03 R1 8 tooth crank w/ 1 tooth cam", 8, 0, 0, 0.50f, false, 2, {371.2f, 416.2f, 0.0f, 0.0f}, {true, false, false, false} },
     { "GM 4 even-tooth crank with 1 tooth cam", 2, 0, 0, 0.50f, false, 1, {360.0f, 0.0f, 0.0f, 0.0f}, {true, false, false, false} },
     { "GM 6 even-tooth crank with 1 tooth cam", 3, 0, 0, 0.50f, false, 1, {360.0f, 0.0f, 0.0f, 0.0f}, {true, false, false, false} },
     { "GM 8 even-tooth crank with 1 tooth cam", 4, 0, 0, 0.50f, false, 1, {360.0f, 0.0f, 0.0f, 0.0f}, {true, false, false, false} },
@@ -59,9 +65,9 @@ const WheelPresetItem OEM_DATABASE_PRESETS[OEM_DATABASE_COUNT] = {
     { "Mitsubishi 4g63 aka 4/2 crank and cam", 2, 0, 0, 0.50f, false, 4, {0.0f, 55.0f, 270.0f, 340.0f}, {true, false, true, false} },
     { "Audi 135 tooth crank and cam", 135, 0, 0, 0.50f, false, 3, {0.0f, 7.3f, 719.3f, 0.0f}, {true, false, true, false} },
     { "Honda D17 Crank (12+1)", 14, 2, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
-    { "Honda Jazz/Fit GD3 L15A", 14, 2, 0, 0.50f, false, 4, {115.0f, 130.0f, 330.0f, 480.0f}, {true, false, true, false} },
-    { "Honda Jazz/Fit L15A V2", 14, 2, 0, 0.50f, false, 4, {0.0f, 180.0f, 350.0f, 365.0f}, {true, false, true, false} },
-    { "Honda Jazz/Fit L15A V3", 14, 2, 0, 0.50f, false, 4, {180.0f, 195.0f, 390.0f, 535.0f}, {true, false, true, false} },
+    { "Honda Jazz Fit 04-08", 14, 2, 0, 0.50f, false, 4, {115.0f, 130.0f, 330.0f, 480.0f}, {true, false, true, false} },
+    { "Honda Jazz Fit 04-08V2", 14, 2, 0, 0.50f, false, 4, {0.0f, 180.0f, 350.0f, 365.0f}, {true, false, true, false} },
+    { "Honda Jazz Fit 04-08V3", 14, 2, 0, 0.50f, false, 4, {180.0f, 195.0f, 390.0f, 535.0f}, {true, false, true, false} },
     { "Mazda 323 AU version", 2, 0, 0, 0.50f, false, 4, {120.0f, 144.0f, 480.0f, 504.0f}, {true, false, true, false} },
     { "Daihatsu 3+1 distributor (3 cylinders)", 11, 7, 0, 0.50f, false, 0, {0.0f, 0.0f, 0.0f, 0.0f}, {false, false, false, false} },
     { "Miata 99-05", 4, 0, 0, 0.50f, false, 4, {30.0f, 40.0f, 370.0f, 380.0f}, {true, false, true, false} },
@@ -83,5 +89,3 @@ const WheelPresetItem OEM_DATABASE_PRESETS[OEM_DATABASE_COUNT] = {
 };
 
 } // namespace EcuUi
-
-#endif // ECU_ENGINE_WHEEL_DATABASE_H

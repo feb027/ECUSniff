@@ -4,25 +4,19 @@
 #include "joystick_driver.h"
 #include "parametric_pattern.h"
 #include "waveform_canvas.h"
+#include "wheel_database.h"
 
 namespace EcuUi {
 
-enum class WheelCategory : uint8_t {
-    All = 0,
-    ToyotaDaihatsu = 1,
-    HondaSuzuki = 2,
-    MitsuNissanMazda = 3,
-    EuroAmerika = 4,
-    Universal = 5,
-    Custom = 6
-};
+// WheelCategory aliased to BrandCategory for clean UI compatibility
+using WheelCategory = BrandCategory;
 
 class PageWheelBrowser {
 public:
     explicit PageWheelBrowser(LovyanGFX* gfx);
 
     void init();
-    void open(uint16_t initialGlobalIdx = 0);
+    void open(uint16_t initialGlobalIdx = 0, BrandCategory initialCategory = BrandCategory::ALL);
     void close();
     bool isOpen() const { return _isOpen; }
 
@@ -34,12 +28,15 @@ public:
                         char* outName, size_t maxNameLen);
 
     uint16_t getSelectedGlobalIndex() const;
+    BrandCategory getSelectedCategory() const { return _category; }
+
+    static bool matchesCategory(uint16_t globalIdx, BrandCategory cat);
 
 private:
     LovyanGFX*     _gfx;
     WaveformCanvas _canvas;
     bool           _isOpen{false};
-    WheelCategory  _category{WheelCategory::All};
+    BrandCategory  _category{BrandCategory::ALL};
     uint16_t       _filteredIndices[128]{};
     uint16_t       _filteredCount{0};
     int16_t        _cursorIdx{0};
@@ -51,8 +48,6 @@ private:
     void _drawHeader();
     void _drawList(bool forceAll);
     void _drawPreview();
-    void _drawFooter();
-    bool _matchesCategory(uint16_t globalIdx, WheelCategory cat);
 };
 
 } // namespace EcuUi

@@ -5,18 +5,20 @@
 namespace EcuEngine {
 
 enum class EngineRunMode : uint8_t {
-    FixedRpm = 0,
-    AutoSweep = 1,
-    CrankToFix = 2,
-    CrankToSweep = 3
+    FixedRpm = 0,       // Mode Digital Encoder (FIX)
+    Potentiometer = 1,  // Mode Analog Potensio (POT)
+    AutoSweep = 2,      // Mode Auto Sweep (SWEEP)
+    CrankToFix = 3,     // Mode Cranking ke Digital Fix (CRK>FIX)
+    CrankToSweep = 4    // Mode Cranking ke Sweep (CRK>SWP)
 };
 
 struct CrankingConfig {
     uint32_t crankingRpm{200};
     uint32_t runRpm{850};
     uint32_t crankDurationMs{3000};
-    uint32_t rampDurationMs{500};
-    bool     fastFlare{true};
+    uint32_t rampDurationMs{2500};    // Durasi gradual ramp (500 - 5000 ms)
+    uint32_t spinUpDurationMs{400};   // Durasi 0 -> crank start (100 - 2000 ms)
+    bool     fastFlare{false};        // true: MELESAT (instant 0ms ke fix, ~150ms ke sweep), false: GRADUAL
 };
 
 struct SweepConfig {
@@ -85,6 +87,15 @@ struct EngineRuntimeState {
 
     // Live Pre-Flight Health Status
     SignalHealthStatus health{};
+
+    // Hardware I2C MCP23017 Outputs
+    bool     mcpFound{false};   // Chip MCP23017 terdeteksi pada bus I2C (0x20)
+    bool     staActive{false};  // Sinyal Crank STA (+12V) aktif ke ECU
+    bool     chgLampOn{true};   // Sinyal Indikator Pengisian Alternator (true = Lampu Aki ON / Ground aktif)
+
+    // Hardware I2C ADS1115 ADC (Potentiometer)
+    bool     adsFound{false};   // Chip ADS1115 ADC terdeteksi pada bus I2C (0x48)
+    uint32_t potRpm{0};         // Nilai RPM hasil pembacaan potensiometer (0 - 10000 RPM)
 };
 
 } // namespace EcuEngine

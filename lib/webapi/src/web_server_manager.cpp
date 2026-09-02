@@ -87,6 +87,8 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
     doc["type"] = "telemetry";
     doc["rpm"] = state.isRunning ? state.currentRpm : state.targetRpm;
     doc["targetRpm"] = state.targetRpm;
+    doc["potRpm"] = state.potRpm;
+    doc["adsFound"] = state.adsFound;
     doc["running"] = state.isRunning;
     doc["mode"] = static_cast<uint8_t>(state.runMode);
     doc["uiLevel"] = state.uiLevel;
@@ -98,6 +100,16 @@ void WebServerManager::updateLiveTelemetry(const EcuEngine::EngineRuntimeState& 
     ckp["missingPosition"] = wheel.missingPosition;
     ckp["dutyCycle"] = wheel.dutyCycle;
     ckp["inverted"] = wheel.inverted;
+
+    JsonObject crk = doc["cranking"].to<JsonObject>();
+    crk["rpm"] = state.cranking.crankingRpm;
+    crk["duration"] = state.cranking.crankDurationMs;
+    crk["spinUp"] = state.cranking.spinUpDurationMs;
+    crk["ramp"] = state.cranking.rampDurationMs;
+    crk["fastFlare"] = state.cranking.fastFlare;
+    crk["sta"] = state.staActive;
+    crk["chg"] = state.chgLampOn;
+    crk["mcpFound"] = state.mcpFound;
 
     JsonArray cmpArr = doc["cmp"].to<JsonArray>();
     const auto* events = cam.getEvents();

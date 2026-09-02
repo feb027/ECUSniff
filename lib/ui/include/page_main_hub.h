@@ -13,8 +13,10 @@ public:
 private:
     LovyanGFX* _gfx;
     uint8_t    _lastSelectedIndex{0xFF};
+    uint8_t    _scrollOffset{0};
+    uint8_t    _lastScrollOffset{0xFF};
 
-    void _drawCard(uint8_t moduleIndex, bool isSelected);
+    void _drawCard(uint8_t moduleIndex, int32_t y, bool isSelected);
 };
 
 } // namespace EcuUi

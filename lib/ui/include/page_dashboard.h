@@ -44,7 +44,10 @@ public:
     uint8_t getActivePresetIdx() const { return _activePresetIdx; }
     void setActivePresetIdx(uint8_t idx) { _activePresetIdx = idx; }
 
-    static constexpr size_t BASE_PRESET_COUNT = 64;
+    uint8_t getActiveCategory() const { return _activeCategory; }
+    void setActiveCategory(uint8_t cat) { _activeCategory = cat; }
+
+    static constexpr size_t BASE_PRESET_COUNT = 70;
     static constexpr size_t MAX_CUSTOM_PRESETS = 16;
 
 private:
@@ -57,6 +60,7 @@ private:
     bool     _lastIsEditMode{false};
     uint8_t  _lastEditRow{0xFF};
     int8_t   _activePresetIdx{0};
+    uint8_t  _activeCategory{0}; // 0: All, 1: Toyota, 2: Honda, etc.
     uint16_t _lastTotalTeeth{0xFFFF};
     uint8_t  _lastMissingTeeth{0xFF};
     int32_t  _lastBarW{-1};
@@ -67,6 +71,7 @@ private:
     void _drawEditFrames(bool isEditMode, uint8_t editRow, bool isRunning, const EcuEngine::ParametricWheel& wheel);
     void _drawRpmBar(uint32_t activeRpm, bool fullRedraw);
     void _applyPreset(uint8_t idx, EcuEngine::ParametricWheel& wheel, EcuEngine::CamEventTable& cam);
+    int32_t _getNextPresetInCategory(int32_t currentIdx, int32_t direction, uint8_t category);
 };
 
 } // namespace EcuUi
