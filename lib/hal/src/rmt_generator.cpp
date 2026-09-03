@@ -482,31 +482,42 @@ void RmtGenerator::swapBuffer() {
     size_t activeCmp2Size   = (nextIdx == 1) ? _cmp2SizeB   : _cmp2SizeA;
 
     if (_running) {
-        // 1. Stop all channels synchronously to prevent memory tearing and phase slip
-        rmt_tx_stop(CH_CKP);
-        rmt_tx_stop(CH_CMP);
-        rmt_tx_stop(CH_CMP2);
+        if (_patternChanged) {
+            // Pola preset/tipe roda baru dipilih: restart kanal hardware secara bersih
+            rmt_tx_stop(CH_CKP);
+            rmt_tx_stop(CH_CMP);
+            rmt_tx_stop(CH_CMP2);
 
-        // 2. Fill all channels with new cycle items and configure loop mode
-        if (activeCkpSize > 0) {
-            rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
-            rmt_set_tx_loop_mode(CH_CKP, true);
-        }
-        if (activeCmp1Size > 0) {
-            rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
-            rmt_set_tx_loop_mode(CH_CMP, true);
-        }
-        if (activeCmp2Size > 0) {
-            rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
-            rmt_set_tx_loop_mode(CH_CMP2, true);
+            if (activeCkpSize > 0) {
+                rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
+                rmt_set_tx_loop_mode(CH_CKP, true);
+            }
+            if (activeCmp1Size > 0) {
+                rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
+                rmt_set_tx_loop_mode(CH_CMP, true);
+            }
+            if (activeCmp2Size > 0) {
+                rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
+                rmt_set_tx_loop_mode(CH_CMP2, true);
+            }
+
+            if (activeCkpSize > 0)  rmt_tx_start(CH_CKP, true);
+            if (activeCmp1Size > 0) rmt_tx_start(CH_CMP, true);
+            if (activeCmp2Size > 0) rmt_tx_start(CH_CMP2, true);
+            _patternChanged = false;
+        } else {
+            // Pembaruan RPM/VVT halus tanpa menghentikan pulsa crank
+            if (activeCkpSize > 0) {
+                rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
+            }
+            if (activeCmp1Size > 0) {
+                rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
+            }
+            if (activeCmp2Size > 0) {
+                rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
+            }
         }
 
-        // 3. Start all channels simultaneously from sample 0 (absolute lockstep phase)
-        if (activeCkpSize > 0)  rmt_tx_start(CH_CKP, true);
-        if (activeCmp1Size > 0) rmt_tx_start(CH_CMP, true);
-        if (activeCmp2Size > 0) rmt_tx_start(CH_CMP2, true);
-
-        _patternChanged = false;
         _activeBufferIdx = nextIdx;
         _activeRpm = _pendingRpm;
         _cycleStartUs = micros();
