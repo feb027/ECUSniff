@@ -401,11 +401,13 @@ void PageGenSettings::render(bool fullRedraw, uint8_t editRow,
         }
 
         if (state.vvt.maxAdvanceDeg != _lastVvtAdv || needFull) {
-            char buf[16]; snprintf(buf, sizeof(buf), "+%u DEG    ", (unsigned)state.vvt.maxAdvanceDeg);
+            char buf[16];
+            if (state.vvt.maxAdvanceDeg > 0) snprintf(buf, sizeof(buf), "+%d DEG    ", (int)state.vvt.maxAdvanceDeg);
+            else snprintf(buf, sizeof(buf), "%d DEG    ", (int)state.vvt.maxAdvanceDeg);
             _gfx->setTextColor(0xFFE0, 0x0841); _gfx->setTextSize(2);
             _gfx->drawString(buf, 24, 177);
             _gfx->setTextColor(0x07FF, 0x0841); _gfx->setTextSize(1);
-            _gfx->drawString("Derajat kemajuan maksimal kruk as", 24, 203);
+            _gfx->drawString("Derajat pergeseran kruk as", 24, 203);
             _lastVvtAdv = state.vvt.maxAdvanceDeg;
         }
 
@@ -532,7 +534,7 @@ void PageGenSettings::onEncoderTurn(int32_t delta, uint8_t editRow,
             }
         } else if (editRow == 2) {
             int32_t val = (int32_t)state.vvt.maxAdvanceDeg + (delta * 1);
-            state.vvt.maxAdvanceDeg = (uint8_t)constrain(val, 5, 55);
+            state.vvt.maxAdvanceDeg = (int8_t)constrain(val, -45, 55);
         } else if (editRow == 3) {
             int32_t val = (int32_t)state.vvt.fullRpm + (delta * 100);
             uint32_t minAllowed = state.vvt.startRpm + 500;

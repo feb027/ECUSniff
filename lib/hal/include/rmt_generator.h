@@ -24,7 +24,7 @@ public:
     void setChannelEnables(bool ckp, bool cmp1, bool cmp2, bool inverted);
     void setRpm(uint32_t targetRpm);
     void setVvtConfig(const EcuEngine::VvtConfig& config);
-    uint8_t getCurrentVvtAdvance() const { return _currentVvtAdvance; }
+    int8_t getCurrentVvtAdvance() const { return _currentVvtAdvance; }
     
     void prepareNextCycle();
     void prepareBitArrayCycle();
@@ -61,7 +61,7 @@ private:
     bool _patternChanged{false};
     bool _isBitArrayMode{false};
     EcuEngine::VvtConfig _vvtConfig{};
-    uint8_t _currentVvtAdvance{0};
+    int8_t _currentVvtAdvance{0};
     uint32_t _cycleStartUs{0};
     uint32_t _activeCycleUs{141176}; // 720 deg @ 850 RPM (~141.176 ms)
 

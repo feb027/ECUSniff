@@ -65,7 +65,7 @@ private:
     bool     _lastVvtEnabled{false};
     uint32_t _lastVvtStart{0};
     uint32_t _lastVvtFull{0};
-    uint8_t  _lastVvtAdv{0};
+    int8_t   _lastVvtAdv{0};
 
     void _drawSubNav(bool fullRedraw);
     void _drawPanel(int32_t x, int32_t y, int32_t w, int32_t h, bool isSel);
