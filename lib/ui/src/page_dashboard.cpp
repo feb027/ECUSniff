@@ -174,10 +174,10 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
         if (_activePresetIdx < WheelDatabase::getWheelCount()) {
             const WheelDefinition* def = WheelDatabase::getWheel(_activePresetIdx);
-            if (def) _canvas.render(def, state.vvt.currentAdvanceDeg, 16, 48);
-            else _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
+            if (def) _canvas.render(def, 16, 48, state.vvt.currentAdvanceDeg);
+            else _canvas.render(wheel, cam, 16, 48, state.vvt.currentAdvanceDeg);
         } else {
-            _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
+            _canvas.render(wheel, cam, 16, 48, state.vvt.currentAdvanceDeg);
         }
 
         _drawRpmBar(activeRpm, modeMinRpm, modeMaxRpm, true);
@@ -215,10 +215,10 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     if (vvtChanged && !fullRedraw) {
         if (_activePresetIdx < WheelDatabase::getWheelCount()) {
             const WheelDefinition* def = WheelDatabase::getWheel(_activePresetIdx);
-            if (def) _canvas.render(def, state.vvt.currentAdvanceDeg, 16, 48);
-            else _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
+            if (def) _canvas.render(def, 16, 48, state.vvt.currentAdvanceDeg);
+            else _canvas.render(wheel, cam, 16, 48, state.vvt.currentAdvanceDeg);
         } else {
-            _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
+            _canvas.render(wheel, cam, 16, 48, state.vvt.currentAdvanceDeg);
         }
         _lastVvtAdv = state.vvt.currentAdvanceDeg;
     }
@@ -434,10 +434,10 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         if (!fullRedraw) {
             if (_activePresetIdx < WheelDatabase::getWheelCount()) {
                 const WheelDefinition* def = WheelDatabase::getWheel(_activePresetIdx);
-                if (def) _canvas.render(def, 16, 48);
-                else _canvas.render(wheel, cam, 16, 48);
+                if (def) _canvas.render(def, 16, 48, state.vvt.currentAdvanceDeg);
+                else _canvas.render(wheel, cam, 16, 48, state.vvt.currentAdvanceDeg);
             } else {
-                _canvas.render(wheel, cam, 16, 48);
+                _canvas.render(wheel, cam, 16, 48, state.vvt.currentAdvanceDeg);
             }
         }
     }

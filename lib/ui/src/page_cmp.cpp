@@ -40,8 +40,8 @@ void PageCmp::render(uint8_t activePresetIdx,
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
 
         // Header Waveform Canvas (Live Dual-Track CKP + CMP with sliding animation)
-        if (def) _canvas.render(def, curAdv, 16, 48);
-        else _canvas.render(wheel, cam, curAdv, 16, 48);
+        if (def) _canvas.render(def, 16, 48, curAdv);
+        else _canvas.render(wheel, cam, 16, 48, curAdv);
 
         // Panel 1: Manual Rotary VVT Shifter (W = 448, Y = 128, H = 54)
         _gfx->fillRoundRect(16, 128, 448, 54, 6, 0x0841);
@@ -72,8 +72,8 @@ void PageCmp::render(uint8_t activePresetIdx,
 
     // Dynamic Waveform Update when VVT advance shifts
     if (curAdv != _lastVvtAdv && !fullRedraw) {
-        if (def) _canvas.render(def, curAdv, 16, 48);
-        else _canvas.render(wheel, cam, curAdv, 16, 48);
+        if (def) _canvas.render(def, 16, 48, curAdv);
+        else _canvas.render(wheel, cam, 16, 48, curAdv);
     }
 
     // Panel 1 Value: Live VVT Advance Angle

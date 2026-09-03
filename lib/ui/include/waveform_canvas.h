@@ -17,13 +17,13 @@ public:
     bool init(int32_t width = 440, int32_t height = 80);
 
     // Multi-channel rendering directly from PROGMEM bit-array WheelDefinition
-    void render(const WheelDefinition* wheel, int8_t vvtAdvanceDeg = 0, int32_t screenX = 12, int32_t screenY = 184);
+    void render(const WheelDefinition* wheel, int32_t screenX, int32_t screenY, int8_t vvtAdvanceDeg = 0);
 
-    // Backward-compatible render method for ParametricWheel + CamEventTable
+    // Multi-channel rendering for ParametricWheel + CamEventTable
     void render(const EcuEngine::ParametricWheel& wheel, 
                 const EcuEngine::CamEventTable& cam,
-                int8_t vvtAdvanceDeg = 0,
-                int32_t screenX = 20, int32_t screenY = 125);
+                int32_t screenX, int32_t screenY,
+                int8_t vvtAdvanceDeg = 0);
 
     void clear();
 

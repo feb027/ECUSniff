@@ -162,7 +162,7 @@ void WaveformCanvas::_drawBitArrayTrace(const uint8_t* bitArray, uint16_t totalE
     }
 }
 
-void WaveformCanvas::render(const WheelDefinition* wheel, int8_t vvtAdvanceDeg, int32_t screenX, int32_t screenY) {
+void WaveformCanvas::render(const WheelDefinition* wheel, int32_t screenX, int32_t screenY, int8_t vvtAdvanceDeg) {
     if (!_initialized) return;
 
     if (!wheel || !wheel->bitArray) {
@@ -198,7 +198,7 @@ void WaveformCanvas::render(const WheelDefinition* wheel, int8_t vvtAdvanceDeg, 
     if (wheel->hasCmp2) {
         int16_t cmp2Shift = -(int16_t)(((int32_t)vvtAdvanceDeg * 5) / 8);
         _drawBitArrayTrace(wheel->bitArray, wheel->totalEdges, deg, 0x04, TFT_CYAN,
-                           tracks[2].yHigh, tracks[2].yLow, xOffset, availableW, cmp2Shift);
+                       tracks[2].yHigh, tracks[2].yLow, xOffset, availableW, cmp2Shift);
     }
 
     _sprite.pushSprite(screenX, screenY);
@@ -206,8 +206,8 @@ void WaveformCanvas::render(const WheelDefinition* wheel, int8_t vvtAdvanceDeg, 
 
 void WaveformCanvas::render(const EcuEngine::ParametricWheel& wheel, 
                             const EcuEngine::CamEventTable& cam,
-                            int8_t vvtAdvanceDeg,
-                            int32_t screenX, int32_t screenY) {
+                            int32_t screenX, int32_t screenY,
+                            int8_t vvtAdvanceDeg) {
     if (!_initialized) return;
 
     uint8_t numTracks = 2;
