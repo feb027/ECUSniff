@@ -98,8 +98,8 @@ void PageWheelBrowser::render(bool fullRedraw) {
 }
 
 void PageWheelBrowser::_drawHeader() {
-    _gfx->fillRect(0, 0, 480, 42, 0x1082);
-    _gfx->drawFastHLine(0, 42, 480, 0x39E7);
+    _gfx->fillRect(0, 0, 480, 42, 0x0841);
+    _gfx->drawFastHLine(0, 42, 480, 0x52AA);
 
     uint8_t catIdx = static_cast<uint8_t>(_category);
     int32_t xPos = 6;
@@ -108,14 +108,17 @@ void PageWheelBrowser::_drawHeader() {
         int32_t w = CAT_WIDTHS[c];
         bool active = (c == catIdx);
 
-        _gfx->fillRoundRect(xPos, 5, w, 32, 5, active ? 0x07E0 : 0x18C3);
+        uint16_t bg = active ? 0x07E0 : 0x18C3;
+        uint16_t border = active ? 0xFFE0 : 0x31A6;
+        uint16_t fg = active ? TFT_BLACK : TFT_WHITE;
+
+        _gfx->fillRoundRect(xPos, 5, w, 32, 5, bg);
+        _gfx->drawRoundRect(xPos, 5, w, 32, 5, border);
         if (active) {
-            _gfx->drawRoundRect(xPos, 5, w, 32, 5, 0xFFE0);
-        } else {
-            _gfx->drawRoundRect(xPos, 5, w, 32, 5, 0x31A6);
+            _gfx->drawRoundRect(xPos + 1, 6, w - 2, 30, 4, 0xFFE0);
         }
 
-        _gfx->setTextColor(active ? TFT_BLACK : TFT_WHITE, active ? 0x07E0 : 0x18C3);
+        _gfx->setTextColor(fg, bg);
         _gfx->setTextSize(1);
         _gfx->drawCenterString(CAT_NAMES[c], xPos + (w / 2), 16);
         xPos += (w + 4);
@@ -160,8 +163,9 @@ void PageWheelBrowser::_drawList(bool forceAll) {
 
             if (!titleName) titleName = "Unknown Pattern";
 
-            uint32_t bg = isSel ? 0x2104 : 0x1082;
-            uint32_t border = isSel ? 0xFFE0 : 0x39E7;
+            // Latar belakang bersih seragam 0x0841 tanpa blocking biru
+            uint16_t bg = 0x0841;
+            uint16_t border = isSel ? 0xFFE0 : 0x31A6;
 
             // Full width pattern card (456 x 64 px)
             _gfx->fillRoundRect(12, y, 456, 64, 6, bg);
@@ -178,7 +182,7 @@ void PageWheelBrowser::_drawList(bool forceAll) {
             _gfx->drawString(fullTitle, 22, y + 10);
 
             // Pattern metadata & channel badges (Font Size 1)
-            _gfx->setTextColor(isSel ? 0x07E0 : 0xAD55, bg);
+            _gfx->setTextColor(isSel ? 0x07E0 : 0x8410, bg);
             _gfx->setTextSize(1);
             _gfx->drawString(specBuf, 22, y + 38);
         } else {
@@ -189,9 +193,9 @@ void PageWheelBrowser::_drawList(bool forceAll) {
 
 void PageWheelBrowser::_drawPreview() {
     if (_filteredCount == 0 || _cursorIdx >= _filteredCount) {
-        _gfx->fillRect(12, 184, 456, 124, TFT_BLACK);
-        _gfx->drawRoundRect(12, 184, 456, 124, 6, 0x39E7);
-        _gfx->setTextColor(0xF800, TFT_BLACK);
+        _gfx->fillRect(12, 184, 456, 124, 0x0841);
+        _gfx->drawRoundRect(12, 184, 456, 124, 6, 0x52AA);
+        _gfx->setTextColor(0xF800, 0x0841);
         _gfx->setTextSize(2);
         _gfx->drawCenterString("Tidak Ada Pola Dalam Kategori Ini", 240, 236);
         return;
