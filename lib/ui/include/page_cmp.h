@@ -26,8 +26,9 @@ private:
     uint8_t        _lastDrawnItem{0xFF};
     uint8_t        _lastPresetIdx{0xFF};
     int8_t         _lastVvtAdv{0x7F};
-    uint32_t       _lastRpm{0xFFFFFFFF};
-    bool           _lastVvtEnabled{false};
+    uint32_t           _lastRpm{0xFFFFFFFF};
+    bool               _lastVvtEnabled{false};
+    EcuEngine::VvtMode _lastVvtMode{EcuEngine::VvtMode::AutoRpm};
 
     void _drawPanel(int32_t x, int32_t y, int32_t w, int32_t h, bool isSelected);
 };

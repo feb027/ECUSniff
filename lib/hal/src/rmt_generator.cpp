@@ -134,6 +134,8 @@ void RmtGenerator::setRpm(uint32_t targetRpm) {
 
 void RmtGenerator::setVvtConfig(const EcuEngine::VvtConfig& config) {
     if (_vvtConfig.enabled != config.enabled ||
+        _vvtConfig.mode != config.mode ||
+        _vvtConfig.manualAdvanceDeg != config.manualAdvanceDeg ||
         _vvtConfig.startRpm != config.startRpm ||
         _vvtConfig.fullRpm != config.fullRpm ||
         _vvtConfig.maxAdvanceDeg != config.maxAdvanceDeg) {
@@ -265,18 +267,24 @@ size_t RmtGenerator::compileBitArrayToRmt(
 void RmtGenerator::prepareBitArrayCycle() {
     if (_activeWheel == nullptr || _pendingRpm == 0) return;
 
-    // Calculate dynamic VVT advance based on pending RPM
-    if (_vvtConfig.enabled && _pendingRpm > _vvtConfig.startRpm) {
-        if (_pendingRpm >= _vvtConfig.fullRpm) {
-            _currentVvtAdvance = _vvtConfig.maxAdvanceDeg;
-        } else {
-            uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
-            uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
-            int32_t calcAdv = ((int32_t)diff * (int32_t)_vvtConfig.maxAdvanceDeg) / (int32_t)span;
-            _currentVvtAdvance = (int8_t)calcAdv;
-        }
-    } else {
+    // Calculate dynamic VVT advance based on manual mode or pending RPM
+    if (!_vvtConfig.enabled) {
         _currentVvtAdvance = 0;
+    } else if (_vvtConfig.mode == EcuEngine::VvtMode::Manual) {
+        _currentVvtAdvance = _vvtConfig.manualAdvanceDeg;
+    } else {
+        if (_pendingRpm > _vvtConfig.startRpm) {
+            if (_pendingRpm >= _vvtConfig.fullRpm) {
+                _currentVvtAdvance = _vvtConfig.maxAdvanceDeg;
+            } else {
+                uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
+                uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
+                int32_t calcAdv = ((int32_t)diff * (int32_t)_vvtConfig.maxAdvanceDeg) / (int32_t)span;
+                _currentVvtAdvance = (int8_t)calcAdv;
+            }
+        } else {
+            _currentVvtAdvance = 0;
+        }
     }
 
     rmt_item32_t* targetCkp  = (_activeBufferIdx == 0) ? _ckpBufferB  : _ckpBufferA;
@@ -349,11 +357,10 @@ void RmtGenerator::prepareNextCycle() {
     }
 
     // Parametric fallback mode
-    // 1. Generate CKP (720 deg)
-    size_t ckpCount = EcuEngine::ParametricEngine::generateCkpCycle(
-        _wheel, _pendingRpm, s_segments, EcuEngine::MAX_CYCLE_PULSES);
-
-    if (ckpCount > 0) {
+    // 1. Generate CKP
+    {
+        size_t ckpCount = EcuEngine::ParametricEngine::generateCkpCycle(
+            _wheel, _pendingRpm, s_segments, EcuEngine::MAX_CYCLE_PULSES);
         size_t phaseCount = 0;
         for (size_t i = 0; i < ckpCount && phaseCount < (EcuEngine::MAX_CYCLE_PULSES * 2 - 4); ++i) {
             uint32_t rem0 = s_segments[i].duration0Us;
@@ -394,28 +401,34 @@ void RmtGenerator::prepareNextCycle() {
 
     // 2. Generate CMP (720 deg) with VVT phase shift
     EcuEngine::CamEventTable shiftedCam = _cam;
-    if (_vvtConfig.enabled && _pendingRpm > _vvtConfig.startRpm) {
-        if (_pendingRpm >= _vvtConfig.fullRpm) {
-            _currentVvtAdvance = _vvtConfig.maxAdvanceDeg;
-        } else {
-            uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
-            uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
-            int32_t calcAdv = ((int32_t)diff * (int32_t)_vvtConfig.maxAdvanceDeg) / (int32_t)span;
-            _currentVvtAdvance = (int8_t)calcAdv;
-        }
-        if (_currentVvtAdvance != 0) {
-            shiftedCam.clear();
-            uint8_t count = _cam.getEventCount();
-            const auto* evs = _cam.getEvents();
-            for (uint8_t i = 0; i < count; ++i) {
-                float newAngle = evs[i].angleDeg - (float)_currentVvtAdvance;
-                while (newAngle < 0.0f) newAngle += 720.0f;
-                while (newAngle >= 720.0f) newAngle -= 720.0f;
-                shiftedCam.addEvent(newAngle, evs[i].levelHigh);
-            }
-        }
-    } else {
+    if (!_vvtConfig.enabled) {
         _currentVvtAdvance = 0;
+    } else if (_vvtConfig.mode == EcuEngine::VvtMode::Manual) {
+        _currentVvtAdvance = _vvtConfig.manualAdvanceDeg;
+    } else {
+        if (_pendingRpm > _vvtConfig.startRpm) {
+            if (_pendingRpm >= _vvtConfig.fullRpm) {
+                _currentVvtAdvance = _vvtConfig.maxAdvanceDeg;
+            } else {
+                uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
+                uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
+                int32_t calcAdv = ((int32_t)diff * (int32_t)_vvtConfig.maxAdvanceDeg) / (int32_t)span;
+                _currentVvtAdvance = (int8_t)calcAdv;
+            }
+        } else {
+            _currentVvtAdvance = 0;
+        }
+    }
+    if (_currentVvtAdvance != 0) {
+        shiftedCam.clear();
+        uint8_t count = _cam.getEventCount();
+        const EcuEngine::CmpEvent* ev = _cam.getEvents();
+        for (uint8_t i = 0; i < count; ++i) {
+            float shiftedAngle = ev[i].angleDeg - (float)_currentVvtAdvance;
+            while (shiftedAngle < 0.0f) shiftedAngle += 720.0f;
+            while (shiftedAngle >= 720.0f) shiftedAngle -= 720.0f;
+            shiftedCam.addEvent(shiftedAngle, ev[i].levelHigh);
+        }
     }
 
     size_t cmpCount = EcuEngine::ParametricEngine::generateCmpCycle(

@@ -104,14 +104,17 @@ void PageCmp::render(uint8_t activePresetIdx,
         _lastVvtAdv = curAdv;
     }
 
-    // Panel 2 Value: VVT Enabled / Disabled
-    if (state.vvt.enabled != _lastVvtEnabled || fullRedraw) {
+    // Panel 2 Value: VVT Mode
+    if (state.vvt.mode != _lastVvtMode || state.vvt.enabled != _lastVvtEnabled || fullRedraw) {
         _gfx->fillRect(24, 207, 204, 28, 0x0841);
-        const char* eStr = state.vvt.enabled ? "[ AKTIF (AUTO) ]" : "[ NONAKTIF ]";
-        uint16_t col = state.vvt.enabled ? 0x07E0 : 0xF800;
+        const char* eStr = !state.vvt.enabled ? "[ NONAKTIF ]" : 
+                           (state.vvt.mode == EcuEngine::VvtMode::Manual ? "[ MANUAL ROTARI ]" : "[ AUTO RPM ]");
+        uint16_t col = !state.vvt.enabled ? 0xF800 : 
+                       (state.vvt.mode == EcuEngine::VvtMode::Manual ? 0xFFE0 : 0x07E0);
         _gfx->setTextColor(col, 0x0841); _gfx->setTextSize(2);
         _gfx->drawString(eStr, 24, 209);
         _lastVvtEnabled = state.vvt.enabled;
+        _lastVvtMode = state.vvt.mode;
     }
 
     // Panel 3 Value: Live RPM
@@ -138,11 +141,16 @@ void PageCmp::render(uint8_t activePresetIdx,
 void PageCmp::onEncoderTurn(int32_t delta, uint8_t selectedItem, EcuEngine::EngineRuntimeState& state) {
     if (selectedItem == 0 || selectedItem == 255) {
         // Manual VVT Phase Shifter: langsung ubah derajat pergeseran real-time
-        int32_t val = (int32_t)state.vvt.currentAdvanceDeg + (delta * 1);
-        state.vvt.currentAdvanceDeg = (int8_t)constrain(val, -45, 55);
-        state.vvt.maxAdvanceDeg = state.vvt.currentAdvanceDeg;
+        state.vvt.mode = EcuEngine::VvtMode::Manual;
+        state.vvt.enabled = true;
+        int32_t val = (int32_t)state.vvt.manualAdvanceDeg + (delta * 1);
+        state.vvt.manualAdvanceDeg = (int8_t)constrain(val, -45, 55);
+        state.vvt.currentAdvanceDeg = state.vvt.manualAdvanceDeg;
+        state.vvt.maxAdvanceDeg = state.vvt.manualAdvanceDeg;
     } else if (selectedItem == 1) {
-        if (delta != 0) state.vvt.enabled = !state.vvt.enabled;
+        if (delta != 0) {
+            state.vvt.mode = (state.vvt.mode == EcuEngine::VvtMode::Manual) ? EcuEngine::VvtMode::AutoRpm : EcuEngine::VvtMode::Manual;
+        }
     } else if (selectedItem == 2) {
         int32_t val = (int32_t)state.vvt.startRpm + (delta * 50);
         state.vvt.startRpm = (uint32_t)constrain(val, 1000, 4500);
@@ -150,8 +158,8 @@ void PageCmp::onEncoderTurn(int32_t delta, uint8_t selectedItem, EcuEngine::Engi
 }
 
 void PageCmp::onEncoderClick(uint8_t selectedItem, EcuEngine::EngineRuntimeState& state) {
-    if (selectedItem == 1) {
-        state.vvt.enabled = !state.vvt.enabled;
+    if (selectedItem == 1 || selectedItem == 0) {
+        state.vvt.mode = (state.vvt.mode == EcuEngine::VvtMode::Manual) ? EcuEngine::VvtMode::AutoRpm : EcuEngine::VvtMode::Manual;
     }
 }
 

@@ -181,6 +181,10 @@ void MenuManager::onEncoderTurn(int32_t delta,
     if (_pageBrowser.isOpen()) { _pageBrowser.onEncoderTurn(delta); return; }
     if (_uiLevel == UiLevel::MainHub) { _pageHub.onEncoderTurn(delta, _hubIndex); return; }
     uint8_t maxTabs = (_uiLevel == UiLevel::Generator) ? 4 : ((_uiLevel == UiLevel::PowerCycle) ? 1 : 3);
+    if (_uiLevel == UiLevel::Generator && _genTab == 3) {
+        _pageCmp.onEncoderTurn(delta, _focusTabBar ? 0 : _editRow, state);
+        return;
+    }
     if (_focusTabBar) { _genTab = constrain((int32_t)_genTab + delta, 0, (int32_t)maxTabs); _needsFullRedraw = true; return; }
 
     if (_uiLevel == UiLevel::EpsTester && _epsController) _pageEps.onEncoderTurn(delta, _editRow, *_epsController);

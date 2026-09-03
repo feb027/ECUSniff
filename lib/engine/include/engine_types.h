@@ -70,12 +70,19 @@ struct SignalHealthStatus {
     char     diagnosticMsg[48]{"Menunggu Sinyal..."};
 };
 
+enum class VvtMode : uint8_t {
+    AutoRpm = 0,
+    Manual = 1
+};
+
 struct VvtConfig {
-    bool    enabled{true};
+    bool     enabled{true};
+    VvtMode  mode{VvtMode::Manual};   ///< Default to Manual for interactive shifter
     uint32_t startRpm{2800};
     uint32_t fullRpm{5500};
-    int8_t   maxAdvanceDeg{10};    ///< Maximum cam advance in crank degrees (-45 to +50 deg)
-    int8_t   currentAdvanceDeg{0}; ///< Current real-time advance in crank degrees
+    int8_t   maxAdvanceDeg{10};       ///< Maximum cam advance in crank degrees (-45 to +55 deg)
+    int8_t   manualAdvanceDeg{0};     ///< Real-time manual angle set by rotary encoder (-45 to +55 deg)
+    int8_t   currentAdvanceDeg{0};    ///< Current real-time advance in crank degrees
 };
 
 struct EngineRuntimeState {
