@@ -89,7 +89,7 @@ void WaveformCanvas::_drawGrid(uint8_t numTracks, bool hasCmp2, const TrackGeome
 
 void WaveformCanvas::_drawBitArrayTrace(const uint8_t* bitArray, uint16_t totalEdges, uint16_t cycleDegrees,
                                         uint8_t bitMask, uint16_t color, int32_t yHigh, int32_t yLow,
-                                        int32_t xOffset, int32_t availableW) {
+                                        int32_t xOffset, int32_t availableW, int16_t phaseAdvanceDeg) {
     if (!bitArray || totalEdges == 0 || availableW <= 0) {
         _sprite.drawFastHLine(xOffset, yLow, availableW, color);
         return;
@@ -102,8 +102,21 @@ void WaveformCanvas::_drawBitArrayTrace(const uint8_t* bitArray, uint16_t totalE
         return;
     }
 
+    int32_t advSegs = 0;
+    if (phaseAdvanceDeg != 0 && totalEdges > 0 && cycleDegrees > 0) {
+        advSegs = ((int32_t)phaseAdvanceDeg * (int32_t)totalEdges) / (int32_t)cycleDegrees;
+    }
+
+    auto getLevel = [&](size_t s) -> uint8_t {
+        int32_t baseIdx = (cycleDegrees == 360) ? (int32_t)(s % totalEdges) : (int32_t)s;
+        int32_t srcIdx = baseIdx + advSegs;
+        while (srcIdx < 0) srcIdx += totalEdges;
+        srcIdx = srcIdx % totalEdges;
+        return (bitArray[srcIdx] & bitMask) ? 1 : 0;
+    };
+
     // Initial state before column 0
-    uint8_t prevEndLevel = (bitArray[0] & bitMask) ? 1 : 0;
+    uint8_t prevEndLevel = getLevel(0);
 
     for (int32_t x = 0; x < availableW; ++x) {
         size_t segStart = (static_cast<size_t>(x) * numTotalSegments) / availableW;
@@ -117,8 +130,7 @@ void WaveformCanvas::_drawBitArrayTrace(const uint8_t* bitArray, uint16_t totalE
         uint8_t lastLevel = 0;
 
         for (size_t s = segStart; s < segEnd; ++s) {
-            size_t arrIdx = (cycleDegrees == 360) ? (s % totalEdges) : s;
-            uint8_t lvl = (bitArray[arrIdx] & bitMask) ? 1 : 0;
+            uint8_t lvl = getLevel(s);
             if (lvl) hasHigh = true; else hasLow = true;
             if (s == segStart) firstLevel = lvl;
             lastLevel = lvl;
@@ -150,7 +162,7 @@ void WaveformCanvas::_drawBitArrayTrace(const uint8_t* bitArray, uint16_t totalE
     }
 }
 
-void WaveformCanvas::render(const WheelDefinition* wheel, int32_t screenX, int32_t screenY) {
+void WaveformCanvas::render(const WheelDefinition* wheel, int8_t vvtAdvanceDeg, int32_t screenX, int32_t screenY) {
     if (!_initialized) return;
 
     if (!wheel || !wheel->bitArray) {
@@ -174,18 +186,19 @@ void WaveformCanvas::render(const WheelDefinition* wheel, int32_t screenX, int32
     int32_t availableW = _width - xOffset - xPad;
     uint16_t deg = static_cast<uint16_t>(wheel->cycleDegrees);
 
-    // Track 0: CKP (Yellow - Bit 0 / Mask 0x01)
+    // Track 0: CKP (Yellow - Bit 0 / Mask 0x01) - Always 0 phase shift
     _drawBitArrayTrace(wheel->bitArray, wheel->totalEdges, deg, 0x01, TFT_YELLOW,
-                       tracks[0].yHigh, tracks[0].yLow, xOffset, availableW);
+                       tracks[0].yHigh, tracks[0].yLow, xOffset, availableW, 0);
 
-    // Track 1: CMP1 (Green - Bit 1 / Mask 0x02)
+    // Track 1: CMP1 (Green - Bit 1 / Mask 0x02) - Dynamic VVT Advance
     _drawBitArrayTrace(wheel->bitArray, wheel->totalEdges, deg, 0x02, TFT_GREEN,
-                       tracks[1].yHigh, tracks[1].yLow, xOffset, availableW);
+                       tracks[1].yHigh, tracks[1].yLow, xOffset, availableW, vvtAdvanceDeg);
 
-    // Track 2: CMP2 (Cyan - Bit 2 / Mask 0x04)
+    // Track 2: CMP2 (Cyan - Bit 2 / Mask 0x04) - Retarded
     if (wheel->hasCmp2) {
+        int16_t cmp2Shift = -(int16_t)(((int32_t)vvtAdvanceDeg * 5) / 8);
         _drawBitArrayTrace(wheel->bitArray, wheel->totalEdges, deg, 0x04, TFT_CYAN,
-                           tracks[2].yHigh, tracks[2].yLow, xOffset, availableW);
+                           tracks[2].yHigh, tracks[2].yLow, xOffset, availableW, cmp2Shift);
     }
 
     _sprite.pushSprite(screenX, screenY);
@@ -193,6 +206,7 @@ void WaveformCanvas::render(const WheelDefinition* wheel, int32_t screenX, int32
 
 void WaveformCanvas::render(const EcuEngine::ParametricWheel& wheel, 
                             const EcuEngine::CamEventTable& cam,
+                            int8_t vvtAdvanceDeg,
                             int32_t screenX, int32_t screenY) {
     if (!_initialized) return;
 
@@ -207,7 +221,7 @@ void WaveformCanvas::render(const EcuEngine::ParametricWheel& wheel,
     int32_t availableW = _width - xOffset - xPad;
 
     _drawCkpTraceParametric(wheel, tracks[0].yHigh, tracks[0].yLow, xOffset, availableW);
-    _drawCmpTraceParametric(cam, tracks[1].yHigh, tracks[1].yLow, xOffset, availableW);
+    _drawCmpTraceParametric(cam, tracks[1].yHigh, tracks[1].yLow, xOffset, availableW, vvtAdvanceDeg);
 
     _sprite.pushSprite(screenX, screenY);
 }
@@ -265,7 +279,7 @@ void WaveformCanvas::_drawCkpTraceParametric(const EcuEngine::ParametricWheel& w
 
 void WaveformCanvas::_drawCmpTraceParametric(const EcuEngine::CamEventTable& cam,
                                              int32_t yHigh, int32_t yLow,
-                                             int32_t xOffset, int32_t availableW) {
+                                             int32_t xOffset, int32_t availableW, int16_t phaseAdvanceDeg) {
     if (availableW <= 0) return;
 
     uint8_t count = cam.getEventCount();
@@ -280,7 +294,11 @@ void WaveformCanvas::_drawCmpTraceParametric(const EcuEngine::CamEventTable& cam
     int32_t lastY = ev[0].levelHigh ? yLow : yHigh;
 
     for (uint8_t i = 0; i < count; ++i) {
-        int32_t eventX = xOffset + static_cast<int32_t>((ev[i].angleDeg / 720.0f) * availableW);
+        float shiftedAngle = ev[i].angleDeg - (float)phaseAdvanceDeg;
+        while (shiftedAngle < 0.0f) shiftedAngle += 720.0f;
+        while (shiftedAngle >= 720.0f) shiftedAngle -= 720.0f;
+
+        int32_t eventX = xOffset + static_cast<int32_t>((shiftedAngle / 720.0f) * availableW);
         int32_t nextY = ev[i].levelHigh ? yHigh : yLow;
 
         if (eventX > lastX) {

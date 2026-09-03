@@ -11,7 +11,7 @@ void MenuManager::init(EcuHal::CaptureDriver* capDriver, EcuEngine::SignalSniffe
                        EcuEngine::EpsController* eps, EcuEngine::SpeedoController* speedo,
                        EcuEngine::PowerCycleController* pwrCycle) {
     _epsController = eps; _speedoController = speedo; _powerCycleController = pwrCycle;
-    _pageDash.init(); _pageGenSettings.init(); _pageCapture.init(capDriver, sniffer);
+    _pageDash.init(); _pageCmp.init(); _pageGenSettings.init(); _pageCapture.init(capDriver, sniffer);
     _pageEps.init(); _pageSpeedo.init(); _pageBrowser.init(); _pagePwrCycle.init();
     _uiLevel = UiLevel::MainHub; _hubIndex = 0; _genTab = 1;
     _focusTabBar = true; _needsFullRedraw = true;
@@ -158,7 +158,7 @@ void MenuManager::render(const EcuEngine::EngineRuntimeState& state,
     else if (_uiLevel == UiLevel::Generator) {
         if (_genTab == 1) _pageDash.render(isRedraw, false, activeEditRow, state, wheel, cam);
         else if (_genTab == 2) _pageCkp.render(_pageDash.getActivePresetIdx(), wheel, false, activeEditRow, isRedraw);
-        else if (_genTab == 3) _pageCmp.render(_pageDash.getActivePresetIdx(), cam, false, activeEditRow, isRedraw);
+        else if (_genTab == 3) _pageCmp.render(_pageDash.getActivePresetIdx(), state, wheel, cam, false, activeEditRow, isRedraw);
         else if (_genTab == 4) {
             uint8_t settingsEditRow = (_focusTabBar || _pageGenSettings.isFocusSubNav()) ? 255 : _editRow;
             _pageGenSettings.render(isRedraw, settingsEditRow, state, wheel);
@@ -197,14 +197,7 @@ void MenuManager::onEncoderTurn(int32_t delta,
             else if (_editRow == 3) wheel.dutyCycle = constrain(wheel.dutyCycle + (delta * 0.05f), 0.10f, 0.90f);
             else if (_editRow == 4 && delta != 0) wheel.inverted = !wheel.inverted;
         } else if (_genTab == 3) {
-            uint8_t count = cam.getEventCount();
-            if (_editRow < count && count > 0) {
-                EcuEngine::CmpEvent tempEvents[16]; const auto* evs = cam.getEvents();
-                for (uint8_t i = 0; i < count; ++i) tempEvents[i] = evs[i];
-                tempEvents[_editRow].angleDeg = constrain(tempEvents[_editRow].angleDeg + (delta * 5.0f), 0.0f, 720.0f);
-                cam.clear();
-                for (uint8_t i = 0; i < count; ++i) cam.addEvent(tempEvents[i].angleDeg, tempEvents[i].levelHigh);
-            }
+            _pageCmp.onEncoderTurn(delta, _editRow, state);
         } else if (_genTab == 4) {
             if (_pageGenSettings.isFocusSubNav()) {
                 if (delta > 0) _pageGenSettings.nextSubCategory();
@@ -550,6 +543,10 @@ void MenuManager::onEncoderClick(EcuEngine::EngineRuntimeState& state,
                 return;
             }
             state.isRunning = !state.isRunning; _needsFullRedraw = true;
+        } else if (_genTab == 3) {
+            _pageCmp.onEncoderClick(_editRow, state);
+            _needsFullRedraw = true;
+            return;
         } else if (_genTab == 4) {
             if (_pageGenSettings.isFocusSubNav()) {
                 _pageGenSettings.setFocusSubNav(false);

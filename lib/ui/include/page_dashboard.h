@@ -68,6 +68,7 @@ private:
     bool     _lastCmp1En{false};
     bool     _lastCmp2En{false};
     bool     _lastInverted{false};
+    int8_t   _lastVvtAdv{0x7F};
 
     static WheelPresetItem s_customSlots[MAX_CUSTOM_PRESETS];
     static uint8_t         s_customCount;

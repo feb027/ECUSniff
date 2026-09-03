@@ -174,10 +174,10 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _gfx->drawRoundRect(8, 44, 464, 268, 8, 0x52AA);
         if (_activePresetIdx < WheelDatabase::getWheelCount()) {
             const WheelDefinition* def = WheelDatabase::getWheel(_activePresetIdx);
-            if (def) _canvas.render(def, 16, 48);
-            else _canvas.render(wheel, cam, 16, 48);
+            if (def) _canvas.render(def, state.vvt.currentAdvanceDeg, 16, 48);
+            else _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
         } else {
-            _canvas.render(wheel, cam, 16, 48);
+            _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
         }
 
         _drawRpmBar(activeRpm, modeMinRpm, modeMaxRpm, true);
@@ -203,12 +203,25 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
         _lastEditRow = 0xFF; _lastTotalTeeth = 0xFFFF;
         _lastCkpEn = !state.ckpEnabled; _lastCmp1En = !state.cmp1Enabled;
         _lastCmp2En = !state.cmp2Enabled; _lastInverted = !wheel.inverted;
+        _lastVvtAdv = state.vvt.currentAdvanceDeg;
     }
 
     bool isRunningChanged = (state.isRunning != _lastIsRunning);
     bool rpmChanged = (activeRpm != _lastRpm);
     bool modeChanged = (curMode != _lastMode);
     bool editChanged = (editRow != _lastEditRow);
+    bool vvtChanged = (state.vvt.currentAdvanceDeg != _lastVvtAdv);
+
+    if (vvtChanged && !fullRedraw) {
+        if (_activePresetIdx < WheelDatabase::getWheelCount()) {
+            const WheelDefinition* def = WheelDatabase::getWheel(_activePresetIdx);
+            if (def) _canvas.render(def, state.vvt.currentAdvanceDeg, 16, 48);
+            else _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
+        } else {
+            _canvas.render(wheel, cam, state.vvt.currentAdvanceDeg, 16, 48);
+        }
+        _lastVvtAdv = state.vvt.currentAdvanceDeg;
+    }
 
     if (rpmChanged || isRunningChanged || modeChanged || fullRedraw) {
         _drawRpmBar(activeRpm, modeMinRpm, modeMaxRpm, fullRedraw || modeChanged);
@@ -325,7 +338,7 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     bool chgChanged = (state.chgLampOn != s_lastChg);
     bool nameChanged = (strcmp(state.activeWheelName, s_lastWheelName) != 0);
     bool camChanged = (cam.getEventCount() != s_lastCamCount);
-    bool vvtChanged = (state.vvt.currentAdvanceDeg != s_lastVvtAdv || state.vvt.enabled != s_lastVvtEn);
+    bool vvtBadgeChanged = (state.vvt.currentAdvanceDeg != s_lastVvtAdv || state.vvt.enabled != s_lastVvtEn);
 
     s_lastSta = state.staActive;
     s_lastChg = state.chgLampOn;
@@ -335,7 +348,7 @@ void PageDashboard::render(bool fullRedraw, bool isEditMode, uint8_t editRow,
     s_lastCamCount = cam.getEventCount();
 
     if (wheel.totalTeeth != _lastTotalTeeth || wheel.missingTeeth != _lastMissingTeeth || 
-        nameChanged || camChanged || staChanged || chgChanged || vvtChanged || fullRedraw) {
+        nameChanged || camChanged || staChanged || chgChanged || vvtBadgeChanged || fullRedraw) {
         const char* name = (state.activeWheelName[0] != '\0') ? state.activeWheelName : "Pola Kustom";
         
         // Hapus area teks nama preset sebelah kiri (X: 22 s/d 362)
