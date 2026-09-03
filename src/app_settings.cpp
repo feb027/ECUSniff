@@ -107,9 +107,9 @@ void loadSettings(EcuEngine::EngineRuntimeState& engineState,
     engineState.cmp1Enabled = pref.getBool("cmp1_en", true);
     engineState.cmp2Enabled = pref.getBool("cmp2_en", true);
     engineState.vvt.enabled = pref.getBool("vvt_en", true);
-    engineState.vvt.startRpm = pref.getUInt("vvt_start", 2000);
-    engineState.vvt.fullRpm = pref.getUInt("vvt_full", 4500);
-    engineState.vvt.maxAdvanceDeg = pref.getChar("vvt_adv", 30);
+    engineState.vvt.startRpm = pref.getUInt("vvt_start", 2800);
+    engineState.vvt.fullRpm = pref.getUInt("vvt_full", 5500);
+    engineState.vvt.maxAdvanceDeg = pref.getChar("vvt_adv", 10);
 
     uint8_t c = pref.getUChar("ccnt", 4);
     camCfg.clear();

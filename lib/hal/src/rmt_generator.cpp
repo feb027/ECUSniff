@@ -272,7 +272,8 @@ void RmtGenerator::prepareBitArrayCycle() {
         } else {
             uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
             uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
-            _currentVvtAdvance = (uint8_t)((diff * (uint32_t)_vvtConfig.maxAdvanceDeg) / span);
+            int32_t calcAdv = ((int32_t)diff * (int32_t)_vvtConfig.maxAdvanceDeg) / (int32_t)span;
+            _currentVvtAdvance = (int8_t)calcAdv;
         }
     } else {
         _currentVvtAdvance = 0;
@@ -399,9 +400,10 @@ void RmtGenerator::prepareNextCycle() {
         } else {
             uint32_t span = _vvtConfig.fullRpm - _vvtConfig.startRpm;
             uint32_t diff = _pendingRpm - _vvtConfig.startRpm;
-            _currentVvtAdvance = (uint8_t)((diff * (uint32_t)_vvtConfig.maxAdvanceDeg) / span);
+            int32_t calcAdv = ((int32_t)diff * (int32_t)_vvtConfig.maxAdvanceDeg) / (int32_t)span;
+            _currentVvtAdvance = (int8_t)calcAdv;
         }
-        if (_currentVvtAdvance > 0) {
+        if (_currentVvtAdvance != 0) {
             shiftedCam.clear();
             uint8_t count = _cam.getEventCount();
             const auto* evs = _cam.getEvents();

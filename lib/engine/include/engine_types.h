@@ -72,9 +72,9 @@ struct SignalHealthStatus {
 
 struct VvtConfig {
     bool    enabled{true};
-    uint32_t startRpm{2000};
-    uint32_t fullRpm{4500};
-    int8_t   maxAdvanceDeg{30};    ///< Maximum cam advance in crank degrees (-45 to +50 deg)
+    uint32_t startRpm{2800};
+    uint32_t fullRpm{5500};
+    int8_t   maxAdvanceDeg{10};    ///< Maximum cam advance in crank degrees (-45 to +50 deg)
     int8_t   currentAdvanceDeg{0}; ///< Current real-time advance in crank degrees
 };
 
