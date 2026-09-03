@@ -133,8 +133,13 @@ void RmtGenerator::setRpm(uint32_t targetRpm) {
 }
 
 void RmtGenerator::setVvtConfig(const EcuEngine::VvtConfig& config) {
-    _vvtConfig = config;
-    _needsUpdate = true;
+    if (_vvtConfig.enabled != config.enabled ||
+        _vvtConfig.startRpm != config.startRpm ||
+        _vvtConfig.fullRpm != config.fullRpm ||
+        _vvtConfig.maxAdvanceDeg != config.maxAdvanceDeg) {
+        _vvtConfig = config;
+        _needsUpdate = true;
+    }
 }
 
 size_t RmtGenerator::compileBitArrayToRmt(
@@ -477,48 +482,37 @@ void RmtGenerator::swapBuffer() {
     size_t activeCmp2Size   = (nextIdx == 1) ? _cmp2SizeB   : _cmp2SizeA;
 
     if (_running) {
-        if (_patternChanged) {
-            // Pola preset/tipe roda baru dipilih: restart kanal hardware secara bersih
-            rmt_tx_stop(CH_CKP);
-            rmt_tx_stop(CH_CMP);
-            rmt_tx_stop(CH_CMP2);
+        // 1. Stop all channels synchronously to prevent memory tearing and phase slip
+        rmt_tx_stop(CH_CKP);
+        rmt_tx_stop(CH_CMP);
+        rmt_tx_stop(CH_CMP2);
 
-            if (activeCkpSize > 0) {
-                rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
-                rmt_set_tx_loop_mode(CH_CKP, true);
-                rmt_tx_start(CH_CKP, true);
-            }
-            if (activeCmp1Size > 0) {
-                rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
-                rmt_set_tx_loop_mode(CH_CMP, true);
-                rmt_tx_start(CH_CMP, true);
-            }
-            if (activeCmp2Size > 0) {
-                rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
-                rmt_set_tx_loop_mode(CH_CMP2, true);
-                rmt_tx_start(CH_CMP2, true);
-            }
-            _patternChanged = false;
-        } else {
-            // Perubahan RPM saja: update memori RMT secara live instan tanpa mematikan hardware
-            if (activeCkpSize > 0) {
-                rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
-            }
-            if (activeCmp1Size > 0) {
-                rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
-            }
-            if (activeCmp2Size > 0) {
-                rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
-            }
+        // 2. Fill all channels with new cycle items and configure loop mode
+        if (activeCkpSize > 0) {
+            rmt_fill_tx_items(CH_CKP, activeCkp, activeCkpSize, 0);
+            rmt_set_tx_loop_mode(CH_CKP, true);
+        }
+        if (activeCmp1Size > 0) {
+            rmt_fill_tx_items(CH_CMP, activeCmp1, activeCmp1Size, 0);
+            rmt_set_tx_loop_mode(CH_CMP, true);
+        }
+        if (activeCmp2Size > 0) {
+            rmt_fill_tx_items(CH_CMP2, activeCmp2, activeCmp2Size, 0);
+            rmt_set_tx_loop_mode(CH_CMP2, true);
         }
 
+        // 3. Start all channels simultaneously from sample 0 (absolute lockstep phase)
+        if (activeCkpSize > 0)  rmt_tx_start(CH_CKP, true);
+        if (activeCmp1Size > 0) rmt_tx_start(CH_CMP, true);
+        if (activeCmp2Size > 0) rmt_tx_start(CH_CMP2, true);
+
+        _patternChanged = false;
         _activeBufferIdx = nextIdx;
         _activeRpm = _pendingRpm;
         _cycleStartUs = micros();
         _activeCycleUs = (_activeRpm > 0) ? (120000000ULL / _activeRpm) : 120000;
         _needsUpdate = false;
     } else {
-        uint8_t nextIdx = (_activeBufferIdx == 0) ? 1 : 0;
         _activeBufferIdx = nextIdx;
         _activeRpm = _pendingRpm;
         _activeCycleUs = (_activeRpm > 0) ? (120000000ULL / _activeRpm) : 120000;
