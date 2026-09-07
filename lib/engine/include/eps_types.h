@@ -7,18 +7,23 @@ enum class EpsOemPreset : uint8_t {
     ToyotaAvanza = 0,
     SuzukiKarimun = 1,
     SuzukiErtiga  = 2,
-    HondaJazz     = 3,
-    CustomParametric = 4,
-    COUNT         = 5
+    SuzukiSwift   = 3,
+    HondaJazz     = 4,
+    HondaCity     = 5,
+    RetrofitSwap  = 6,
+    CustomParametric = 7,
+    COUNT         = 8
 };
 
 struct EpsPresetData {
     const char* name;
     const char* vehicleModel;
-    float       vssPulsePerKm;    // Pulsa VSS per km tempuh (~2548 = 4 pulsa/putaran ban standar)
-    uint8_t     rpmPulsesPerRev;  // Pulsa Tachometer per putaran mesin (misal: 2 untuk 4-silinder)
+    float       vssPulsePerKm;    // Pulsa VSS per km tempuh
+    uint8_t     rpmPulsesPerRev;  // Pulsa Tachometer per putaran mesin
     float       defaultTrqVoltage;// Tegangan center torque sensor (umumnya 2.50 V)
-    float       trqVoltageSpan;   // Rentang tegangan maks deviasi torque (misal: 1.50 V -> 1.0V - 4.0V)
+    float       trqVoltageSpan;   // Rentang tegangan maks deviasi torque
+    float       defaultSpeedKmh;  // Kecepatan default saat preset dipilih (km/h)
+    uint32_t    defaultRpm;       // RPM default saat preset dipilih
 };
 
 struct EpsConfig {
@@ -28,10 +33,17 @@ struct EpsConfig {
     float        vssPulsePerKm{2548.0f};
     uint8_t      rpmPulsesPerRev{2};
     float        steerTorque{0.0f};   // -1.0f (Full Kiri) s.d. +1.0f (Full Kanan), 0.0f (Lurus)
+    float        trqCenterVoltage{2.500f}; // Tegangan netral
+    float        trqVoltageSpan{1.500f};   // Rentang deviasi tegangan maksimal
     bool         autoSweep{false};
     float        sweepMinSpeed{0.0f};
     float        sweepMaxSpeed{120.0f};
     float        sweepStep{2.0f};
+    // Kalibrasi ADC Feedback TRQ (Divider Multiplier & Offset)
+    float        trq1AdcScale{2.000f};   // Pengali rasio pembagi tegangan (10k:10k = 2.0x)
+    float        trq1AdcOffset{0.000f};  // Offset koreksi tegangan A1 (Volt)
+    float        trq2AdcScale{2.000f};   // Pengali rasio pembagi tegangan (10k:10k = 2.0x)
+    float        trq2AdcOffset{0.000f};  // Offset koreksi tegangan A2 (Volt)
 };
 
 struct EpsRuntimeState {
@@ -40,9 +52,14 @@ struct EpsRuntimeState {
     uint32_t currentRpm{0};
     float    vssFreqHz{0.0f};
     float    rpmFreqHz{0.0f};
-    float    trq1Voltage{2.50f};
-    float    trq2Voltage{2.50f};
+    float    trq1Voltage{2.50f};         // Target DAC output
+    float    trq2Voltage{2.50f};         // Target DAC output
+    float    trq1FeedbackVoltage{0.0f};  // Tegangan terukur riil dari ADC A1
+    float    trq2FeedbackVoltage{0.0f};  // Tegangan terukur riil dari ADC A2
     bool     sweepDirectionUp{true};
+    bool     dacTrq1Found{false};
+    bool     dacTrq2Found{false};
+    bool     adcFound{false};
 };
 
 } // namespace EcuEngine

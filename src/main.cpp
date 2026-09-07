@@ -91,7 +91,13 @@ void taskCore0UiWeb(void *pvParameters) {
         else if (isDown && btnDown) {
             if (!longHandled && (now - btnTime) >= 600) {
                 longHandled = true; clickCount = 0;
-                engineState.isRunning = !engineState.isRunning;
+                if (menuMgr && menuMgr->getUiLevel() == static_cast<uint8_t>(EcuUi::UiLevel::EpsTester)) {
+                    epsController.toggleRunning();
+                } else if (menuMgr && menuMgr->getUiLevel() == static_cast<uint8_t>(EcuUi::UiLevel::SpeedoTester)) {
+                    speedoController.toggleRunning();
+                } else {
+                    engineState.isRunning = !engineState.isRunning;
+                }
             }
         } else if (!isDown && btnDown) {
             if (!longHandled) { clickCount++; relTime = now; }
@@ -145,12 +151,15 @@ void taskCore0UiWeb(void *pvParameters) {
             uint32_t dt = now - lastRpm; lastRpm = now;
 
             // ================================================================
-            // PEMBACAAN POTENSIOMETER ANALOG (Hanya Aktif Saat Mode POT)
+            // PEMBACAAN ADC ADS1115 (Multi-Channel Non-Blocking Round-Robin)
             // ================================================================
+            adsAdc.update();
+            engineState.adsFound = adsAdc.isFound();
+
+            // Sinyal Potensiometer RPM Analog (Channel A0)
             if (engineState.runMode == EcuEngine::EngineRunMode::Potentiometer) {
                 float voltage = adsAdc.readVoltageA0();
                 rpmController.updatePotentiometer(voltage, engineState);
-                engineState.adsFound = adsAdc.isFound();
             }
 
             if (engineState.isRunning) {
@@ -195,6 +204,19 @@ void taskCore0UiWeb(void *pvParameters) {
 
         if (now - lastEps >= 20) {
             float dtSec = (now - lastEps) / 1000.0f; lastEps = now;
+
+            // Sinkronisasi kalibrasi dari controller ke driver ADS1115
+            const auto& epsCfg = epsController.getConfig();
+            adsAdc.setTrq1Scale(epsCfg.trq1AdcScale);
+            adsAdc.setTrq1Offset(epsCfg.trq1AdcOffset);
+            adsAdc.setTrq2Scale(epsCfg.trq2AdcScale);
+            adsAdc.setTrq2Offset(epsCfg.trq2AdcOffset);
+
+            // Teruskan tegangan feedback terkalibrasi ke controller
+            float fb1 = adsAdc.getCalibratedVoltageA1();
+            float fb2 = adsAdc.getCalibratedVoltageA2();
+            epsController.setFeedbackVoltages(fb1, fb2, adsAdc.isFound());
+
             epsController.update(dtSec);
             epsDriver.updateOutputs(epsController.getState());
         }
@@ -401,11 +423,25 @@ void setup() {
     speedoDriver.detectDacs(dacFuel, dacTemp);
     speedoController.setDacFound(dacFuel, dacTemp);
 
+    bool dacTrq1 = false, dacTrq2 = false;
+    epsDriver.detectDacs(dacTrq1, dacTrq2);
+    epsController.setDacFound(dacTrq1, dacTrq2);
+    if (dacTrq1 || dacTrq2) {
+        Serial.printf("[EPS] Dual MCP4725 DAC: TRQ1(0x60)=%s, TRQ2(0x61)=%s\n", dacTrq1 ? "OK" : "NO", dacTrq2 ? "OK" : "NO");
+    }
+
     // Inisialisasi MCP23017 (I/O Expander untuk sinyal STA & CHG)
     engineState.mcpFound = mcpExpander.init(EcuHal::Mcp23017Driver::DEFAULT_I2C_ADDR);
 
-    // Inisialisasi ADS1115 (16-bit I2C ADC untuk Potensiometer RPM)
+    // Inisialisasi ADS1115 (16-bit I2C ADC untuk Potensiometer RPM & Feedback TRQ)
     engineState.adsFound = adsAdc.init(EcuHal::Ads1115Driver::DEFAULT_I2C_ADDR);
+    if (engineState.adsFound) {
+        const auto& epsCfg = epsController.getConfig();
+        adsAdc.setTrq1Scale(epsCfg.trq1AdcScale);
+        adsAdc.setTrq1Offset(epsCfg.trq1AdcOffset);
+        adsAdc.setTrq2Scale(epsCfg.trq2AdcScale);
+        adsAdc.setTrq2Offset(epsCfg.trq2AdcOffset);
+    }
 
     syncSignalGenPattern();
     signalGen.setRpm(engineState.targetRpm);

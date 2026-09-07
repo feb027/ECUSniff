@@ -4,9 +4,19 @@
 
 namespace EcuHal {
 
+struct AdsTrqCalibration {
+    float trq1Scale{2.000f};   // Pengali rasio voltage divider (10k:10k = 2.0x)
+    float trq1Offset{0.000f};  // Koreksi tegangan (Offset V)
+    float trq2Scale{2.000f};
+    float trq2Offset{0.000f};
+};
+
 /**
- * @brief Driver ringan I2C untuk ADS1115 (16-bit) / ADS1015 (12-bit) ADC.
- * Default I2C address: 0x48 (ADDR pin ke GND).
+ * @brief Driver multi-channel I2C untuk ADS1115 (16-bit) ADC.
+ * Mendukung pembacaan bergiliran (round-robin non-blocking) untuk:
+ * - A0: Potensiometer RPM Analog
+ * - A1: Sinyal Feedback Realtime TRQ1
+ * - A2: Sinyal Feedback Realtime TRQ2
  */
 class Ads1115Driver {
 public:
@@ -14,37 +24,48 @@ public:
 
     Ads1115Driver() = default;
 
-    /**
-     * @brief Inisialisasi komunikasi I2C dengan ADS1115.
-     * @param i2cAddr Alamat I2C ADS1115 (default 0x48).
-     * @return true jika chip terdeteksi, false jika tidak ada respon.
-     */
     bool init(uint8_t i2cAddr = DEFAULT_I2C_ADDR);
-
-    /**
-     * @brief Cek apakah chip ADS1115 terdeteksi di bus I2C.
-     */
     bool isFound() const { return _isFound; }
 
     /**
-     * @brief Membaca nilai raw ADC single-ended pada Channel A0.
-     * Konfigurasi: Single-ended AIN0 ke GND, FSR ±4.096V, 860 SPS.
-     * @return int16_t Nilai raw ADC (0..32767 untuk tegangan positif).
+     * @brief Update siklus sampling round-robin non-blocking (panggil berkala di loop sensor).
      */
-    int16_t readRawA0();
+    void update();
 
-    /**
-     * @brief Membaca tegangan pada Channel A0 dalam satuan Volt.
-     * @return float Tegangan (0.0V - 3.3V).
-     */
-    float readVoltageA0();
+    // Nilai pembacaan tegangan
+    float readVoltageA0() const { return _voltageA0; }
+    float getRawVoltageA1() const { return _rawVoltageA1; }
+    float getRawVoltageA2() const { return _rawVoltageA2; }
+    float getCalibratedVoltageA1() const;
+    float getCalibratedVoltageA2() const;
+
+    // Pengaturan Kalibrasi
+    void setCalibration(const AdsTrqCalibration& cal) { _cal = cal; }
+    const AdsTrqCalibration& getCalibration() const { return _cal; }
+
+    void setTrq1Scale(float scale) { _cal.trq1Scale = scale; }
+    void setTrq1Offset(float offset) { _cal.trq1Offset = offset; }
+    void setTrq2Scale(float scale) { _cal.trq2Scale = scale; }
+    void setTrq2Offset(float offset) { _cal.trq2Offset = offset; }
 
 private:
     uint8_t _i2cAddr{DEFAULT_I2C_ADDR};
     bool    _isFound{false};
 
+    uint8_t  _currentChannel{0}; // 0: A0, 1: A1, 2: A2
+    uint32_t _lastTriggerMs{0};
+
+    float _voltageA0{0.0f};
+    float _rawVoltageA1{0.0f};
+    float _rawVoltageA2{0.0f};
+
+    AdsTrqCalibration _cal;
+
     static constexpr uint8_t REG_CONVERSION = 0x00;
     static constexpr uint8_t REG_CONFIG     = 0x01;
+
+    void _triggerConversion(uint8_t channel);
+    int16_t _readConversion();
 };
 
 } // namespace EcuHal

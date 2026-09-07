@@ -13,40 +13,52 @@ bool Ads1115Driver::init(uint8_t i2cAddr) {
         return false;
     }
 
-    // Konfigurasi ADS1115 Continuous Conversion Mode pada AIN0:
-    // - MUX: AIN0 vs GND (0x4000)
-    // - PGA: +/- 4.096V (0x0200) -> 1 LSB = 0.125 mV (Sangat cocok untuk rentang 0-3.3V)
-    // - MODE: Continuous Conversion (0x0000)
-    // - DR: 860 SPS (0x00E0)
-    // - COMP_QUE: Disable comparator (0x0003)
-    // Total Config = 0x42E3
-    uint16_t config = 0x42E3;
+    _isFound = true;
+    _currentChannel = 0;
+    _triggerConversion(0); // Start first conversion on AIN0
+    return true;
+}
 
+void Ads1115Driver::_triggerConversion(uint8_t channel) {
+    if (!_isFound) return;
+
+    // MUX:
+    // A0 (AIN0 vs GND) = 0x4000
+    // A1 (AIN1 vs GND) = 0x5000
+    // A2 (AIN2 vs GND) = 0x6000
+    uint16_t mux = 0x4000;
+    if (channel == 1) mux = 0x5000;
+    else if (channel == 2) mux = 0x6000;
+
+    // Config: OS=1 (start conversion), MUX=mux, PGA=+/-4.096V (0x0200),
+    // MODE=Single-shot (0x0100), DR=860 SPS (0x00E0), COMP_QUE=Disable (0x0003)
+    uint16_t config = 0x8000 | mux | 0x0200 | 0x0100 | 0x00E0 | 0x0003;
+
+    Wire.setTimeOut(2);
     Wire.beginTransmission(_i2cAddr);
     Wire.write(REG_CONFIG);
     Wire.write((uint8_t)(config >> 8));
     Wire.write((uint8_t)(config & 0xFF));
     if (Wire.endTransmission() != 0) {
         _isFound = false;
-        return false;
+        return;
     }
 
-    // Set pointer register ke Conversion Register (0x00)
+    _currentChannel = channel;
+    _lastTriggerMs = millis();
+}
+
+int16_t Ads1115Driver::_readConversion() {
+    if (!_isFound) return 0;
+
+    Wire.setTimeOut(2);
     Wire.beginTransmission(_i2cAddr);
     Wire.write(REG_CONVERSION);
     if (Wire.endTransmission() != 0) {
         _isFound = false;
-        return false;
+        return 0;
     }
 
-    _isFound = true;
-    return true;
-}
-
-int16_t Ads1115Driver::readRawA0() {
-    if (!_isFound) return 0;
-
-    Wire.setTimeOut(2);
     size_t len = Wire.requestFrom((int)_i2cAddr, 2);
     if (len >= 2 && Wire.available() >= 2) {
         uint8_t msb = Wire.read();
@@ -56,30 +68,48 @@ int16_t Ads1115Driver::readRawA0() {
         return raw;
     }
 
-    // Jika request gagal / NACK, tandai offline agar tidak membebani loop FreeRTOS
     _isFound = false;
     return 0;
 }
 
-float Ads1115Driver::readVoltageA0() {
+void Ads1115Driver::update() {
     if (!_isFound) {
         static uint32_t lastRetry = 0;
         uint32_t now = millis();
-        if (now - lastRetry < 3000) {
-            return 0.0f; // Jeda 3 detik sebelum retry agar CPU tetap lancar 60 FPS
-        }
+        if (now - lastRetry < 3000) return;
         lastRetry = now;
-        if (!init(_i2cAddr)) {
-            return 0.0f;
-        }
+        if (!init(_i2cAddr)) return;
     }
 
-    int16_t raw = readRawA0();
-    // FSR +/- 4.096V (15-bit single ended: 32767 = 4.096V -> 1 LSB = 0.000125V)
-    float voltage = (float)raw * 0.000125f;
-    if (voltage < 0.0f) voltage = 0.0f;
-    if (voltage > 3.3f) voltage = 3.3f;
-    return voltage;
+    int16_t raw = _readConversion();
+    float v = (float)raw * 0.000125f; // FSR 4.096V -> 1 LSB = 0.125 mV
+
+    if (_currentChannel == 0) {
+        if (v < 0.0f) v = 0.0f;
+        if (v > 3.3f) v = 3.3f;
+        _voltageA0 = v;
+        _triggerConversion(1); // Next: A1 (TRQ1)
+    } else if (_currentChannel == 1) {
+        _rawVoltageA1 = v;
+        _triggerConversion(2); // Next: A2 (TRQ2)
+    } else {
+        _rawVoltageA2 = v;
+        _triggerConversion(0); // Next: A0 (POT)
+    }
+}
+
+float Ads1115Driver::getCalibratedVoltageA1() const {
+    float v = (_rawVoltageA1 * _cal.trq1Scale) + _cal.trq1Offset;
+    if (v < 0.0f) v = 0.0f;
+    if (v > 6.0f) v = 6.0f;
+    return v;
+}
+
+float Ads1115Driver::getCalibratedVoltageA2() const {
+    float v = (_rawVoltageA2 * _cal.trq2Scale) + _cal.trq2Offset;
+    if (v < 0.0f) v = 0.0f;
+    if (v > 6.0f) v = 6.0f;
+    return v;
 }
 
 } // namespace EcuHal
