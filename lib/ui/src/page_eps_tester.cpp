@@ -12,6 +12,7 @@ static const char* PRESET_NAMES[] = {
     "Suzuki Swift",
     "Honda Jazz / Brio",
     "Honda City (Ind)",
+    "Universal LVDT",
     "Retrofit / Swap",
     "Custom Tuning"
 };
@@ -22,7 +23,8 @@ static const char* PRESET_MODELS[] = {
     "Ertiga, Splash, Ignis (Mitsubishi)",
     "Swift 2006 (Active Amp 2.50V / Pin E52-16)",
     "Jazz GD3/GE8, Brio (Showa DC 2.430V)",
-    "City GM2/GM6 (Showa 7.3 Ohm Inductive)",
+    "City GM2/GM6 (Showa 7.9 Ohm Inductive)",
+    "LVDT TRQ1:13.6R 2.35mH / TRQ2:13.7R 2.38mH",
     "Bypass Standalone (Jimny/Kijang/Taft)",
     "Manual Parametric Tuning Mode"
 };
@@ -49,8 +51,14 @@ void PageEpsTester::init() {
     _lastRpmFreq = -1.0f;
 
     _lastPreset = 0xFF;
-    _lastCenterVolt = -1.0f;
-    _lastSpanVolt = -1.0f;
+    _trqCenterFocus = 0;
+    _trqSpanFocus = 0;
+    _lastT1Center = -1.0f;
+    _lastT2Center = -1.0f;
+    _lastT1Span = -1.0f;
+    _lastT2Span = -1.0f;
+    _lastCenterFocus = 0xFF;
+    _lastSpanFocus = 0xFF;
     _lastVssPulses = -1.0f;
     _lastRpmPulses = 0xFF;
     _lastT1Scale = -1.0f;
@@ -95,8 +103,12 @@ void PageEpsTester::render(uint8_t currentTab, bool fullRedraw, uint8_t editRow,
         } else {
             _drawStaticLayoutTab2();
             _lastPreset = 0xFF;
-            _lastCenterVolt = -1.0f;
-            _lastSpanVolt = -1.0f;
+            _lastT1Center = -1.0f;
+            _lastT2Center = -1.0f;
+            _lastT1Span = -1.0f;
+            _lastT2Span = -1.0f;
+            _lastCenterFocus = 0xFF;
+            _lastSpanFocus = 0xFF;
             _lastVssPulses = -1.0f;
             _lastRpmPulses = 0xFF;
             _lastT1Scale = -1.0f;
@@ -261,7 +273,7 @@ void PageEpsTester::_renderValuesTab1(const EcuEngine::EpsController& controller
         _gfx->setTextSize(1);
         _gfx->setTextPadding(220);
         char presetBuf[64];
-        const char* pName = (curPreset < 8) ? PRESET_NAMES[curPreset] : "Custom Tuning";
+        const char* pName = (curPreset < 9) ? PRESET_NAMES[curPreset] : "Custom Tuning";
         snprintf(presetBuf, sizeof(presetBuf), "PRESET: %s", pName);
         _gfx->drawString(presetBuf, 12, 52);
 
@@ -524,7 +536,6 @@ void PageEpsTester::_drawStaticLayoutTab2() {
     // Static subtitles drawn once here to avoid any runtime redraw flicker
     _gfx->setTextColor(0xCE79, 0x10A2);
     _gfx->setTextSize(1);
-    _gfx->drawString("Titik Nol Sensor Saat Setir Lurus (Putar: +/- 10 mV)", 125, TAB2_ROW_Y[1] + 20);
     _gfx->drawString("Kalibrasi Rasio Pulsa Speedo VSS (Putar: +/- 50)", 125, TAB2_ROW_Y[3] + 20);
     _gfx->drawString("Menyimpan rasio pembagi tegangan permanen ke Flash", 125, TAB2_ROW_Y[6] + 20);
 }
@@ -546,13 +557,13 @@ void PageEpsTester::_renderValuesTab2(const EcuEngine::EpsController& controller
     // Row 0: Preset
     uint8_t curPreset = static_cast<uint8_t>(cfg.preset);
     if (curPreset != _lastPreset) {
-        const char* pName = (curPreset < 8) ? PRESET_NAMES[curPreset] : "Custom";
+        const char* pName = (curPreset < 9) ? PRESET_NAMES[curPreset] : "Custom";
         _gfx->setTextColor(0xFFE0, 0x10A2);
         _gfx->setTextSize(2);
         _gfx->setTextPadding(335);
         _gfx->drawString(pName, 125, TAB2_ROW_Y[0] + 4);
 
-        const char* pModel = (curPreset < 8) ? PRESET_MODELS[curPreset] : "Manual Tuning";
+        const char* pModel = (curPreset < 9) ? PRESET_MODELS[curPreset] : "Manual Tuning";
         _gfx->setTextColor(0xCE79, 0x10A2);
         _gfx->setTextSize(1);
         _gfx->setTextPadding(335);
@@ -561,36 +572,58 @@ void PageEpsTester::_renderValuesTab2(const EcuEngine::EpsController& controller
         _lastPreset = curPreset;
     }
 
-    // Row 1: Center Voltage
-    if (cfg.trqCenterVoltage != _lastCenterVolt) {
-        char buf[48];
-        snprintf(buf, sizeof(buf), "%.3f V  (Neutral)", cfg.trqCenterVoltage);
+    // Row 1: Independent Center Voltage (TRQ1 & TRQ2)
+    if (cfg.trq1CenterVoltage != _lastT1Center || cfg.trq2CenterVoltage != _lastT2Center || _trqCenterFocus != _lastCenterFocus) {
+        char buf[64];
+        if (_trqCenterFocus == 0) {
+            snprintf(buf, sizeof(buf), "[T1]:%.3fV   T2:%.3fV", cfg.trq1CenterVoltage, cfg.trq2CenterVoltage);
+        } else {
+            snprintf(buf, sizeof(buf), " T1:%.3fV  [T2]:%.3fV", cfg.trq1CenterVoltage, cfg.trq2CenterVoltage);
+        }
         _gfx->setTextColor(0x07FF, 0x10A2);
         _gfx->setTextSize(2);
         _gfx->setTextPadding(335);
         _gfx->drawString(buf, 125, TAB2_ROW_Y[1] + 4);
+
+        char subBuf[64];
+        const char* focStr = (_trqCenterFocus == 0) ? "Fokus TRQ1" : "Fokus TRQ2";
+        snprintf(subBuf, sizeof(subBuf), "[%s] Knob: +/-10mV | Klik: Pindah | Joy: +/-5mV", focStr);
+        _gfx->setTextColor(0xCE79, 0x10A2);
+        _gfx->setTextSize(1);
+        _gfx->setTextPadding(335);
+        _gfx->drawString(subBuf, 125, TAB2_ROW_Y[1] + 20);
         _gfx->setTextPadding(0);
-        _lastCenterVolt = cfg.trqCenterVoltage;
+
+        _lastT1Center = cfg.trq1CenterVoltage;
+        _lastT2Center = cfg.trq2CenterVoltage;
+        _lastCenterFocus = _trqCenterFocus;
     }
 
-    // Row 2: Span Voltage
-    if (cfg.trqVoltageSpan != _lastSpanVolt || cfg.trqCenterVoltage != _lastCenterVolt) {
-        char buf[48];
-        snprintf(buf, sizeof(buf), "+/- %.3f V  (Span)", cfg.trqVoltageSpan);
+    // Row 2: Independent Span Voltage (TRQ1 & TRQ2)
+    if (cfg.trq1VoltageSpan != _lastT1Span || cfg.trq2VoltageSpan != _lastT2Span || _trqSpanFocus != _lastSpanFocus) {
+        char buf[64];
+        if (_trqSpanFocus == 0) {
+            snprintf(buf, sizeof(buf), "[T1]:+/-%.3fV  T2:+/-%.3fV", cfg.trq1VoltageSpan, cfg.trq2VoltageSpan);
+        } else {
+            snprintf(buf, sizeof(buf), " T1:+/-%.3fV [T2]:+/-%.3fV", cfg.trq1VoltageSpan, cfg.trq2VoltageSpan);
+        }
         _gfx->setTextColor(0xFD20, 0x10A2);
         _gfx->setTextSize(2);
         _gfx->setTextPadding(335);
         _gfx->drawString(buf, 125, TAB2_ROW_Y[2] + 4);
 
-        snprintf(buf, sizeof(buf), "Rentang: %.3fV s/d %.3fV", 
-                 cfg.trqCenterVoltage - cfg.trqVoltageSpan, 
-                 cfg.trqCenterVoltage + cfg.trqVoltageSpan);
+        char subBuf[64];
+        const char* focStr = (_trqSpanFocus == 0) ? "Fokus TRQ1" : "Fokus TRQ2";
+        snprintf(subBuf, sizeof(subBuf), "[%s] Knob: +/-10mV | Klik: Pindah | Joy: +/-5mV", focStr);
         _gfx->setTextColor(0xCE79, 0x10A2);
         _gfx->setTextSize(1);
         _gfx->setTextPadding(335);
-        _gfx->drawString(buf, 125, TAB2_ROW_Y[2] + 20);
+        _gfx->drawString(subBuf, 125, TAB2_ROW_Y[2] + 20);
         _gfx->setTextPadding(0);
-        _lastSpanVolt = cfg.trqVoltageSpan;
+
+        _lastT1Span = cfg.trq1VoltageSpan;
+        _lastT2Span = cfg.trq2VoltageSpan;
+        _lastSpanFocus = _trqSpanFocus;
     }
 
     // Row 3: Pulsa VSS per km
@@ -724,13 +757,27 @@ void PageEpsTester::onEncoderTurn(uint8_t currentTab, int32_t delta, uint8_t edi
         switch (editRow) {
             case 0: {
                 int32_t p = static_cast<int32_t>(cfg.preset) + (delta > 0 ? 1 : -1);
-                if (p < 0) p = 7;
-                if (p > 7) p = 0;
+                if (p < 0) p = 8;
+                if (p > 8) p = 0;
                 controller.setPreset(static_cast<EcuEngine::EpsOemPreset>(p));
                 break;
             }
-            case 1: controller.setCenterVoltage(cfg.trqCenterVoltage + (delta * 0.010f)); break;
-            case 2: controller.setSpanVoltage(cfg.trqVoltageSpan + (delta * 0.010f)); break;
+            case 1: {
+                if (_trqCenterFocus == 0) {
+                    controller.setTrq1CenterVoltage(cfg.trq1CenterVoltage + (delta * 0.010f));
+                } else {
+                    controller.setTrq2CenterVoltage(cfg.trq2CenterVoltage + (delta * 0.010f));
+                }
+                break;
+            }
+            case 2: {
+                if (_trqSpanFocus == 0) {
+                    controller.setTrq1SpanVoltage(cfg.trq1VoltageSpan + (delta * 0.010f));
+                } else {
+                    controller.setTrq2SpanVoltage(cfg.trq2VoltageSpan + (delta * 0.010f));
+                }
+                break;
+            }
             case 3: controller.setVssPulsePerKm(cfg.vssPulsePerKm + (delta * 50.0f)); break;
             case 4: controller.setTrq1Scale(cfg.trq1AdcScale + (delta * 0.002f)); break;
             case 5: controller.setTrq2Scale(cfg.trq2AdcScale + (delta * 0.002f)); break;
@@ -757,8 +804,14 @@ void PageEpsTester::onJoystickAction(uint8_t currentTab, EcuHal::JoyAction actio
         if (action == EcuHal::JoyAction::Left) {
             if (_lastEditRow == 0) {
                 int32_t p = static_cast<int32_t>(cfg.preset) - 1;
-                if (p < 0) p = 7;
+                if (p < 0) p = 8;
                 controller.setPreset(static_cast<EcuEngine::EpsOemPreset>(p));
+            } else if (_lastEditRow == 1) {
+                if (_trqCenterFocus == 0) controller.setTrq1CenterVoltage(cfg.trq1CenterVoltage - 0.005f);
+                else controller.setTrq2CenterVoltage(cfg.trq2CenterVoltage - 0.005f);
+            } else if (_lastEditRow == 2) {
+                if (_trqSpanFocus == 0) controller.setTrq1SpanVoltage(cfg.trq1VoltageSpan - 0.005f);
+                else controller.setTrq2SpanVoltage(cfg.trq2VoltageSpan - 0.005f);
             } else if (_lastEditRow == 4) {
                 controller.setTrq1Offset(cfg.trq1AdcOffset - 0.005f); // Trim -5 mV
             } else if (_lastEditRow == 5) {
@@ -767,8 +820,14 @@ void PageEpsTester::onJoystickAction(uint8_t currentTab, EcuHal::JoyAction actio
         } else if (action == EcuHal::JoyAction::Right) {
             if (_lastEditRow == 0) {
                 int32_t p = static_cast<int32_t>(cfg.preset) + 1;
-                if (p > 7) p = 0;
+                if (p > 8) p = 0;
                 controller.setPreset(static_cast<EcuEngine::EpsOemPreset>(p));
+            } else if (_lastEditRow == 1) {
+                if (_trqCenterFocus == 0) controller.setTrq1CenterVoltage(cfg.trq1CenterVoltage + 0.005f);
+                else controller.setTrq2CenterVoltage(cfg.trq2CenterVoltage + 0.005f);
+            } else if (_lastEditRow == 2) {
+                if (_trqSpanFocus == 0) controller.setTrq1SpanVoltage(cfg.trq1VoltageSpan + 0.005f);
+                else controller.setTrq2SpanVoltage(cfg.trq2VoltageSpan + 0.005f);
             } else if (_lastEditRow == 4) {
                 controller.setTrq1Offset(cfg.trq1AdcOffset + 0.005f); // Trim +5 mV
             } else if (_lastEditRow == 5) {
@@ -791,8 +850,14 @@ void PageEpsTester::onEncoderClick(uint8_t currentTab, uint8_t editRow,
     } else {
         if (editRow == 0) {
             int32_t p = static_cast<int32_t>(controller.getConfig().preset) + 1;
-            if (p > 7) p = 0;
+            if (p > 8) p = 0;
             controller.setPreset(static_cast<EcuEngine::EpsOemPreset>(p));
+        } else if (editRow == 1) {
+            _trqCenterFocus = (_trqCenterFocus == 0) ? 1 : 0;
+            _lastCenterFocus = 0xFF;
+        } else if (editRow == 2) {
+            _trqSpanFocus = (_trqSpanFocus == 0) ? 1 : 0;
+            _lastSpanFocus = 0xFF;
         } else if (editRow == 6) {
             controller.saveCalibration();
             _savedNoticeUntilMs = millis() + 2500;

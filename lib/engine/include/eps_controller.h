@@ -16,7 +16,11 @@ public:
     void setRunning(bool running);
     void toggleRunning();
     void setCenterVoltage(float volts);
+    void setTrq1CenterVoltage(float volts);
+    void setTrq2CenterVoltage(float volts);
     void setSpanVoltage(float volts);
+    void setTrq1SpanVoltage(float volts);
+    void setTrq2SpanVoltage(float volts);
     void setVssPulsePerKm(float pulses);
     void setRpmPulsesPerRev(uint8_t pulses);
     void setSweepLimits(float minKmh, float maxKmh, float step);

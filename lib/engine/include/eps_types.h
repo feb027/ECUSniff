@@ -10,20 +10,23 @@ enum class EpsOemPreset : uint8_t {
     SuzukiSwift   = 3,
     HondaJazz     = 4,
     HondaCity     = 5,
-    RetrofitSwap  = 6,
-    CustomParametric = 7,
-    COUNT         = 8
+    UniversalCoil13 = 6,
+    RetrofitSwap  = 7,
+    CustomParametric = 8,
+    COUNT         = 9
 };
 
 struct EpsPresetData {
     const char* name;
     const char* vehicleModel;
-    float       vssPulsePerKm;    // Pulsa VSS per km tempuh
-    uint8_t     rpmPulsesPerRev;  // Pulsa Tachometer per putaran mesin
-    float       defaultTrqVoltage;// Tegangan center torque sensor (umumnya 2.50 V)
-    float       trqVoltageSpan;   // Rentang tegangan maks deviasi torque
-    float       defaultSpeedKmh;  // Kecepatan default saat preset dipilih (km/h)
-    uint32_t    defaultRpm;       // RPM default saat preset dipilih
+    float       vssPulsePerKm;     // Pulsa VSS per km tempuh
+    uint8_t     rpmPulsesPerRev;   // Pulsa Tachometer per putaran mesin
+    float       defaultTrq1Voltage;// Center TRQ1 (umumnya 2.50 V)
+    float       defaultTrq2Voltage;// Center TRQ2 (umumnya 2.50 V)
+    float       trq1VoltageSpan;   // Rentang deviasi TRQ1
+    float       trq2VoltageSpan;   // Rentang deviasi TRQ2
+    float       defaultSpeedKmh;   // Kecepatan default saat preset dipilih (km/h)
+    uint32_t    defaultRpm;        // RPM default saat preset dipilih
 };
 
 struct EpsConfig {
@@ -33,8 +36,11 @@ struct EpsConfig {
     float        vssPulsePerKm{2548.0f};
     uint8_t      rpmPulsesPerRev{2};
     float        steerTorque{0.0f};   // -1.0f (Full Kiri) s.d. +1.0f (Full Kanan), 0.0f (Lurus)
-    float        trqCenterVoltage{2.500f}; // Tegangan netral
-    float        trqVoltageSpan{1.500f};   // Rentang deviasi tegangan maksimal
+    // Kalibrasi Independen Koil TRQ1 & TRQ2 (Titik Nol & Span Deviasi)
+    float        trq1CenterVoltage{2.500f}; // Titik netral koil TRQ1 (V)
+    float        trq2CenterVoltage{2.500f}; // Titik netral koil TRQ2 (V)
+    float        trq1VoltageSpan{1.500f};   // Span deviasi kemudi TRQ1 (V)
+    float        trq2VoltageSpan{1.500f};   // Span deviasi kemudi TRQ2 (V)
     bool         autoSweep{false};
     float        sweepMinSpeed{0.0f};
     float        sweepMaxSpeed{120.0f};

@@ -46,8 +46,14 @@ private:
 
     // Tab 2 state tracking (Calibration & Setup)
     uint8_t  _lastPreset{0xFF};
-    float    _lastCenterVolt{-1.0f};
-    float    _lastSpanVolt{-1.0f};
+    uint8_t  _trqCenterFocus{0}; // 0 = TRQ1, 1 = TRQ2
+    uint8_t  _trqSpanFocus{0};   // 0 = TRQ1, 1 = TRQ2
+    float    _lastT1Center{-1.0f};
+    float    _lastT2Center{-1.0f};
+    float    _lastT1Span{-1.0f};
+    float    _lastT2Span{-1.0f};
+    uint8_t  _lastCenterFocus{0xFF};
+    uint8_t  _lastSpanFocus{0xFF};
     float    _lastVssPulses{-1.0f};
     uint8_t  _lastRpmPulses{0xFF};
     float    _lastT1Scale{-1.0f};

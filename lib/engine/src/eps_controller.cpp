@@ -9,8 +9,8 @@ static const EpsPresetData PRESET_DATABASE[] = {
         "Avanza, Xenia, Rush, Terios, Vios (Denso)",
         2548.0f, // ~2.548 Hz per km/h (4 pulses/wheel rev)
         2,       // 2 pulses / crank rev (4-cyl Tach)
-        2.500f,  // TRQ Center 2.500V
-        1.500f,  // TRQ Span 1.500V (1.000V - 4.000V)
+        2.500f, 2.500f, // Center TRQ1 & TRQ2
+        1.500f, 1.500f, // Span TRQ1 & TRQ2 (1.000V - 4.000V)
         40.0f,   // Default Speed 40 km/h (28.3 Hz)
         1200     // Default RPM 1200 (40.0 Hz)
     },
@@ -19,8 +19,8 @@ static const EpsPresetData PRESET_DATABASE[] = {
         "Karimun Wagon R, Estilo (NSK/Koyo)",
         4000.0f, // 4000 pulses/km (Wagon R cluster pulse)
         2,
-        2.500f,
-        1.100f,  // Tighter TRQ Span 1.100V (1.400V - 3.600V)
+        2.500f, 2.500f,
+        1.100f, 1.100f, // Tighter TRQ Span 1.100V (1.400V - 3.600V)
         40.0f,   // Default Speed 40 km/h (44.4 Hz)
         1100     // Default RPM 1100 (36.7 Hz)
     },
@@ -29,8 +29,8 @@ static const EpsPresetData PRESET_DATABASE[] = {
         "Ertiga, Splash, Ignis (Mitsubishi)",
         4000.0f,
         2,
-        2.500f,
-        1.350f,  // TRQ Span 1.350V (1.150V - 3.850V)
+        2.500f, 2.500f,
+        1.350f, 1.350f, // TRQ Span 1.350V (1.150V - 3.850V)
         50.0f,   // Default Speed 50 km/h (55.6 Hz)
         1400     // Default RPM 1400 (46.7 Hz)
     },
@@ -39,8 +39,8 @@ static const EpsPresetData PRESET_DATABASE[] = {
         "Swift 2006 (Active Amp 2.50V / Pin E52-16)",
         4000.0f, // 4000 pulses/km
         2,       // 2 pulses / rev
-        2.500f,  // TRQ Center 2.500V
-        1.350f,  // TRQ Span 1.350V (1.150V - 3.850V)
+        2.500f, 2.500f,  // TRQ Center 2.500V
+        1.350f, 1.350f,  // TRQ Span 1.350V (1.150V - 3.850V)
         40.0f,   // Default Speed 40 km/h (44.4 Hz)
         1200     // Default RPM 1200 (40.0 Hz)
     },
@@ -49,18 +49,28 @@ static const EpsPresetData PRESET_DATABASE[] = {
         "Jazz GD3/GE8, Brio, Mobilio (Showa DC)",
         4100.0f, // 4100 pulses/km (Honda VSS gear)
         2,
-        2.430f,  // Proven Exact Neutral: 2.430V
-        0.100f,  // Micro Steer Span: +-0.100V (2.330V - 2.530V)
+        2.430f, 2.430f,  // Proven Exact Neutral: 2.430V
+        0.100f, 0.100f,  // Micro Steer Span: +-0.100V (2.330V - 2.530V)
         40.0f,   // Default Speed 40 km/h (45.6 Hz)
         1200     // Default RPM 1200 (40.0 Hz)
     },
     {
         "Honda City (Ind)",
-        "City GM2/GM6, Civic (Showa 7.3 Ohm Coil)",
+        "City GM2/GM6, Civic (Showa 7.9 Ohm Coil)",
         4100.0f, // 4100 pulses/km
         2,
-        2.500f,  // Demodulated Center 2.500V
-        0.080f,  // Micro-Trim Span: +-0.080V (Inductive Helper)
+        2.500f, 2.500f,  // Demodulated Center 2.500V
+        0.080f, 0.080f,  // Micro-Trim Span: +-0.080V (Inductive Helper)
+        40.0f,   // Default Speed 40 km/h (45.6 Hz)
+        1200     // Default RPM 1200 (40.0 Hz)
+    },
+    {
+        "Universal LVDT",
+        "LVDT TRQ1:13.6R 2.35mH / TRQ2:13.7R 2.38mH",
+        4100.0f, // 4100 pulses/km
+        2,
+        2.500f, 2.500f,  // Demodulated Center 2.500V
+        0.100f, 0.100f,  // Micro-Trim Span: +-0.100V
         40.0f,   // Default Speed 40 km/h (45.6 Hz)
         1200     // Default RPM 1200 (40.0 Hz)
     },
@@ -69,8 +79,8 @@ static const EpsPresetData PRESET_DATABASE[] = {
         "Bypass Standalone (Jimny/Kijang/Taft)",
         2548.0f,
         2,
-        2.500f,
-        1.500f,
+        2.500f, 2.500f,
+        1.500f, 1.500f,
         15.0f,   // Speed 15 km/h (10.6 Hz - Max Assist Enteng!)
         950      // RPM 950 (31.7 Hz - Engine Running relay ON)
     },
@@ -79,8 +89,8 @@ static const EpsPresetData PRESET_DATABASE[] = {
         "Manual Tuning Bebas Parameter",
         2548.0f,
         2,
-        2.500f,
-        1.500f,
+        2.500f, 2.500f,
+        1.500f, 1.500f,
         40.0f,
         1200
     }
@@ -97,8 +107,10 @@ void EpsController::init() {
     _config.vssPulsePerKm = 2548.0f;
     _config.rpmPulsesPerRev = 2;
     _config.steerTorque = 0.0f;
-    _config.trqCenterVoltage = 2.500f;
-    _config.trqVoltageSpan = 1.500f;
+    _config.trq1CenterVoltage = 2.500f;
+    _config.trq2CenterVoltage = 2.500f;
+    _config.trq1VoltageSpan = 1.500f;
+    _config.trq2VoltageSpan = 1.500f;
     _config.autoSweep = false;
     _config.sweepMinSpeed = 0.0f;
     _config.sweepMaxSpeed = 120.0f;
@@ -133,8 +145,10 @@ void EpsController::setPreset(EpsOemPreset preset) {
     if (preset != EpsOemPreset::CustomParametric) {
         _config.vssPulsePerKm = data.vssPulsePerKm;
         _config.rpmPulsesPerRev = data.rpmPulsesPerRev;
-        _config.trqCenterVoltage = data.defaultTrqVoltage;
-        _config.trqVoltageSpan = data.trqVoltageSpan;
+        _config.trq1CenterVoltage = data.defaultTrq1Voltage;
+        _config.trq2CenterVoltage = data.defaultTrq2Voltage;
+        _config.trq1VoltageSpan = data.trq1VoltageSpan;
+        _config.trq2VoltageSpan = data.trq2VoltageSpan;
         _config.speedKmh = data.defaultSpeedKmh;
         _state.currentSpeedKmh = data.defaultSpeedKmh;
         _config.targetRpm = data.defaultRpm;
@@ -167,16 +181,40 @@ void EpsController::setSteerTorque(float torque) {
 }
 
 void EpsController::setCenterVoltage(float volts) {
+    setTrq1CenterVoltage(volts);
+    setTrq2CenterVoltage(volts);
+}
+
+void EpsController::setTrq1CenterVoltage(float volts) {
     if (volts < 0.500f) volts = 0.500f;
     if (volts > 4.500f) volts = 4.500f;
-    _config.trqCenterVoltage = volts;
+    _config.trq1CenterVoltage = volts;
+    _recalculateFrequencies();
+}
+
+void EpsController::setTrq2CenterVoltage(float volts) {
+    if (volts < 0.500f) volts = 0.500f;
+    if (volts > 4.500f) volts = 4.500f;
+    _config.trq2CenterVoltage = volts;
     _recalculateFrequencies();
 }
 
 void EpsController::setSpanVoltage(float volts) {
+    setTrq1SpanVoltage(volts);
+    setTrq2SpanVoltage(volts);
+}
+
+void EpsController::setTrq1SpanVoltage(float volts) {
     if (volts < 0.020f) volts = 0.020f;
     if (volts > 2.000f) volts = 2.000f;
-    _config.trqVoltageSpan = volts;
+    _config.trq1VoltageSpan = volts;
+    _recalculateFrequencies();
+}
+
+void EpsController::setTrq2SpanVoltage(float volts) {
+    if (volts < 0.020f) volts = 0.020f;
+    if (volts > 2.000f) volts = 2.000f;
+    _config.trq2VoltageSpan = volts;
     _recalculateFrequencies();
 }
 
@@ -254,9 +292,9 @@ void EpsController::update(float dtSeconds) {
 }
 
 void EpsController::_recalculateFrequencies() {
-    // TRQ1 and TRQ2 using dedicated calibrated center and span (always active)
-    _state.trq1Voltage = _config.trqCenterVoltage + (_config.trqVoltageSpan * _config.steerTorque);
-    _state.trq2Voltage = _config.trqCenterVoltage - (_config.trqVoltageSpan * _config.steerTorque);
+    // TRQ1 and TRQ2 using dedicated calibrated center and span per coil (always active)
+    _state.trq1Voltage = _config.trq1CenterVoltage + (_config.trq1VoltageSpan * _config.steerTorque);
+    _state.trq2Voltage = _config.trq2CenterVoltage - (_config.trq2VoltageSpan * _config.steerTorque);
 
     if (_state.trq1Voltage < 0.050f) _state.trq1Voltage = 0.050f;
     if (_state.trq1Voltage > 4.950f) _state.trq1Voltage = 4.950f;
@@ -334,6 +372,10 @@ void EpsController::saveCalibration() {
     p.putFloat("t1_off", _config.trq1AdcOffset);
     p.putFloat("t2_scale", _config.trq2AdcScale);
     p.putFloat("t2_off", _config.trq2AdcOffset);
+    p.putFloat("t1_c", _config.trq1CenterVoltage);
+    p.putFloat("t2_c", _config.trq2CenterVoltage);
+    p.putFloat("t1_s", _config.trq1VoltageSpan);
+    p.putFloat("t2_s", _config.trq2VoltageSpan);
     p.end();
 }
 
@@ -344,6 +386,18 @@ void EpsController::loadCalibration() {
     _config.trq1AdcOffset = p.getFloat("t1_off", 0.000f);
     _config.trq2AdcScale = p.getFloat("t2_scale", 2.000f);
     _config.trq2AdcOffset = p.getFloat("t2_off", 0.000f);
+    if (p.isKey("t1_c")) {
+        float t1c = p.getFloat("t1_c", 2.500f);
+        float t2c = p.getFloat("t2_c", 2.500f);
+        float t1s = p.getFloat("t1_s", 1.500f);
+        float t2s = p.getFloat("t2_s", 1.500f);
+        if (_config.preset == EpsOemPreset::CustomParametric) {
+            _config.trq1CenterVoltage = t1c;
+            _config.trq2CenterVoltage = t2c;
+            _config.trq1VoltageSpan = t1s;
+            _config.trq2VoltageSpan = t2s;
+        }
+    }
     p.end();
 }
 
