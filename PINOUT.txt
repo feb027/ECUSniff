@@ -71,4 +71,7 @@ constexpr int8_t I2C_SCL     = 21; ///< I2C SCL for MCP4725 / MCP23017 / ADS1115
 // 5. Sensor Feedback ADS1115 16-Bit ADC (I2C Bus SDA 13, SCL 21):
 //    - Pin A1     : Sambungkan ke jalur TRQ1 untuk pembacaan voltase feedback presisi tinggi
 //    - Pin A2     : Sambungkan ke jalur TRQ2 untuk pembacaan voltase feedback presisi tinggi
+//
+// * Panduan skematik sirkuit lengkap & wiring soket ECU tersedia di:
+//   docs/HARDWARE_EPS_BENCH_TESTER.md
 // ============================================================================
