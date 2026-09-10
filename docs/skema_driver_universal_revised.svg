@@ -1,0 +1,297 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" style="background:#ffffff; font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#16a34a" />
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <rect width="100%" height="100%" fill="url(#grid)" />
+
+  <!-- Outer Border Frame -->
+  <rect x="24" y="20" width="1232" height="680" rx="12" fill="none" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Header Banner -->
+  <rect x="24" y="20" width="1232" height="56" rx="12" fill="#0f172a" />
+  <text x="48" y="55" font-size="20" font-weight="800" fill="#38bdf8" letter-spacing="0.5">SKEMA DRIVER UNIVERSAL OTOMOTIF (VSS, RPM, CKP, CMP)</text>
+  <text x="920" y="55" font-size="13" font-weight="500" fill="#94a3b8">ECUSniff Hardware Interface v2.1</text>
+
+  <!-- ==================== 3 MAIN FUNCTIONAL BLOCKS ==================== -->
+  <!-- Block 1 -->
+  <rect x="44" y="95" width="360" height="440" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4" filter="url(#shadow)"/>
+  <rect x="56" y="107" width="336" height="28" rx="6" fill="#e2e8f0" />
+  <text x="68" y="126" font-size="12" font-weight="700" fill="#334155">BLOK 1: PEMBERSIH &amp; BUFFER SINYAL (74HC14)</text>
+
+  <!-- Block 2 -->
+  <rect x="420" y="95" width="390" height="440" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4" filter="url(#shadow)"/>
+  <rect x="432" y="107" width="366" height="28" rx="6" fill="#e2e8f0" />
+  <text x="444" y="126" font-size="12" font-weight="700" fill="#334155">BLOK 2: DRIVER TRANSISTOR &amp; SELEKTOR TEGANGAN (SW1)</text>
+
+  <!-- Block 3 -->
+  <rect x="826" y="95" width="410" height="440" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4" filter="url(#shadow)"/>
+  <rect x="838" y="107" width="386" height="28" rx="6" fill="#e2e8f0" />
+  <text x="850" y="126" font-size="12" font-weight="700" fill="#334155">BLOK 3: SELEKTOR KOPLING DC / AC (SW2)</text>
+
+  <!-- ================================================================ -->
+  <!--                      BLOK 1: SCHMITT TRIGGER                     -->
+  <!-- ================================================================ -->
+  <!-- Power IC Info Box -->
+  <rect x="235" y="150" width="150" height="52" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+  <text x="247" y="171" font-size="11" font-weight="700" fill="#dc2626">Pin 14 VCC: +5V</text>
+  <text x="247" y="190" font-size="11" font-weight="700" fill="#475569">Pin 7 GND: Ground</text>
+
+  <!-- ESP32 Input Terminal Box -->
+  <rect x="60" y="290" width="110" height="54" rx="8" fill="#0284c7" stroke="#0369a1" stroke-width="2" />
+  <text x="72" y="313" font-size="12" font-weight="800" fill="#ffffff">ESP32 GPIO</text>
+  <text x="72" y="331" font-size="11" font-weight="600" fill="#e0f2fe">Pin 38 / 39 (3.3V)</text>
+
+  <!-- Wire: ESP32 to R1 -->
+  <line x1="170" y1="317" x2="195" y2="317" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Resistor R1 (10k) -->
+  <rect x="195" y="307" width="38" height="20" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <text x="203" y="321" font-size="10" font-weight="700" fill="#0f172a">10k</text>
+  <text x="204" y="298" font-size="11" font-weight="700" fill="#64748b">R1</text>
+
+  <!-- Wire: R1 to Inverter 1 -->
+  <line x1="233" y1="317" x2="265" y2="317" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="248" cy="317" r="3.5" fill="#0f172a" />
+
+  <!-- Filter Cap C1 (100pF) to Ground -->
+  <line x1="248" y1="317" x2="248" y2="390" stroke="#0f172a" stroke-width="2" />
+  <line x1="238" y1="390" x2="258" y2="390" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="238" y1="396" x2="258" y2="396" stroke="#0f172a" stroke-width="2.5" />
+  <text x="264" y="396" font-size="10" font-weight="600" fill="#64748b">C1 100pF</text>
+  <line x1="248" y1="396" x2="248" y2="416" stroke="#0f172a" stroke-width="2" />
+  <!-- GND symbol -->
+  <line x1="240" y1="416" x2="256" y2="416" stroke="#0f172a" stroke-width="2" />
+  <line x1="243" y1="420" x2="253" y2="420" stroke="#0f172a" stroke-width="2" />
+  <line x1="246" y1="424" x2="250" y2="424" stroke="#0f172a" stroke-width="2" />
+
+  <!-- Inverter U1:A (Pins 1 & 2) -->
+  <polygon points="265,292 265,342 305,317" fill="#e0f2fe" stroke="#0284c7" stroke-width="2" />
+  <!-- Schmitt Hysteresis Glyph inside inverter -->
+  <path d="M 273 322 L 279 322 L 279 312 L 285 312" fill="none" stroke="#0369a1" stroke-width="1.5" />
+  <circle cx="309" cy="317" r="4" fill="#ffffff" stroke="#0284c7" stroke-width="2" />
+  <text x="255" y="286" font-size="11" font-weight="700" fill="#0284c7">Pin 1</text>
+  <text x="300" y="286" font-size="11" font-weight="700" fill="#0284c7">Pin 2</text>
+  <text x="270" y="358" font-size="11" font-weight="800" fill="#0369a1">U1:A</text>
+
+  <!-- Wire between Inverters -->
+  <line x1="313" y1="317" x2="340" y2="317" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Inverter U1:B (Pins 3 & 4) -->
+  <polygon points="340,292 340,342 380,317" fill="#e0f2fe" stroke="#0284c7" stroke-width="2" />
+  <path d="M 348 322 L 354 322 L 354 312 L 360 312" fill="none" stroke="#0369a1" stroke-width="1.5" />
+  <circle cx="384" cy="317" r="4" fill="#ffffff" stroke="#0284c7" stroke-width="2" />
+  <text x="330" y="286" font-size="11" font-weight="700" fill="#0284c7">Pin 3</text>
+  <text x="375" y="286" font-size="11" font-weight="700" fill="#0284c7">Pin 4</text>
+  <text x="345" y="358" font-size="11" font-weight="800" fill="#0369a1">U1:B</text>
+
+  <!-- ================================================================ -->
+  <!--               BLOK 2: TRANSISTOR & SW1 PULL-UP SELECTOR          -->
+  <!-- ================================================================ -->
+  <!-- Wire from Pin 4 to R2 -->
+  <line x1="388" y1="317" x2="445" y2="317" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Resistor R2 (1k) -->
+  <rect x="445" y="307" width="38" height="20" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <text x="455" y="321" font-size="10" font-weight="700" fill="#0f172a">1k</text>
+  <text x="455" y="298" font-size="11" font-weight="700" fill="#64748b">R2</text>
+
+  <!-- Wire: R2 to Transistor Base -->
+  <line x1="483" y1="317" x2="525" y2="317" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- NPN Transistor Q1 (BC547 / 2N2222) -->
+  <circle cx="545" cy="317" r="25" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <!-- Base bar -->
+  <line x1="533" y1="302" x2="533" y2="332" stroke="#0f172a" stroke-width="3" />
+  <!-- Collector wire -->
+  <line x1="533" y1="308" x2="553" y2="292" stroke="#0f172a" stroke-width="2" />
+  <line x1="553" y1="292" x2="553" y2="265" stroke="#0f172a" stroke-width="2.5" />
+  <!-- Emitter wire with arrow -->
+  <line x1="533" y1="326" x2="553" y2="342" stroke="#0f172a" stroke-width="2" />
+  <polygon points="548,334 554,343 543,340" fill="#0f172a" />
+  <line x1="553" y1="342" x2="553" y2="390" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Emitter Ground -->
+  <line x1="545" y1="390" x2="561" y2="390" stroke="#0f172a" stroke-width="2" />
+  <line x1="548" y1="394" x2="558" y2="394" stroke="#0f172a" stroke-width="2" />
+  <line x1="551" y1="398" x2="555" y2="398" stroke="#0f172a" stroke-width="2" />
+
+  <!-- Transistor Label -->
+  <text x="576" y="310" font-size="13" font-weight="800" fill="#0f172a">Q1</text>
+  <text x="576" y="326" font-size="11" font-weight="600" fill="#475569">BC547 / 2N2222</text>
+  <text x="576" y="340" font-size="10" font-weight="600" fill="#0284c7">(NPN Pull-Down)</text>
+
+  <!-- NODE A (Collector Node) -->
+  <circle cx="553" cy="250" r="5" fill="#dc2626" />
+  <text x="490" y="254" font-size="12" font-weight="800" fill="#dc2626">NODE A</text>
+
+  <!-- Wire up from Node A to Pull-up Resistor R_pull -->
+  <line x1="553" y1="250" x2="553" y2="220" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Pull-up Resistor R_pull (2.2k) -->
+  <rect x="543" y="168" width="20" height="52" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <text x="515" y="198" font-size="10" font-weight="700" fill="#0f172a">2.2k</text>
+  <text x="568" y="198" font-size="11" font-weight="700" fill="#64748b">R_pull</text>
+
+  <!-- Wire from R_pull top across to SW1 Pivot -->
+  <line x1="553" y1="168" x2="553" y2="145" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="553" y1="145" x2="595" y2="145" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="595" y1="145" x2="595" y2="225" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="595" y1="225" x2="625" y2="225" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- SAKLAR 1 (SW1) Graphic Box -->
+  <rect x="610" y="130" width="188" height="150" rx="8" fill="#ffffff" stroke="#0284c7" stroke-width="2" />
+  <text x="622" y="152" font-size="12" font-weight="800" fill="#0284c7">SAKLAR 1 (SW1)</text>
+  <text x="622" y="167" font-size="10" font-weight="600" fill="#64748b">PEMILIH TEGANGAN PULL-UP:</text>
+
+  <!-- SW1 Common Pivot Point -->
+  <circle cx="625" cy="225" r="4.5" fill="#0284c7" />
+
+  <!-- Position 1: Open Collector (Floating) -->
+  <circle cx="660" cy="195" r="4.5" fill="#16a34a" />
+  <text x="672" y="199" font-size="11" font-weight="700" fill="#16a34a">[1] OPEN COLLECTOR</text>
+  <text x="692" y="211" font-size="9.5" fill="#64748b">(Lepas / Mengambang)</text>
+
+  <!-- Position 2: +5V -->
+  <circle cx="660" cy="232" r="4.5" fill="#0284c7" />
+  <text x="672" y="236" font-size="11" font-weight="700" fill="#0284c7">[2] PULL-UP +5V</text>
+
+  <!-- Position 3: +12V -->
+  <circle cx="660" cy="262" r="4.5" fill="#dc2626" />
+  <text x="672" y="266" font-size="11" font-weight="700" fill="#dc2626">[3] PULL-UP +12V</text>
+
+  <!-- SW1 Switch Blade Arm (Connected cleanly to [1] Open Collector) -->
+  <line x1="625" y1="225" x2="656" y2="198" stroke="#0284c7" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- ================================================================ -->
+  <!--                 BLOK 3: SELEKTOR KOPLING DC / AC (SW2)           -->
+  <!-- ================================================================ -->
+  <!-- Wire from Node A (Collector) over to SW2 Common Pole -->
+  <line x1="553" y1="250" x2="845" y2="250" stroke="#0f172a" stroke-width="2.5" />
+  <circle cx="845" cy="250" r="4" fill="#16a34a" />
+
+  <!-- SAKLAR 2 (SW2) Container Box -->
+  <rect x="840" y="150" width="130" height="195" rx="8" fill="#ffffff" stroke="#16a34a" stroke-width="2" />
+  <text x="852" y="172" font-size="12" font-weight="800" fill="#16a34a">SAKLAR 2 (SW2)</text>
+  <text x="852" y="186" font-size="9.5" font-weight="600" fill="#64748b">KOPLING OUTPUT:</text>
+
+  <!-- Pole Common input terminal -->
+  <circle cx="860" cy="250" r="4.5" fill="#16a34a" />
+
+  <!-- Contact Terminal A: DIRECT DC -->
+  <circle cx="945" cy="210" r="4.5" fill="#0f172a" />
+  <text x="875" y="214" font-size="11" font-weight="800" fill="#0f172a">[A] DC</text>
+
+  <!-- Contact Terminal B: AC COUPLING -->
+  <circle cx="945" cy="290" r="4.5" fill="#7c3aed" />
+  <text x="875" y="294" font-size="11" font-weight="800" fill="#7c3aed">[B] AC</text>
+
+  <!-- Switch Blade Arm in SW2 (Shown connected to Pos A Direct DC) -->
+  <line x1="860" y1="250" x2="940" y2="212" stroke="#16a34a" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- === JALUR [A]: DIRECT DC === -->
+  <!-- Top Label for DC Path -->
+  <rect x="985" y="170" width="165" height="24" rx="4" fill="#f1f5f9" stroke="#cbd5e1" />
+  <text x="995" y="186" font-size="10.5" font-weight="700" fill="#0f172a">Jalur [A]: DC Direct Line</text>
+
+  <!-- Wire from Contact A across top to Output Node -->
+  <line x1="945" y1="210" x2="1120" y2="210" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="1120" y1="210" x2="1120" y2="280" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- === JALUR [B]: AC COUPLING (KAPASITOR & CLAMPING) === -->
+  <!-- Bottom Label for AC Path -->
+  <rect x="980" y="380" width="215" height="24" rx="4" fill="#f5f3ff" stroke="#ddd6fe" />
+  <text x="988" y="396" font-size="10.5" font-weight="700" fill="#7c3aed">Jalur [B]: AC Coupling (Kapasitor)</text>
+
+  <!-- Wire from Contact B to C2 -->
+  <line x1="945" y1="290" x2="985" y2="290" stroke="#7c3aed" stroke-width="2.5" />
+
+  <!-- Capacitor C2 (100nF) -->
+  <line x1="985" y1="276" x2="985" y2="304" stroke="#7c3aed" stroke-width="3" />
+  <line x1="993" y1="276" x2="993" y2="304" stroke="#7c3aed" stroke-width="3" />
+  <text x="974" y="268" font-size="11" font-weight="800" fill="#7c3aed">C2 100nF</text>
+
+  <!-- Wire from C2 to Clamping Diodes Junction -->
+  <line x1="993" y1="290" x2="1055" y2="290" stroke="#7c3aed" stroke-width="2.5" />
+  <circle cx="1055" cy="290" r="3.5" fill="#7c3aed" />
+
+  <!-- Diode Clamping Sub-circuit to GND -->
+  <!-- Branch to D1 (pointing DOWN to GND) -->
+  <line x1="1040" y1="290" x2="1040" y2="310" stroke="#dc2626" stroke-width="1.5" />
+  <polygon points="1035,310 1045,310 1040,322" fill="#dc2626" />
+  <line x1="1035" y1="322" x2="1045" y2="322" stroke="#dc2626" stroke-width="2" />
+
+  <!-- Branch to D2 (pointing UP from GND) -->
+  <line x1="1070" y1="290" x2="1070" y2="310" stroke="#dc2626" stroke-width="1.5" />
+  <line x1="1065" y1="310" x2="1075" y2="310" stroke="#dc2626" stroke-width="2" />
+  <polygon points="1065,322 1075,322 1070,310" fill="#dc2626" />
+
+  <!-- Connect both diode cathodes/anodes to common ground line -->
+  <line x1="1040" y1="322" x2="1040" y2="335" stroke="#dc2626" stroke-width="1.5" />
+  <line x1="1070" y1="322" x2="1070" y2="335" stroke="#dc2626" stroke-width="1.5" />
+  <line x1="1040" y1="335" x2="1070" y2="335" stroke="#0f172a" stroke-width="1.5" />
+  <line x1="1055" y1="335" x2="1055" y2="345" stroke="#0f172a" stroke-width="1.5" />
+  <!-- Diode GND symbol -->
+  <line x1="1049" y1="345" x2="1061" y2="345" stroke="#0f172a" stroke-width="1.5" />
+  <line x1="1051" y1="348" x2="1059" y2="348" stroke="#0f172a" stroke-width="1.5" />
+  <line x1="1053" y1="351" x2="1057" y2="351" stroke="#0f172a" stroke-width="1.5" />
+
+  <!-- Label for D1 & D2 placed cleanly below -->
+  <text x="1016" y="366" font-size="9.5" font-weight="700" fill="#dc2626">D1, D2 (1N4148)</text>
+
+  <!-- Wire from Diode Junction up to join Output Junction -->
+  <line x1="1055" y1="290" x2="1120" y2="290" stroke="#7c3aed" stroke-width="2.5" />
+  <line x1="1120" y1="290" x2="1120" y2="280" stroke="#7c3aed" stroke-width="2.5" />
+
+  <!-- OUTPUT JUNCTION POINT -->
+  <circle cx="1120" cy="280" r="5" fill="#0f172a" />
+
+  <!-- Wire to Series Resistor R_out -->
+  <line x1="1120" y1="280" x2="1135" y2="280" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Protection Resistor R_out (47 ohm) -->
+  <rect x="1135" y="270" width="32" height="20" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <text x="1141" y="284" font-size="10" font-weight="700" fill="#0f172a">47Ω</text>
+  <text x="1138" y="263" font-size="10" font-weight="700" fill="#64748b">R_out</text>
+
+  <!-- Wire from R_out to Terminal -->
+  <line x1="1167" y1="280" x2="1182" y2="280" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Final Output Terminal Block -->
+  <rect x="1182" y="255" width="46" height="50" rx="6" fill="#16a34a" stroke="#15803d" stroke-width="2" />
+  <text x="1187" y="276" font-size="9.5" font-weight="800" fill="#ffffff">SIGNAL</text>
+  <text x="1193" y="292" font-size="9.5" font-weight="800" fill="#ffffff">OUT</text>
+
+  <!-- Arrow pointing out to ECU -->
+  <line x1="1228" y1="280" x2="1246" y2="280" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)" />
+
+  <!-- ================================================================ -->
+  <!--               FOOTER: BENCH-TEST QUICK REFERENCE GUIDE           -->
+  <!-- ================================================================ -->
+  <rect x="44" y="555" width="1192" height="125" rx="10" fill="#0f172a" />
+  <text x="68" y="584" font-size="15" font-weight="800" fill="#38bdf8">⚡ PANDUAN PENYETELAN 2 SAKLAR DI MEJA KERJA (BENCH-TEST):</text>
+
+  <rect x="68" y="600" width="360" height="65" rx="6" fill="#1e293b" stroke="#334155" />
+  <text x="80" y="620" font-size="12" font-weight="800" fill="#facc15">1. EPS Avanza / Xenia / Karimun:</text>
+  <text x="80" y="638" font-size="11.5" fill="#f8fafc">• SW1: <tspan font-weight="700" fill="#4ade80">[1] Open-Collector</tspan></text>
+  <text x="80" y="654" font-size="11.5" fill="#f8fafc">• SW2: <tspan font-weight="700" fill="#38bdf8">[A] Direct DC</tspan> (Modul punya pull-up internal)</text>
+
+  <rect x="444" y="600" width="360" height="65" rx="6" fill="#1e293b" stroke="#334155" />
+  <text x="456" y="620" font-size="12" font-weight="800" fill="#facc15">2. Speedometer Jarum / Cluster 12V:</text>
+  <text x="456" y="638" font-size="11.5" fill="#f8fafc">• SW1: <tspan font-weight="700" fill="#f87171">[3] Pull-up +12V</tspan></text>
+  <text x="456" y="654" font-size="11.5" fill="#f8fafc">• SW2: <tspan font-weight="700" fill="#38bdf8">[A] Direct DC</tspan> (Butuh pulsa tegangan aktif 12V)</text>
+
+  <rect x="820" y="600" width="400" height="65" rx="6" fill="#1e293b" stroke="#334155" />
+  <text x="832" y="620" font-size="12" font-weight="800" fill="#c084fc">3. ECU Gagal DC Biasa (Tacho Koil / Reluctor):</text>
+  <text x="832" y="638" font-size="11.5" fill="#f8fafc">• SW1: <tspan font-weight="700" fill="#f87171">[3] Pull-up +12V</tspan></text>
+  <text x="832" y="654" font-size="11.5" fill="#f8fafc">• SW2: <tspan font-weight="700" fill="#c084fc">[B] AC COUPLING (Kapasitor 100nF)</tspan> ➔ Zero Crossing!</text>
+</svg>

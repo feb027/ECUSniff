@@ -1,4 +1,4 @@
-﻿# Panduan Hardware Antarmuka & Skematik EPS Bench Tester (ECUSniff)
+# Panduan Hardware Antarmuka & Skematik EPS Bench Tester (ECUSniff)
 
 Dokumen ini menjelaskan secara teknis karakteristik kelistrikan modul **EPS (Electric Power Steering)** otomotif, analisis penyebab kegagalan sinyal 5V biasa di meja tes, serta menyediakan **skematik sirkuit antarmuka (interface board)** dan **diagram pinout soket EPS** populer.
 
@@ -49,6 +49,17 @@ Pin ESP32 ─────[R_gate: 100Ω]───┐
 **Kelebihan:**
 1. **Toleran Tegangan Bebas:** Aman untuk ECU EPS bertegangan pull-up 5V, 8V, maupun 12V karena tegangan tinggi terisolasi di Drain MOSFET.
 2. **RC Damper Filter ($220\ \Omega + 10\text{ nF}$):** Memperhalus transisi tepi pulsa menjadi ~3–5 mikrodetik, menyerupai keluaran sensor Hall roda/girboks asli dan mencegah *inductive ringing* pemicu error debounce ECU.
+
+---
+
+### C. Skema Universal Signal Injector (74HC14 + Transistor + AC/DC Selector)
+Untuk pengujian multi-fungsi (VSS, RPM, CKP, dan CMP) yang membutuhkan fleksibilitas antara sinyal Open-Collector murni, pulsa aktif 5V/12V, serta kopling AC kapasitor (Zero-Crossing untuk ECU koil/reluctor), gunakan rangkaian lengkap pada berkas:
+* **Skematik Visual:** [skema_driver_universal_revised.png](file:///c:/project/ECUSniff/docs/skema_driver_universal_revised.png)
+* **Berkas Vektor:** [skema_driver_universal_revised.svg](file:///c:/project/ECUSniff/docs/skema_driver_universal_revised.svg)
+
+Sirkuit ini dilengkapi:
+1. **SW1 (3-Way Selector):** Memilih antara `[1] Open-Collector (Lepas/Floating)`, `[2] Pull-up +5V`, atau `[3] Pull-up +12V`.
+2. **SW2 (Coupling Selector):** Memilih antara `[A] Direct DC` (lurus bypass) atau `[B] AC Coupling` (melewati kapasitor $100\text{ nF}$ + sepasang dioda clamping 1N4148 ke GND).
 
 ---
 
