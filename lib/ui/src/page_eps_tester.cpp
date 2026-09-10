@@ -1,4 +1,5 @@
 #include "page_eps_tester.h"
+#include "pin_config.h"
 
 namespace EcuUi {
 
@@ -163,7 +164,9 @@ void PageEpsTester::_drawStaticLayoutTab1(const EcuEngine::EpsController& contro
     _gfx->drawRoundRect(12, 76, 224, 76, 4, 0x31A6);
     _gfx->setTextColor(0xCE79, 0x10A2);
     _gfx->setTextSize(1);
-    _gfx->drawString("● TRQ 1 MONITOR (MCP4725 0x60 / A1)", 18, 80);
+    char trq1Title[48];
+    snprintf(trq1Title, sizeof(trq1Title), "● TRQ1 (MCP 0x60 | PWM:GPIO %d)", PinConfig::EPS_TRQ1);
+    _gfx->drawString(trq1Title, 18, 80);
 
     // Static labels for TRQ1
     _gfx->setTextColor(TFT_WHITE, 0x10A2);
@@ -176,7 +179,9 @@ void PageEpsTester::_drawStaticLayoutTab1(const EcuEngine::EpsController& contro
     _gfx->drawRoundRect(244, 76, 224, 76, 4, 0x31A6);
     _gfx->setTextColor(0xCE79, 0x10A2);
     _gfx->setTextSize(1);
-    _gfx->drawString("● TRQ 2 MONITOR (MCP4725 0x61 / A2)", 250, 80);
+    char trq2Title[48];
+    snprintf(trq2Title, sizeof(trq2Title), "● TRQ2 (MCP 0x61 | PWM:GPIO %d)", PinConfig::EPS_TRQ2);
+    _gfx->drawString(trq2Title, 250, 80);
 
     // Static labels for TRQ2
     _gfx->setTextColor(TFT_WHITE, 0x10A2);
@@ -184,17 +189,16 @@ void PageEpsTester::_drawStaticLayoutTab1(const EcuEngine::EpsController& contro
     _gfx->setTextColor(0x07FF, 0x10A2);
     _gfx->drawString("READ:", 250, 117);
 
-    // Steering Balance Indicator Bar (Y: 156, H: 30, X: 12, W: 456)
-    _gfx->fillRoundRect(12, 156, 456, 30, 4, 0x10A2);
-    _gfx->drawRoundRect(12, 156, 456, 30, 4, 0x31A6);
+    // Dynamic Delta / Verification error tags
+    _gfx->setTextColor(0xCE79, 0x10A2);
+    _gfx->drawString("Diff:", 112, 137);
+    _gfx->drawString("Diff:", 344, 137);
 
+    // --- Center Steering Torque Deflection Indicator ---
+    _gfx->setTextColor(0xCE79, 0x0841);
     _gfx->setTextSize(1);
-    _gfx->setTextColor(0x07FF, 0x10A2);
-    _gfx->drawString("<< KIRI", 20, 161);
-    _gfx->setTextColor(0x07E0, 0x10A2);
-    _gfx->drawString("KANAN >>", 400, 161);
+    _gfx->drawString("STEERING SENSOR TORQUE COMMAND", 14, 161);
 
-    // Mini slider gauge frame (W: 420, H: 7, X: 30, Y: 173)
     int32_t barX = 30;
     int32_t barY = 173;
     int32_t barW = 420;
@@ -209,14 +213,18 @@ void PageEpsTester::_drawStaticLayoutTab1(const EcuEngine::EpsController& contro
     _gfx->drawRoundRect(6, 196, 232, 54, 4, 0x31A6);
     _gfx->setTextColor(0xCE79, 0x10A2);
     _gfx->setTextSize(1);
-    _gfx->drawString("VEHICLE SPEED (VSS)", 14, 201);
+    char vssTitle[32];
+    snprintf(vssTitle, sizeof(vssTitle), "VSS OUT [GPIO %d]", PinConfig::EPS_VSS);
+    _gfx->drawString(vssTitle, 14, 201);
 
     // Tachometer Pod (Row 1) (X: 242, Y: 196, W: 232, H: 54)
     _gfx->fillRoundRect(242, 196, 232, 54, 4, 0x10A2);
     _gfx->drawRoundRect(242, 196, 232, 54, 4, 0x31A6);
     _gfx->setTextColor(0xCE79, 0x10A2);
     _gfx->setTextSize(1);
-    _gfx->drawString("ENGINE SPEED (RPM TACHO)", 250, 201);
+    char rpmTitle[32];
+    snprintf(rpmTitle, sizeof(rpmTitle), "RPM TACHO [GPIO %d]", PinConfig::EPS_RPM);
+    _gfx->drawString(rpmTitle, 250, 201);
 
     // Auto Sweep Pod (Row 3) (X: 6, Y: 254, W: 180, H: 54)
     _gfx->fillRoundRect(6, 254, 180, 54, 4, 0x10A2);

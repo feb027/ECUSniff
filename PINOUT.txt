@@ -44,3 +44,31 @@ constexpr int8_t SPEEDO_TEMP = 45; ///< Temperature Gauge PWM OUT
 constexpr int8_t SPEEDO_FUEL = 46; ///< Fuel Gauge PWM OUT
 constexpr int8_t I2C_SDA     = 13; ///< I2C SDA for MCP4725 / MCP23017 / ADS1115 (Pin 13)
 constexpr int8_t I2C_SCL     = 21; ///< I2C SCL for MCP4725 / MCP23017 / ADS1115 (Pin 21)
+
+// ============================================================================
+// PANDUAN WIRING BENCH TESTER MODUL EPS (ELECTRIC POWER STEERING)
+// ============================================================================
+// 1. Sinyal VSS (Vehicle Speed Sensor):
+//    - Output Pin : GPIO 38 (ESP32-S3) / GPIO 4 (ESP32 Classic)
+//    - Karakter   : 0.2 Hz s/d 1000 Hz Square wave 50% duty (0-3.3V MCU level)
+//    - Ke ECU EPS : Pin SPD / VSS / Vehicle Speed Input (gunakan transistor/pullup 5V/12V jika ECU tipe open-collector)
+//
+// 2. Sinyal RPM (Engine Speed Tachometer):
+//    - Output Pin : GPIO 39 (ESP32-S3) / GPIO 2 (ESP32 Classic)
+//    - Karakter   : 10 Hz s/d 500 Hz Square wave 50% duty (0-3.3V MCU level)
+//    - Ke ECU EPS : Pin TA / TACHO / NE+ Engine Speed Input (modul EPS butuh engine running agar assist aktif)
+//
+// 3. Sinyal TRQ1 (Torque Sensor 1 / Sub):
+//    - Output DAC : MCP4725 I2C Address 0x60 (VOUT) -> Output murni analog 0.0V s/d 5.0V
+//    - Output PWM : GPIO 40 (ESP32-S3) / GPIO 15 (ESP32 Classic) -> 20 kHz PWM (tambahkan low-pass filter R=10k, C=100nF)
+//    - Ke ECU EPS : Pin TRQ1 / Sub Torque Input
+//
+// 4. Sinyal TRQ2 (Torque Sensor 2 / Main):
+//    - Output DAC : MCP4725 I2C Address 0x61 (VOUT) -> Output murni analog 0.0V s/d 5.0V
+//    - Output PWM : GPIO 41 (ESP32-S3) / GPIO 5 (ESP32 Classic) -> 20 kHz PWM (tambahkan low-pass filter R=10k, C=100nF)
+//    - Ke ECU EPS : Pin TRQ2 / Main Torque Input
+//
+// 5. Sensor Feedback ADS1115 16-Bit ADC (I2C Bus SDA 13, SCL 21):
+//    - Pin A1     : Sambungkan ke jalur TRQ1 untuk pembacaan voltase feedback presisi tinggi
+//    - Pin A2     : Sambungkan ke jalur TRQ2 untuk pembacaan voltase feedback presisi tinggi
+// ============================================================================

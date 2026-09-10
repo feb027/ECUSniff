@@ -31,8 +31,6 @@ private:
 
     esp_timer_handle_t _vssTimer{nullptr};
     esp_timer_handle_t _rpmTimer{nullptr};
-    bool               _vssTimerRunning{false};
-    bool               _rpmTimerRunning{false};
 
     static constexpr uint8_t MCP4725_ADDR_TRQ1 = 0x60;
     static constexpr uint8_t MCP4725_ADDR_TRQ2 = 0x61;
