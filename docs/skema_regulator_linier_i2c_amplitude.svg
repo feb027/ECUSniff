@@ -1,0 +1,276 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 740" width="1320" height="740" style="background:#ffffff; font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#dc2626" />
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <rect width="100%" height="100%" fill="url(#grid)" />
+
+  <!-- Outer Frame -->
+  <rect x="24" y="18" width="1272" height="704" rx="12" fill="none" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Header Banner -->
+  <rect x="24" y="18" width="1272" height="56" rx="12" fill="#0f172a" />
+  <text x="48" y="53" font-size="20" font-weight="800" fill="#38bdf8" letter-spacing="0.5">REGULATOR LINIER DIGITAL I2C (5V - 12V VARIABLE AMPLITUDE CONTROLLER)</text>
+  <text x="980" y="53" font-size="13" font-weight="500" fill="#94a3b8">Suplai Rail Totem-Pole ECUSniff</text>
+
+  <!-- ==================== 4 MAIN FUNCTIONAL BLOCKS ==================== -->
+  <!-- Block 1: ESP32 & I2C DAC -->
+  <rect x="44" y="92" width="310" height="460" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4" filter="url(#shadow)"/>
+  <rect x="54" y="104" width="290" height="26" rx="5" fill="#e2e8f0" />
+  <text x="64" y="122" font-size="11" font-weight="700" fill="#334155">BLOK 1: KONTROL I2C &amp; MODUL DAC (MCP4725)</text>
+
+  <!-- Block 2: Op-Amp Precision Error Amplifier -->
+  <rect x="374" y="92" width="330" height="460" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4" filter="url(#shadow)"/>
+  <rect x="384" y="104" width="310" height="26" rx="5" fill="#e2e8f0" />
+  <text x="394" y="122" font-size="11" font-weight="700" fill="#334155">BLOK 2: PENGUAT ERROR &amp; REGULASI (LM358)</text>
+
+  <!-- Block 3: Power Pass Transistor & Feedback -->
+  <rect x="724" y="92" width="320" height="460" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4" filter="url(#shadow)"/>
+  <rect x="734" y="104" width="300" height="26" rx="5" fill="#e2e8f0" />
+  <text x="744" y="122" font-size="11" font-weight="700" fill="#334155">BLOK 3: POWER PASS TRANSISTOR (BD139)</text>
+
+  <!-- Block 4: Target Sinyal Totem-Pole Driver -->
+  <rect x="1064" y="92" width="232" height="460" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="5 4" filter="url(#shadow)"/>
+  <rect x="1074" y="104" width="212" height="26" rx="5" fill="#e2e8f0" />
+  <text x="1084" y="122" font-size="11" font-weight="700" fill="#334155">BLOK 4: OUTPUT BEBAN PULSA</text>
+
+  <!-- ================================================================ -->
+  <!--               BLOK 1: ESP32 I2C & MODUL DAC MCP4725              -->
+  <!-- ================================================================ -->
+  <!-- ESP32 Terminal Box -->
+  <rect x="60" y="215" width="105" height="115" rx="8" fill="#0284c7" stroke="#0369a1" stroke-width="2" />
+  <text x="72" y="240" font-size="12" font-weight="800" fill="#ffffff">ESP32-S3</text>
+  <text x="72" y="264" font-size="11" font-weight="700" fill="#e0f2fe">Pin 13 (SDA)</text>
+  <text x="72" y="286" font-size="11" font-weight="700" fill="#e0f2fe">Pin 21 (SCL)</text>
+  <text x="72" y="308" font-size="10" fill="#bae6fd">3.3V / GND</text>
+
+  <!-- I2C Bus Wires -->
+  <line x1="165" y1="260" x2="205" y2="260" stroke="#0284c7" stroke-width="2.5" />
+  <line x1="165" y1="282" x2="205" y2="282" stroke="#0284c7" stroke-width="2.5" />
+
+  <!-- MCP4725 Module Box -->
+  <rect x="205" y="195" width="130" height="165" rx="8" fill="#ffffff" stroke="#0284c7" stroke-width="2" />
+  <text x="217" y="219" font-size="12" font-weight="800" fill="#0284c7">MCP4725</text>
+  <text x="217" y="233" font-size="9.5" font-weight="600" fill="#64748b">12-Bit I2C DAC</text>
+  <text x="217" y="247" font-size="9" fill="#0369a1">(Address: 0x62)</text>
+
+  <!-- Pin labels in MCP4725 -->
+  <text x="215" y="264" font-size="10" font-weight="700" fill="#334155">SDA</text>
+  <text x="215" y="286" font-size="10" font-weight="700" fill="#334155">SCL</text>
+  <text x="215" y="310" font-size="9.5" font-weight="600" fill="#dc2626">VCC: 3.3V</text>
+  <text x="215" y="330" font-size="9.5" font-weight="600" fill="#475569">GND: 0V</text>
+
+  <!-- DAC Analog Output Pin (VOUT) -->
+  <circle cx="335" cy="275" r="4.5" fill="#16a34a" />
+  <text x="282" y="279" font-size="11" font-weight="800" fill="#16a34a">VOUT</text>
+
+  <!-- Information Box in Block 1 -->
+  <rect x="56" y="385" width="286" height="145" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1" />
+  <text x="68" y="407" font-size="11" font-weight="800" fill="#166534">📊 RESOLUSI TEGANGAN I2C:</text>
+  <text x="68" y="427" font-size="10" fill="#1e293b">• DAC 12-Bit = 4096 Tingkat Presisi</text>
+  <text x="68" y="445" font-size="10" fill="#1e293b">• Rentang VOUT DAC = 0V s.d. 3.0V</text>
+  <text x="68" y="463" font-size="10" fill="#1e293b">• Skala Penguatan Op-Amp = <tspan font-weight="700" fill="#16a34a">4.0x Lipat</tspan></text>
+  <text x="68" y="483" font-size="10" font-weight="700" fill="#15803d">➔ Rentang V_RAIL = 0V s.d. 12.0V</text>
+  <text x="68" y="501" font-size="9.5" fill="#64748b">Akurasi tegangan: ±0.01V (10 mV step)</text>
+  <text x="68" y="517" font-size="9.5" fill="#64748b">Bebas noise frekuensi tinggi (Pure DC)</text>
+
+  <!-- ================================================================ -->
+  <!--             BLOK 2: OP-AMP ERROR AMPLIFIER (LM358)               -->
+  <!-- ================================================================ -->
+  <!-- Common +14V Power Input Bus across top of Blocks 2 & 3 -->
+  <rect x="620" y="135" width="125" height="32" rx="6" fill="#dc2626" stroke="#b91c1c" stroke-width="1.5" />
+  <text x="630" y="156" font-size="11" font-weight="800" fill="#ffffff">+14V / AKI IN</text>
+
+  <!-- Power distribution lines from +14V -->
+  <line x1="620" y1="151" x2="450" y2="151" stroke="#dc2626" stroke-width="2.5" />
+  <line x1="450" y1="151" x2="450" y2="255" stroke="#dc2626" stroke-width="2" />
+  <circle cx="450" cy="151" r="3" fill="#dc2626" />
+  <text x="456" y="240" font-size="9" font-weight="800" fill="#dc2626">Pin 8</text>
+
+  <line x1="745" y1="151" x2="800" y2="151" stroke="#dc2626" stroke-width="2.5" />
+  <line x1="800" y1="151" x2="800" y2="267" stroke="#dc2626" stroke-width="2.5" />
+
+  <!-- Wire from DAC VOUT to OpAmp Non-inverting Input (+) -->
+  <line x1="335" y1="275" x2="420" y2="275" stroke="#16a34a" stroke-width="2.5" />
+  <circle cx="420" cy="275" r="3.5" fill="#16a34a" />
+  <text x="355" y="267" font-size="10" font-weight="700" fill="#16a34a">V_ref</text>
+
+  <!-- Filter Cap C_ref (100nF) to Ground -->
+  <line x1="375" y1="275" x2="375" y2="330" stroke="#0f172a" stroke-width="2" />
+  <circle cx="375" cy="275" r="3" fill="#0f172a" />
+  <line x1="367" y1="330" x2="383" y2="330" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="367" y1="336" x2="383" y2="336" stroke="#0f172a" stroke-width="2.5" />
+  <text x="390" y="336" font-size="9" font-weight="600" fill="#64748b">100nF</text>
+  <line x1="375" y1="336" x2="375" y2="350" stroke="#0f172a" stroke-width="2" />
+  <!-- GND symbol -->
+  <line x1="370" y1="350" x2="380" y2="350" stroke="#0f172a" stroke-width="1.5" />
+  <line x1="372" y1="353" x2="378" y2="353" stroke="#0f172a" stroke-width="1.5" />
+
+  <!-- Op-Amp Triangle (1/2 LM358) -->
+  <polygon points="420,255 420,335 490,295" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+  <text x="426" y="280" font-size="14" font-weight="800" fill="#16a34a">+</text>
+  <text x="427" y="318" font-size="14" font-weight="800" fill="#dc2626">−</text>
+  <text x="440" y="300" font-size="11" font-weight="800" fill="#2563eb">LM358</text>
+
+  <!-- OpAmp Ground Pin 4 -->
+  <line x1="450" y1="335" x2="450" y2="380" stroke="#0f172a" stroke-width="2" />
+  <text x="456" y="375" font-size="9" font-weight="700" fill="#475569">Pin 4</text>
+  <line x1="442" y1="380" x2="458" y2="380" stroke="#0f172a" stroke-width="1.5" />
+  <line x1="445" y1="383" x2="455" y2="383" stroke="#0f172a" stroke-width="1.5" />
+
+  <!-- OpAmp Output Pin (Pin 1) -->
+  <line x1="490" y1="295" x2="550" y2="295" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Base Resistor R_base (220 ohm) -->
+  <rect x="550" y="285" width="34" height="20" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <text x="556" y="299" font-size="9" font-weight="700" fill="#0f172a">220Ω</text>
+  <text x="556" y="277" font-size="9" font-weight="600" fill="#64748b">R_b</text>
+
+  <!-- Wire from R_b to Base of Q_pass -->
+  <line x1="584" y1="295" x2="776" y2="295" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- ================================================================ -->
+  <!--           BLOK 3: POWER PASS TRANSISTOR & FEEDBACK DIVIDER       -->
+  <!-- ================================================================ -->
+  <!-- Pass Transistor Q_pass (BD139 / TIP41 NPN) -->
+  <circle cx="790" cy="295" r="28" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <line x1="776" y1="279" x2="776" y2="311" stroke="#0f172a" stroke-width="3" />
+  <!-- Base connection -->
+  <line x1="776" y1="295" x2="776" y2="295" stroke="#0f172a" stroke-width="2.5" />
+  <!-- Collector (Top, connects to Main 14V Power Supply) -->
+  <line x1="776" y1="285" x2="800" y2="267" stroke="#dc2626" stroke-width="2.5" />
+  <!-- Emitter (Bottom with Arrow Out) -->
+  <line x1="776" y1="305" x2="800" y2="323" stroke="#0f172a" stroke-width="2.5" />
+  <polygon points="795,315 802,325 790,323" fill="#0f172a" />
+  <line x1="800" y1="323" x2="800" y2="370" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Transistor Labels -->
+  <text x="825" y="290" font-size="13" font-weight="800" fill="#0f172a">Q_pass</text>
+  <text x="825" y="306" font-size="11" font-weight="700" fill="#0284c7">BD139 / TIP41</text>
+  <text x="825" y="320" font-size="9" fill="#64748b">(NPN Series Pass)</text>
+
+  <!-- Main Regulated Output Node: NODE V_RAIL -->
+  <circle cx="800" cy="370" r="5" fill="#dc2626" />
+  <text x="740" y="374" font-size="11" font-weight="800" fill="#dc2626">V_RAIL</text>
+
+  <!-- Output Smoothing Capacitor (10uF + 100nF) to Ground placed at x=880 -->
+  <line x1="880" y1="370" x2="880" y2="420" stroke="#0f172a" stroke-width="2" />
+  <circle cx="880" cy="370" r="3" fill="#0f172a" />
+  <line x1="872" y1="420" x2="888" y2="420" stroke="#0f172a" stroke-width="2.5" />
+  <line x1="872" y1="426" x2="888" y2="426" stroke="#0f172a" stroke-width="2.5" />
+  <!-- Label placed safely below capacitor -->
+  <text x="846" y="452" font-size="9.5" font-weight="700" fill="#64748b">10µF + 100nF</text>
+  <line x1="880" y1="426" x2="880" y2="438" stroke="#0f172a" stroke-width="2" />
+  <!-- GND symbol -->
+  <line x1="875" y1="438" x2="885" y2="438" stroke="#0f172a" stroke-width="1.5" />
+  <line x1="877" y1="441" x2="883" y2="441" stroke="#0f172a" stroke-width="1.5" />
+
+  <!-- === NEGATIVE FEEDBACK VOLTAGE DIVIDER (R1 & R2) === -->
+  <!-- Wire from V_RAIL to top of R1 -->
+  <line x1="800" y1="370" x2="980" y2="370" stroke="#dc2626" stroke-width="2.5" />
+  <circle cx="980" cy="370" r="3.5" fill="#dc2626" />
+  <line x1="980" y1="370" x2="980" y2="395" stroke="#0f172a" stroke-width="2.5" />
+
+  <!-- Resistor R1 (30k - Feedback Top) -->
+  <rect x="970" y="395" width="20" height="46" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <text x="996" y="422" font-size="10" font-weight="700" fill="#0f172a">30k</text>
+  <text x="948" y="422" font-size="10" font-weight="700" fill="#64748b">R1</text>
+
+  <!-- Feedback Sensing Node (Middle) -->
+  <line x1="980" y1="441" x2="980" y2="465" stroke="#0f172a" stroke-width="2.5" />
+  <circle cx="980" cy="465" r="4" fill="#2563eb" />
+  <text x="992" y="469" font-size="10" font-weight="800" fill="#2563eb">V_fb</text>
+
+  <!-- Resistor R2 (10k - Feedback Bottom to GND) -->
+  <line x1="980" y1="465" x2="980" y2="485" stroke="#0f172a" stroke-width="2.5" />
+  <rect x="970" y="485" width="20" height="40" fill="#ffffff" stroke="#0f172a" stroke-width="2" />
+  <text x="996" y="510" font-size="10" font-weight="700" fill="#0f172a">10k</text>
+  <text x="948" y="510" font-size="10" font-weight="700" fill="#64748b">R2</text>
+  <line x1="980" y1="525" x2="980" y2="538" stroke="#0f172a" stroke-width="2" />
+  <!-- GND symbol -->
+  <line x1="974" y1="538" x2="986" y2="538" stroke="#0f172a" stroke-width="1.5" />
+  <line x1="976" y1="541" x2="984" y2="541" stroke="#0f172a" stroke-width="1.5" />
+
+  <!-- Feedback Wire cleanly routed along bottom to Inverting Input (-) of Op-Amp -->
+  <line x1="980" y1="465" x2="980" y2="480" stroke="#2563eb" stroke-width="2" />
+  <line x1="980" y1="480" x2="400" y2="480" stroke="#2563eb" stroke-width="2" />
+  <line x1="400" y1="480" x2="400" y2="315" stroke="#2563eb" stroke-width="2" />
+  <line x1="400" y1="315" x2="420" y2="315" stroke="#2563eb" stroke-width="2" />
+  <text x="500" y="473" font-size="10" font-weight="700" fill="#2563eb">Jalur Umpan Balik (Feedback V_fb = V_RAIL / 4) ke Pin (−) LM358</text>
+
+  <!-- Formula Box in Block 3 (Cleanly placed at top) -->
+  <rect x="740" y="145" width="280" height="50" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1" />
+  <text x="750" y="166" font-size="10.5" font-weight="800" fill="#1e40af">RUMUS: V_RAIL = V_ref × (1 + R1/R2)</text>
+  <text x="750" y="184" font-size="10" font-weight="700" fill="#16a34a">V_RAIL = V_ref × 4.0 (Tuning 5V s.d. 12V)</text>
+
+  <!-- ================================================================ -->
+  <!--           BLOK 4: OUTPUT BEBAN PULSA (TOTEM-POLE DRIVER)         -->
+  <!-- ================================================================ -->
+  <!-- Big Red Power Bus Line carrying V_RAIL to Target Stage -->
+  <line x1="980" y1="370" x2="1080" y2="370" stroke="#dc2626" stroke-width="3" marker-end="url(#arrow)" />
+
+  <rect x="1080" y="195" width="200" height="310" rx="8" fill="#ffffff" stroke="#dc2626" stroke-width="2" />
+  <rect x="1080" y="195" width="200" height="32" rx="8" fill="#fee2e2" />
+  <text x="1092" y="217" font-size="11" font-weight="800" fill="#dc2626">DRIVER TOTEM-POLE</text>
+
+  <!-- Illustration of targeted signal channels -->
+  <text x="1092" y="248" font-size="11" font-weight="700" fill="#0f172a">Menyuplai V_RAIL untuk:</text>
+
+  <rect x="1092" y="260" width="176" height="34" rx="5" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="1102" y="276" font-size="10" font-weight="800" fill="#0284c7">1. CKP &amp; CMP Simulator</text>
+  <text x="1102" y="289" font-size="9" fill="#64748b">Hall 5V / Reluctor 12V</text>
+
+  <rect x="1092" y="302" width="176" height="34" rx="5" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="1102" y="318" font-size="10" font-weight="800" fill="#16a34a">2. VSS Speed Pulse</text>
+  <text x="1102" y="331" font-size="9" fill="#64748b">EPS &amp; Speedometer Cluster</text>
+
+  <rect x="1092" y="344" width="176" height="34" rx="5" fill="#f8fafc" stroke="#cbd5e1" />
+  <text x="1102" y="360" font-size="10" font-weight="800" fill="#7c3aed">3. TACHO RPM Pulse</text>
+  <text x="1102" y="373" font-size="9" fill="#64748b">EPS Assist &amp; RPM Meter</text>
+
+  <rect x="1092" y="390" width="176" height="95" rx="5" fill="#fef2f2" stroke="#fecaca" />
+  <text x="1102" y="410" font-size="10" font-weight="800" fill="#dc2626">AMPLITUDO OUTPUT:</text>
+  <text x="1102" y="428" font-size="11" font-weight="800" fill="#0f172a">V_peak = V_RAIL</text>
+  <text x="1102" y="446" font-size="9.5" fill="#475569">• Set 5.0V ➔ Pulsa 0V-5.0V</text>
+  <text x="1102" y="462" font-size="9.5" fill="#475569">• Set 8.0V ➔ Pulsa 0V-8.0V</text>
+  <text x="1102" y="478" font-size="9.5" fill="#475569">• Set 12.0V ➔ Pulsa 0V-12.0V</text>
+
+  <!-- ================================================================ -->
+  <!--               FOOTER: PANDUAN PENGATURAN TEGANGAN VIA I2C        -->
+  <!-- ================================================================ -->
+  <rect x="44" y="565" width="1252" height="140" rx="10" fill="#0f172a" />
+  <text x="68" y="594" font-size="15" font-weight="800" fill="#38bdf8">⚡ TABEL PRESET TEGANGAN I2C (MCP4725 ➔ V_RAIL TOTEM-POLE):</text>
+
+  <rect x="68" y="610" width="285" height="80" rx="6" fill="#1e293b" stroke="#334155" />
+  <text x="80" y="630" font-size="12" font-weight="800" fill="#38bdf8">Mode Sensor Hall 5V:</text>
+  <text x="80" y="648" font-size="11" fill="#f8fafc">• Target: <tspan font-weight="700" fill="#4ade80">5.00 Volt</tspan> (V_ref = 1.25V)</text>
+  <text x="80" y="665" font-size="11" fill="#f8fafc">• Nilai DAC I2C: <tspan font-weight="700" fill="#facc15">1551 (0x60F)</tspan></text>
+  <text x="80" y="680" font-size="9.5" fill="#94a3b8">Untuk CKP/CMP digital mobil modern &amp; ECU 5V.</text>
+
+  <rect x="368" y="610" width="285" height="80" rx="6" fill="#1e293b" stroke="#334155" />
+  <text x="380" y="630" font-size="12" font-weight="800" fill="#c084fc">Mode Standar Eropa 8V:</text>
+  <text x="380" y="648" font-size="11" fill="#f8fafc">• Target: <tspan font-weight="700" fill="#c084fc">8.00 Volt</tspan> (V_ref = 2.00V)</text>
+  <text x="380" y="665" font-size="11" fill="#f8fafc">• Nilai DAC I2C: <tspan font-weight="700" fill="#facc15">2482 (0x9B2)</tspan></text>
+  <text x="380" y="680" font-size="9.5" fill="#94a3b8">Untuk modul EPS &amp; sensor transmisi referensi 8V.</text>
+
+  <rect x="668" y="610" width="285" height="80" rx="6" fill="#1e293b" stroke="#334155" />
+  <text x="680" y="630" font-size="12" font-weight="800" fill="#f87171">Mode Speedo &amp; Reluctor 12V:</text>
+  <text x="680" y="648" font-size="11" fill="#f8fafc">• Target: <tspan font-weight="700" fill="#f87171">12.00 Volt</tspan> (V_ref = 3.00V)</text>
+  <text x="680" y="665" font-size="11" fill="#f8fafc">• Nilai DAC I2C: <tspan font-weight="700" fill="#facc15">3723 (0xE8B)</tspan></text>
+  <text x="680" y="680" font-size="9.5" fill="#94a3b8">Untuk speedometer jarum analog &amp; tacho koil.</text>
+
+  <rect x="968" y="610" width="310" height="80" rx="6" fill="#1e293b" stroke="#334155" />
+  <text x="980" y="630" font-size="12" font-weight="800" fill="#4ade80">Fitur UI Software:</text>
+  <text x="980" y="648" font-size="11" fill="#f8fafc">• Auto-set saat pindah halaman menu</text>
+  <text x="980" y="665" font-size="11" fill="#f8fafc">• Slider Tuning Manual (5.0V - 12.0V)</text>
+  <text x="980" y="680" font-size="9.5" fill="#94a3b8">Dapat diatur per 0.1V menggunakan Rotary Encoder.</text>
+</svg>
