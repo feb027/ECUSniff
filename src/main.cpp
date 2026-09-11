@@ -518,9 +518,11 @@ void setup() {
 
     // Inisialisasi MCP23017 (I/O Expander untuk sinyal STA & CHG)
     engineState.mcpFound = mcpExpander.init(EcuHal::Mcp23017Driver::DEFAULT_I2C_ADDR);
+    ecuLog("[MCP23017] I/O Expander: %s\n", engineState.mcpFound ? "OK" : "NOT FOUND");
 
     // Inisialisasi ADS1115 (16-bit I2C ADC untuk Potensiometer RPM & Feedback TRQ)
     engineState.adsFound = adsAdc.init(EcuHal::Ads1115Driver::DEFAULT_I2C_ADDR);
+    ecuLog("[ADS1115] 16-Bit ADC: %s\n", engineState.adsFound ? "OK" : "NOT FOUND");
     if (engineState.adsFound) {
         const auto& epsCfg = epsController.getConfig();
         adsAdc.setTrq1Scale(epsCfg.trq1AdcScale);
@@ -533,6 +535,7 @@ void setup() {
     signalGen.setRpm(engineState.targetRpm);
     signalGen.stop();
 
+    ecuLog("[SYSTEM] Setup complete. Starting UiWebTask...\n");
     xTaskCreatePinnedToCore(taskCore0UiWeb, "UiWebTask", 12288, NULL, 1, NULL, 0);
 }
 
