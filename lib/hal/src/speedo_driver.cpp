@@ -8,7 +8,7 @@ namespace EcuHal {
 SpeedoDriver::SpeedoDriver() = default;
 
 void SpeedoDriver::detectDacs(bool& fuelFound, bool& tempFound) {
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
     Wire.beginTransmission(MCP4725_ADDR_FUEL);
     _dacFuelFound = (Wire.endTransmission() == 0);
 
@@ -25,7 +25,7 @@ void SpeedoDriver::_writeDac(uint8_t addr, float volts) {
     uint16_t dacValue = static_cast<uint16_t>((volts / 5.0f) * 4095.0f);
     if (dacValue > 4095) dacValue = 4095;
 
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
     Wire.beginTransmission(addr);
     Wire.write(static_cast<uint8_t>((dacValue >> 8) & 0x0F));
     Wire.write(static_cast<uint8_t>(dacValue & 0xFF));
@@ -35,7 +35,7 @@ void SpeedoDriver::_writeDac(uint8_t addr, float volts) {
 void SpeedoDriver::init() {
     if (_initialized) return;
 
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
     bool f, t;
     detectDacs(f, t);
 

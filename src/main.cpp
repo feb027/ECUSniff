@@ -410,12 +410,54 @@ void setup() {
     menuMgr = new EcuUi::MenuManager(&display.getGfx());
     menuMgr->init(&captureDriver, &sniffer, &epsController, &speedoController, &powerCycleController);
 
-    // Inisialisasi Bus I2C Utama dengan internal pull-up aman
+    // 1. I2C Bus Recovery Routine (Pelepasan slave yang lock SDA LOW)
+    pinMode(PinConfig::I2C_SCL, OUTPUT);
+    pinMode(PinConfig::I2C_SDA, INPUT_PULLUP);
+    for (int i = 0; i < 9; ++i) {
+        digitalWrite(PinConfig::I2C_SCL, LOW);
+        delayMicroseconds(5);
+        digitalWrite(PinConfig::I2C_SCL, HIGH);
+        delayMicroseconds(5);
+    }
+    pinMode(PinConfig::I2C_SDA, OUTPUT);
+    digitalWrite(PinConfig::I2C_SDA, LOW);
+    delayMicroseconds(5);
+    digitalWrite(PinConfig::I2C_SCL, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(PinConfig::I2C_SDA, HIGH);
+    delayMicroseconds(5);
+
+    // 2. Inisialisasi Bus I2C Utama
     pinMode(PinConfig::I2C_SDA, INPUT_PULLUP);
     pinMode(PinConfig::I2C_SCL, INPUT_PULLUP);
     Wire.begin(PinConfig::I2C_SDA, PinConfig::I2C_SCL);
     Wire.setClock(100000);
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
+
+    // 3. I2C Scanner Diagnostik Otomatis saat Boot
+    Serial.println("\n[I2C] ==============================================");
+    Serial.printf("[I2C] Scanning bus on SDA=GPIO %d, SCL=GPIO %d...\n", PinConfig::I2C_SDA, PinConfig::I2C_SCL);
+    uint8_t i2cFoundCount = 0;
+    for (uint8_t addr = 1; addr < 127; ++addr) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            Serial.printf("[I2C] -> Ditemukan device di alamat 0x%02X", addr);
+            if (addr == 0x20) Serial.print(" (MCP23017 I/O Expander)");
+            else if (addr == 0x48 || addr == 0x49) Serial.print(" (ADS1115 16-Bit ADC)");
+            else if (addr == 0x60) Serial.print(" (MCP4725 DAC TRQ1 / Fuel)");
+            else if (addr == 0x61) Serial.print(" (MCP4725 DAC TRQ2 / Temp)");
+            else if (addr == 0x62 || addr == 0x63) Serial.print(" (MCP4725 DAC A1 / Amplitude)");
+            Serial.println();
+            i2cFoundCount++;
+        }
+    }
+    if (i2cFoundCount == 0) {
+        Serial.printf("[I2C] PERINGATAN: Tidak ada modul I2C terdeteksi pada GPIO %d (SDA) & GPIO %d (SCL)!\n", PinConfig::I2C_SDA, PinConfig::I2C_SCL);
+        Serial.println("[I2C] Periksa: 1. Jalur daya VCC 3.3V/5V & GND, 2. Resistor pull-up 4.7k, 3. Pastikan pin SDA & SCL tidak tertukar.");
+    } else {
+        Serial.printf("[I2C] Total %d modul I2C aktif terdeteksi.\n", i2cFoundCount);
+    }
+    Serial.println("[I2C] ==============================================\n");
 
     encoder.init(); joystick.init(); captureDriver.init(); signalGen.init();
     epsDriver.init(); speedoDriver.init();
@@ -426,9 +468,7 @@ void setup() {
     bool dacTrq1 = false, dacTrq2 = false;
     epsDriver.detectDacs(dacTrq1, dacTrq2);
     epsController.setDacFound(dacTrq1, dacTrq2);
-    if (dacTrq1 || dacTrq2) {
-        Serial.printf("[EPS] Dual MCP4725 DAC: TRQ1(0x60)=%s, TRQ2(0x61)=%s\n", dacTrq1 ? "OK" : "NO", dacTrq2 ? "OK" : "NO");
-    }
+    Serial.printf("[EPS] Dual MCP4725 DAC: TRQ1=%s, TRQ2=%s\n", dacTrq1 ? "OK" : "NO", dacTrq2 ? "OK" : "NO");
 
     // Inisialisasi MCP23017 (I/O Expander untuk sinyal STA & CHG)
     engineState.mcpFound = mcpExpander.init(EcuHal::Mcp23017Driver::DEFAULT_I2C_ADDR);

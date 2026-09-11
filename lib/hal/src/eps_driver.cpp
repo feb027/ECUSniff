@@ -6,41 +6,23 @@
 
 namespace EcuHal {
 
-// High-precision non-blocking phase timers for VSS and RPM
-static volatile uint32_t s_vssHalfPeriodUs = 0;
-static volatile uint8_t  s_vssLevel = 0;
-static volatile bool     s_vssActive = false;
-static esp_timer_handle_t s_vssTimerHandle = nullptr;
+static volatile uint8_t s_vssLevel = 0;
+static volatile bool    s_vssActive = false;
 
-static volatile uint32_t s_rpmHalfPeriodUs = 0;
-static volatile uint8_t  s_rpmLevel = 0;
-static volatile bool     s_rpmActive = false;
-static esp_timer_handle_t s_rpmTimerHandle = nullptr;
+static volatile uint8_t s_rpmLevel = 0;
+static volatile bool    s_rpmActive = false;
 
-// Self-rearming callback for VSS (0.2 Hz - 1,000 Hz seamless square wave)
+// Periodic callbacks for continuous, non-blocking square wave pulse train
 static void IRAM_ATTR vssTimerCallback(void* arg) {
-    uint32_t hp = s_vssHalfPeriodUs;
-    if (hp == 0 || !s_vssActive) {
-        s_vssLevel = 0;
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
-        return;
-    }
+    if (!s_vssActive) return;
     s_vssLevel ^= 1;
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), s_vssLevel);
-    esp_timer_start_once(s_vssTimerHandle, hp);
 }
 
-// Self-rearming callback for RPM (0.2 Hz - 1,000 Hz seamless square wave)
 static void IRAM_ATTR rpmTimerCallback(void* arg) {
-    uint32_t hp = s_rpmHalfPeriodUs;
-    if (hp == 0 || !s_rpmActive) {
-        s_rpmLevel = 0;
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
-        return;
-    }
+    if (!s_rpmActive) return;
     s_rpmLevel ^= 1;
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), s_rpmLevel);
-    esp_timer_start_once(s_rpmTimerHandle, hp);
 }
 
 EpsDriver::EpsDriver() = default;
@@ -50,22 +32,40 @@ EpsDriver::~EpsDriver() {
     if (_vssTimer) {
         esp_timer_delete(_vssTimer);
         _vssTimer = nullptr;
-        s_vssTimerHandle = nullptr;
     }
     if (_rpmTimer) {
         esp_timer_delete(_rpmTimer);
         _rpmTimer = nullptr;
-        s_rpmTimerHandle = nullptr;
     }
 }
 
 void EpsDriver::detectDacs(bool& trq1Found, bool& trq2Found) {
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
+
+    // Check default addresses 0x60 & 0x61
     Wire.beginTransmission(MCP4725_ADDR_TRQ1);
     _dacTrq1Found = (Wire.endTransmission() == 0);
+    if (_dacTrq1Found) _trq1Addr = MCP4725_ADDR_TRQ1;
 
     Wire.beginTransmission(MCP4725_ADDR_TRQ2);
     _dacTrq2Found = (Wire.endTransmission() == 0);
+    if (_dacTrq2Found) _trq2Addr = MCP4725_ADDR_TRQ2;
+
+    // Fallback: Check 0x62 & 0x63 (MCP4725A1 chips)
+    if (!_dacTrq1Found) {
+        Wire.beginTransmission(0x62);
+        if (Wire.endTransmission() == 0) {
+            _dacTrq1Found = true;
+            _trq1Addr = 0x62;
+        }
+    }
+    if (!_dacTrq2Found) {
+        Wire.beginTransmission(0x63);
+        if (Wire.endTransmission() == 0) {
+            _dacTrq2Found = true;
+            _trq2Addr = 0x63;
+        }
+    }
 
     trq1Found = _dacTrq1Found;
     trq2Found = _dacTrq2Found;
@@ -77,7 +77,7 @@ void EpsDriver::_writeDac(uint8_t addr, float volts) {
     uint16_t dacValue = static_cast<uint16_t>((volts / 5.0f) * 4095.0f);
     if (dacValue > 4095) dacValue = 4095;
 
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
     Wire.beginTransmission(addr);
     Wire.write(static_cast<uint8_t>((dacValue >> 8) & 0x0F));
     Wire.write(static_cast<uint8_t>(dacValue & 0xFF));
@@ -96,21 +96,19 @@ void EpsDriver::init() {
     gpio_set_direction(static_cast<gpio_num_t>(PinConfig::EPS_RPM), GPIO_MODE_OUTPUT);
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
 
-    // 2. Setup high-precision esp_timer for VSS (Vehicle Speed Sensor)
+    // 2. Setup periodic esp_timer for VSS (Vehicle Speed Sensor)
     esp_timer_create_args_t vss_args{};
     vss_args.callback = &vssTimerCallback;
     vss_args.name = "eps_vss_timer";
     vss_args.dispatch_method = ESP_TIMER_TASK;
     esp_timer_create(&vss_args, &_vssTimer);
-    s_vssTimerHandle = _vssTimer;
 
-    // 3. Setup high-precision esp_timer for RPM (Engine Speed Tachometer)
+    // 3. Setup periodic esp_timer for RPM (Engine Speed Tachometer)
     esp_timer_create_args_t rpm_args{};
     rpm_args.callback = &rpmTimerCallback;
     rpm_args.name = "eps_rpm_timer";
     rpm_args.dispatch_method = ESP_TIMER_TASK;
     esp_timer_create(&rpm_args, &_rpmTimer);
-    s_rpmTimerHandle = _rpmTimer;
 
     // 4. Setup PWM on GPIO 40 (TRQ1) & 41 (TRQ2) as 20kHz RC-filter DAC fallback
     ledcSetup(LEDC_CH_TRQ1, 20000, 8);
@@ -124,66 +122,57 @@ void EpsDriver::init() {
     // 5. Detect I2C Dual MCP4725
     bool d1 = false, d2 = false;
     detectDacs(d1, d2);
-    if (_dacTrq1Found) _writeDac(MCP4725_ADDR_TRQ1, 2.50f);
-    if (_dacTrq2Found) _writeDac(MCP4725_ADDR_TRQ2, 2.50f);
+    if (_dacTrq1Found) _writeDac(_trq1Addr, 2.50f);
+    if (_dacTrq2Found) _writeDac(_trq2Addr, 2.50f);
 
     _initialized = true;
 }
 
 void EpsDriver::_setVssFrequency(float freqHz) {
-    if (freqHz > 0.2f) {
-        uint32_t newHalfPeriod = static_cast<uint32_t>(500000.0f / freqHz);
+    if (freqHz > 0.2f && _vssTimer) {
+        uint64_t newHalfPeriod = static_cast<uint64_t>(500000.0f / freqHz);
         if (newHalfPeriod < 250) newHalfPeriod = 250; // Cap at 2,000 Hz
-        s_vssHalfPeriodUs = newHalfPeriod;
 
-        if (!s_vssActive) {
-            s_vssActive = true;
-            s_vssLevel = 1;
-            gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 1);
-            if (s_vssTimerHandle) {
-                esp_timer_stop(s_vssTimerHandle);
-                esp_timer_start_once(s_vssTimerHandle, newHalfPeriod);
-            }
+        if (_vssTimerRunning) {
+            esp_timer_stop(_vssTimer);
         }
-        // Seamless: when already active, s_vssHalfPeriodUs is picked up at next toggle!
+        s_vssActive = true;
+        s_vssLevel = 1;
+        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 1);
+        esp_timer_start_periodic(_vssTimer, newHalfPeriod);
+        _vssTimerRunning = true;
     } else {
-        if (s_vssActive) {
-            s_vssActive = false;
-            s_vssHalfPeriodUs = 0;
-            if (s_vssTimerHandle) {
-                esp_timer_stop(s_vssTimerHandle);
-            }
-            s_vssLevel = 0;
-            gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
+        if (_vssTimerRunning && _vssTimer) {
+            esp_timer_stop(_vssTimer);
+            _vssTimerRunning = false;
         }
+        s_vssActive = false;
+        s_vssLevel = 0;
+        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
     }
 }
 
 void EpsDriver::_setRpmFrequency(float freqHz) {
-    if (freqHz > 0.2f) {
-        uint32_t newHalfPeriod = static_cast<uint32_t>(500000.0f / freqHz);
+    if (freqHz > 0.2f && _rpmTimer) {
+        uint64_t newHalfPeriod = static_cast<uint64_t>(500000.0f / freqHz);
         if (newHalfPeriod < 250) newHalfPeriod = 250; // Cap at 2,000 Hz
-        s_rpmHalfPeriodUs = newHalfPeriod;
 
-        if (!s_rpmActive) {
-            s_rpmActive = true;
-            s_rpmLevel = 1;
-            gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 1);
-            if (s_rpmTimerHandle) {
-                esp_timer_stop(s_rpmTimerHandle);
-                esp_timer_start_once(s_rpmTimerHandle, newHalfPeriod);
-            }
+        if (_rpmTimerRunning) {
+            esp_timer_stop(_rpmTimer);
         }
+        s_rpmActive = true;
+        s_rpmLevel = 1;
+        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 1);
+        esp_timer_start_periodic(_rpmTimer, newHalfPeriod);
+        _rpmTimerRunning = true;
     } else {
-        if (s_rpmActive) {
-            s_rpmActive = false;
-            s_rpmHalfPeriodUs = 0;
-            if (s_rpmTimerHandle) {
-                esp_timer_stop(s_rpmTimerHandle);
-            }
-            s_rpmLevel = 0;
-            gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
+        if (_rpmTimerRunning && _rpmTimer) {
+            esp_timer_stop(_rpmTimer);
+            _rpmTimerRunning = false;
         }
+        s_rpmActive = false;
+        s_rpmLevel = 0;
+        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
     }
 }
 
@@ -214,10 +203,10 @@ void EpsDriver::updateOutputs(const EcuEngine::EpsRuntimeState& state) {
         }
     }
 
-    // 3. Update TRQ1 (MCP4725 0x60 + PWM GPIO 40) - ALWAYS ACTIVE
+    // 3. Update TRQ1 (MCP4725 + PWM GPIO 40) - ALWAYS ACTIVE
     if (state.trq1Voltage != _lastTrq1Volt) {
         if (_dacTrq1Found) {
-            _writeDac(MCP4725_ADDR_TRQ1, state.trq1Voltage);
+            _writeDac(_trq1Addr, state.trq1Voltage);
         }
         // Simultaneous PWM on GPIO 40
         float norm = (state.trq1Voltage / 5.0f) * 255.0f;
@@ -227,10 +216,10 @@ void EpsDriver::updateOutputs(const EcuEngine::EpsRuntimeState& state) {
         _lastTrq1Volt = state.trq1Voltage;
     }
 
-    // 4. Update TRQ2 (MCP4725 0x61 + PWM GPIO 41) - ALWAYS ACTIVE
+    // 4. Update TRQ2 (MCP4725 + PWM GPIO 41) - ALWAYS ACTIVE
     if (state.trq2Voltage != _lastTrq2Volt) {
         if (_dacTrq2Found) {
-            _writeDac(MCP4725_ADDR_TRQ2, state.trq2Voltage);
+            _writeDac(_trq2Addr, state.trq2Voltage);
         }
         // Simultaneous PWM on GPIO 41
         float norm = (state.trq2Voltage / 5.0f) * 255.0f;

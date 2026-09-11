@@ -22,12 +22,16 @@ private:
     bool     _initialized{false};
     bool     _dacTrq1Found{false};
     bool     _dacTrq2Found{false};
+    uint8_t  _trq1Addr{0x60};
+    uint8_t  _trq2Addr{0x61};
 
     float    _lastVssFreq{-1.0f};
     float    _lastRpmFreq{-1.0f};
     float    _lastTrq1Volt{-1.0f};
     float    _lastTrq2Volt{-1.0f};
     bool     _lastRunning{false};
+    bool     _vssTimerRunning{false};
+    bool     _rpmTimerRunning{false};
 
     esp_timer_handle_t _vssTimer{nullptr};
     esp_timer_handle_t _rpmTimer{nullptr};
@@ -36,7 +40,7 @@ private:
     static constexpr uint8_t MCP4725_ADDR_TRQ2 = 0x61;
 
     static constexpr uint8_t LEDC_CH_TRQ1 = 6;
-    static constexpr uint8_t LEDC_CH_TRQ2 = 7;
+    static constexpr uint8_t LEDC_CH_TRQ2 = 5; // Channel 5 (Channel 7 reserved for Display Backlight)
 
     void _writeDac(uint8_t addr, float volts);
     void _setVssFrequency(float freqHz);

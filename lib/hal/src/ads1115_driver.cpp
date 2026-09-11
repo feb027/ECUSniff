@@ -5,7 +5,7 @@ namespace EcuHal {
 
 bool Ads1115Driver::init(uint8_t i2cAddr) {
     _i2cAddr = i2cAddr;
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
 
     Wire.beginTransmission(_i2cAddr);
     if (Wire.endTransmission() != 0) {
@@ -34,7 +34,7 @@ void Ads1115Driver::_triggerConversion(uint8_t channel) {
     // MODE=Single-shot (0x0100), DR=860 SPS (0x00E0), COMP_QUE=Disable (0x0003)
     uint16_t config = 0x8000 | mux | 0x0200 | 0x0100 | 0x00E0 | 0x0003;
 
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
     Wire.beginTransmission(_i2cAddr);
     Wire.write(REG_CONFIG);
     Wire.write((uint8_t)(config >> 8));
@@ -51,7 +51,7 @@ void Ads1115Driver::_triggerConversion(uint8_t channel) {
 int16_t Ads1115Driver::_readConversion() {
     if (!_isFound) return 0;
 
-    Wire.setTimeOut(2);
+    Wire.setTimeOut(50);
     Wire.beginTransmission(_i2cAddr);
     Wire.write(REG_CONVERSION);
     if (Wire.endTransmission() != 0) {
