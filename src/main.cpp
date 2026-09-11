@@ -229,33 +229,31 @@ void taskCore0UiWeb(void *pvParameters) {
             epsController.setFeedbackVoltages(fb1, fb2, adsAdc.isFound());
 
             epsController.update(dtSec);
-            epsDriver.updateOutputs(epsController.getState());
+            if (!speedoController.getState().isRunning) {
+                epsDriver.updateOutputs(epsController.getState());
+            }
 
             static bool s_lastEpsRunning = false;
             static uint32_t s_lastEpsLogMs = 0;
             bool epsRunning = epsController.getState().isRunning;
             if (epsRunning != s_lastEpsRunning) {
                 s_lastEpsRunning = epsRunning;
-                ecuLog("[EPS] STATUS BERUBAH: %s | Spd: %.1f km/h | VSS: %.1f Hz (GPIO %d & mirror %d) | RPM: %u (GPIO %d & mirror %d) | TRQ1: %.2fV (GPIO %d) | TRQ2: %.2fV (GPIO %d)\n",
+                ecuLog("[EPS] STATUS BERUBAH: %s | Spd: %.1f km/h | VSS: %.1f Hz (Pins 38, 47, 4) | RPM: %u (Pins 39, 48, 5) | TRQ1: %.2fV | TRQ2: %.2fV\n",
                        epsRunning ? "RUNNING" : "STOPPED",
                        epsController.getState().currentSpeedKmh,
                        epsController.getState().vssFreqHz,
-                       PinConfig::EPS_VSS, PinConfig::SIG_CKP,
                        epsController.getState().currentRpm,
-                       PinConfig::EPS_RPM, PinConfig::SIG_CMP,
-                       epsController.getState().trq1Voltage, PinConfig::EPS_TRQ1,
-                       epsController.getState().trq2Voltage, PinConfig::EPS_TRQ2);
+                       epsController.getState().trq1Voltage,
+                       epsController.getState().trq2Voltage);
             }
             if (epsRunning && (now - s_lastEpsLogMs >= 1000)) {
                 s_lastEpsLogMs = now;
-                ecuLog("[EPS PULSE HEARTBEAT] Spd: %.1f km/h | VSS: %.1f Hz (Toggles: %lu on Pin %d & %d) | RPM: %u (Toggles: %lu on Pin %d & %d) | TRQ1: %.2fV | TRQ2: %.2fV\n",
+                ecuLog("[EPS PULSE HEARTBEAT] Spd: %.1f km/h | VSS: %.1f Hz (Toggles: %lu on Pin 38/47/4) | RPM: %u (Toggles: %lu on Pin 39/48/5) | TRQ1: %.2fV | TRQ2: %.2fV\n",
                        epsController.getState().currentSpeedKmh,
                        epsController.getState().vssFreqHz,
                        epsDriver.getVssToggles(),
-                       PinConfig::EPS_VSS, PinConfig::SIG_CKP,
                        epsController.getState().currentRpm,
                        epsDriver.getRpmToggles(),
-                       PinConfig::EPS_RPM, PinConfig::SIG_CMP,
                        epsController.getState().trq1Voltage,
                        epsController.getState().trq2Voltage);
             }
@@ -264,7 +262,32 @@ void taskCore0UiWeb(void *pvParameters) {
         if (now - lastSpeedo >= 20) {
             float dtSec = (now - lastSpeedo) / 1000.0f; lastSpeedo = now;
             speedoController.update(dtSec);
-            speedoDriver.updateOutputs(speedoController.getConfig(), speedoController.getState());
+            if (!epsController.getState().isRunning) {
+                speedoDriver.updateOutputs(speedoController.getConfig(), speedoController.getState());
+            }
+
+            static bool s_lastSpeedoRunning = false;
+            static uint32_t s_lastSpeedoLogMs = 0;
+            bool speedoRunning = speedoController.getState().isRunning;
+            if (speedoRunning != s_lastSpeedoRunning) {
+                s_lastSpeedoRunning = speedoRunning;
+                ecuLog("[SPEEDO] STATUS BERUBAH: %s | Spd: %.1f km/h (%.1f Hz on Pin 47/38/4) | RPM: %.0f (%.1f Hz on Pin 48/39/5)\n",
+                       speedoRunning ? "RUNNING" : "STOPPED",
+                       speedoController.getState().currentKmh,
+                       speedoController.getState().hzKmh,
+                       speedoController.getState().currentRpm,
+                       speedoController.getState().hzRpm);
+            }
+            if (speedoRunning && (now - s_lastSpeedoLogMs >= 1000)) {
+                s_lastSpeedoLogMs = now;
+                ecuLog("[SPEEDO PULSE HEARTBEAT] Spd: %.1f km/h (%.1f Hz, Toggles: %lu on Pin 47/38/4) | RPM: %.0f (%.1f Hz, Toggles: %lu on Pin 48/39/5)\n",
+                       speedoController.getState().currentKmh,
+                       speedoController.getState().hzKmh,
+                       speedoDriver.getKmhToggles(),
+                       speedoController.getState().currentRpm,
+                       speedoController.getState().hzRpm,
+                       speedoDriver.getRpmToggles());
+            }
         }
 
         // ====================================================================
