@@ -19,8 +19,6 @@ static void IRAM_ATTR vssTimerCallback(void* arg) {
     if (!s_vssActive) return;
     s_vssLevel ^= 1;
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), s_vssLevel);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), s_vssLevel); // Mirror ke Pin 4
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), s_vssLevel); // Mirror ke Pin 47
     s_vssToggleCount++;
 }
 
@@ -28,8 +26,6 @@ static void IRAM_ATTR rpmTimerCallback(void* arg) {
     if (!s_rpmActive) return;
     s_rpmLevel ^= 1;
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), s_rpmLevel);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), s_rpmLevel); // Mirror ke Pin 5
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), s_rpmLevel); // Mirror ke Pin 48
     s_rpmToggleCount++;
 }
 
@@ -98,45 +94,68 @@ void EpsDriver::_writeDac(uint8_t addr, float volts) {
 void EpsDriver::init() {
     if (_initialized) return;
 
-    // 1. Setup clean direct GPIO output for VSS & RPM with maximum drive strength
-    pinMode(PinConfig::EPS_VSS, OUTPUT);
-    pinMode(PinConfig::EPS_RPM, OUTPUT);
-    pinMode(PinConfig::SIG_CKP, OUTPUT);
-    pinMode(PinConfig::SIG_CMP, OUTPUT);
-    pinMode(PinConfig::SPEEDO_KMH, OUTPUT);
-    pinMode(PinConfig::SPEEDO_RPM, OUTPUT);
-    pinMode(PinConfig::EPS_TRQ1, OUTPUT);
-    pinMode(PinConfig::EPS_TRQ2, OUTPUT);
+    // 1. Reset pins to strip any lingering JTAG / IO MUX peripheral mapping
+    gpio_reset_pin(static_cast<gpio_num_t>(PinConfig::EPS_VSS));
+    gpio_reset_pin(static_cast<gpio_num_t>(PinConfig::EPS_RPM));
+
+    // 2. Configure dedicated VSS & RPM pins with Input/Output mode and pull-down
+    gpio_config_t io_conf{};
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_INPUT_OUTPUT;
+    io_conf.pin_bit_mask = (1ULL << PinConfig::EPS_VSS) | (1ULL << PinConfig::EPS_RPM);
+    io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
 
     gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::EPS_VSS), GPIO_DRIVE_CAP_3);
     gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::EPS_RPM), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SIG_CKP), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SIG_CMP), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), GPIO_DRIVE_CAP_3);
 
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 0);
 
-    // 2. Setup periodic esp_timer for VSS (Vehicle Speed Sensor)
+    // 3. Hardware Short-Circuit & Pin Crosstalk Self-Test
+    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 1);
+    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
+    delayMicroseconds(50);
+    int readVss1 = gpio_get_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS));
+    int readRpm1 = gpio_get_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM));
+
+    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
+    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 1);
+    delayMicroseconds(50);
+    int readVss2 = gpio_get_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS));
+    int readRpm2 = gpio_get_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM));
+
+    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
+    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
+
+    if (readRpm1 == 1 || readVss2 == 1) {
+        _hardwareShort = true;
+        Serial.printf("\n[EPS DRIVER ALERT] !!! KONSLET TERDETEKSI: Pin %d (VSS) & Pin %d (RPM) TERHUBUNG FISIK DI LUAR CHIP! (R1=%d, R2=%d) !!!\n\n",
+                      PinConfig::EPS_VSS, PinConfig::EPS_RPM, readRpm1, readVss2);
+    } else {
+        _hardwareShort = false;
+        Serial.printf("[EPS DRIVER] Self-Test OK: Pin %d (VSS) & Pin %d (RPM) 100%% independen & bebas konslet.\n",
+                      PinConfig::EPS_VSS, PinConfig::EPS_RPM);
+    }
+
+    // 4. Setup periodic esp_timer for VSS (Vehicle Speed Sensor)
     esp_timer_create_args_t vss_args{};
     vss_args.callback = &vssTimerCallback;
     vss_args.name = "eps_vss_timer";
     vss_args.dispatch_method = ESP_TIMER_TASK;
     esp_timer_create(&vss_args, &_vssTimer);
 
-    // 3. Setup periodic esp_timer for RPM (Engine Speed Tachometer)
+    // 5. Setup periodic esp_timer for RPM (Engine Speed Tachometer)
     esp_timer_create_args_t rpm_args{};
     rpm_args.callback = &rpmTimerCallback;
     rpm_args.name = "eps_rpm_timer";
     rpm_args.dispatch_method = ESP_TIMER_TASK;
     esp_timer_create(&rpm_args, &_rpmTimer);
 
-    // 4. Setup PWM on GPIO 40 (TRQ1) & 41 (TRQ2) as 20kHz RC-filter DAC fallback
+    // 6. Setup PWM on GPIO 40 (TRQ1) & 41 (TRQ2) as 20kHz RC-filter DAC fallback
+    gpio_reset_pin(static_cast<gpio_num_t>(PinConfig::EPS_TRQ1));
+    gpio_reset_pin(static_cast<gpio_num_t>(PinConfig::EPS_TRQ2));
     ledcSetup(LEDC_CH_TRQ1, 20000, 8);
     ledcAttachPin(PinConfig::EPS_TRQ1, LEDC_CH_TRQ1);
     ledcWrite(LEDC_CH_TRQ1, 128); // 50% = 2.5V center
@@ -145,7 +164,7 @@ void EpsDriver::init() {
     ledcAttachPin(PinConfig::EPS_TRQ2, LEDC_CH_TRQ2);
     ledcWrite(LEDC_CH_TRQ2, 128);
 
-    // 5. Detect I2C Dual MCP4725
+    // 7. Detect I2C Dual MCP4725
     bool d1 = false, d2 = false;
     detectDacs(d1, d2);
     if (_dacTrq1Found) _writeDac(_trq1Addr, 2.50f);
@@ -175,8 +194,6 @@ void EpsDriver::_setVssFrequency(float freqHz) {
         s_vssActive = false;
         s_vssLevel = 0;
         gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), 0);
     }
 }
 
@@ -191,8 +208,6 @@ void EpsDriver::_setRpmFrequency(float freqHz) {
         s_rpmActive = true;
         s_rpmLevel = 1;
         gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 1);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), 1);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 1);
         esp_timer_start_periodic(_rpmTimer, newHalfPeriod);
         _rpmTimerRunning = true;
     } else {
@@ -203,8 +218,6 @@ void EpsDriver::_setRpmFrequency(float freqHz) {
         s_rpmActive = false;
         s_rpmLevel = 0;
         gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 0);
     }
 }
 
@@ -269,11 +282,7 @@ void EpsDriver::stop() {
     _setRpmFrequency(0.0f);
 
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), 0);
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 0);
 
     _lastVssFreq = -1.0f;
     _lastRpmFreq = -1.0f;

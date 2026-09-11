@@ -17,11 +17,13 @@ public:
 
     bool isDacTrq1Found() const { return _dacTrq1Found; }
     bool isDacTrq2Found() const { return _dacTrq2Found; }
+    bool isHardwareShortDetected() const { return _hardwareShort; }
     uint32_t getVssToggles() const;
     uint32_t getRpmToggles() const;
 
 private:
     bool     _initialized{false};
+    bool     _hardwareShort{false};
     bool     _dacTrq1Found{false};
     bool     _dacTrq2Found{false};
     uint8_t  _trq1Addr{0x60};

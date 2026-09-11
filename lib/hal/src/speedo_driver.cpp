@@ -18,8 +18,6 @@ static void IRAM_ATTR speedoKmhTimerCallback(void* arg) {
     if (!s_speedoKmhActive) return;
     s_speedoKmhLevel ^= 1;
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), s_speedoKmhLevel);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), s_speedoKmhLevel);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), s_speedoKmhLevel);
     s_speedoKmhToggleCount++;
 }
 
@@ -27,8 +25,6 @@ static void IRAM_ATTR speedoRpmTimerCallback(void* arg) {
     if (!s_speedoRpmActive) return;
     s_speedoRpmLevel ^= 1;
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), s_speedoRpmLevel);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), s_speedoRpmLevel);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), s_speedoRpmLevel);
     s_speedoRpmToggleCount++;
 }
 
@@ -77,20 +73,20 @@ void SpeedoDriver::_writeDac(uint8_t addr, float volts) {
 void SpeedoDriver::init() {
     if (_initialized) return;
 
-    // 1. Setup GPIO output pins for KMH & RPM with maximum drive capability
-    pinMode(PinConfig::SPEEDO_KMH, OUTPUT);
-    pinMode(PinConfig::SPEEDO_RPM, OUTPUT);
-    pinMode(PinConfig::EPS_VSS, OUTPUT);
-    pinMode(PinConfig::EPS_RPM, OUTPUT);
-    pinMode(PinConfig::SIG_CKP, OUTPUT);
-    pinMode(PinConfig::SIG_CMP, OUTPUT);
+    // 1. Reset and configure dedicated KMH & RPM pins with Input/Output mode and pull-down
+    gpio_reset_pin(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH));
+    gpio_reset_pin(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM));
+
+    gpio_config_t io_conf{};
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_INPUT_OUTPUT;
+    io_conf.pin_bit_mask = (1ULL << PinConfig::SPEEDO_KMH) | (1ULL << PinConfig::SPEEDO_RPM);
+    io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
 
     gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), GPIO_DRIVE_CAP_3);
     gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::EPS_VSS), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::EPS_RPM), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SIG_CKP), GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability(static_cast<gpio_num_t>(PinConfig::SIG_CMP), GPIO_DRIVE_CAP_3);
 
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), 0);
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 0);
@@ -138,8 +134,6 @@ void SpeedoDriver::_setKmhFrequency(float freqHz) {
         s_speedoKmhActive = true;
         s_speedoKmhLevel = 1;
         gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), 1);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 1);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), 1);
         esp_timer_start_periodic(_kmhTimer, newHalfPeriod);
         _kmhTimerRunning = true;
     } else {
@@ -150,8 +144,6 @@ void SpeedoDriver::_setKmhFrequency(float freqHz) {
         s_speedoKmhActive = false;
         s_speedoKmhLevel = 0;
         gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), 0);
     }
 }
 
@@ -166,8 +158,6 @@ void SpeedoDriver::_setRpmFrequency(float freqHz) {
         s_speedoRpmActive = true;
         s_speedoRpmLevel = 1;
         gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 1);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 1);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), 1);
         esp_timer_start_periodic(_rpmTimer, newHalfPeriod);
         _rpmTimerRunning = true;
     } else {
@@ -178,8 +168,6 @@ void SpeedoDriver::_setRpmFrequency(float freqHz) {
         s_speedoRpmActive = false;
         s_speedoRpmLevel = 0;
         gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
-        gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), 0);
     }
 }
 
@@ -253,10 +241,6 @@ void SpeedoDriver::stop() {
 
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_KMH), 0);
     gpio_set_level(static_cast<gpio_num_t>(PinConfig::SPEEDO_RPM), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_VSS), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::EPS_RPM), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CKP), 0);
-    gpio_set_level(static_cast<gpio_num_t>(PinConfig::SIG_CMP), 0);
 
     if (_dacFuelFound) _writeDac(MCP4725_ADDR_FUEL, 0.0f);
     if (_dacTempFound) _writeDac(MCP4725_ADDR_TEMP, 0.0f);
