@@ -17,6 +17,8 @@ public:
 
     bool isDacTrq1Found() const { return _dacTrq1Found; }
     bool isDacTrq2Found() const { return _dacTrq2Found; }
+    uint32_t getVssToggles() const;
+    uint32_t getRpmToggles() const;
 
 private:
     bool     _initialized{false};

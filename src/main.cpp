@@ -43,6 +43,17 @@ static EcuEngine::EngineRuntimeState engineState;
 static EcuEngine::ParametricWheel    wheelCfg;
 static EcuEngine::CamEventTable      camCfg;
 
+// Dual-output logger: simultaneous output to USB CDC (Serial) and CH340 UART0 (Serial0)
+void ecuLog(const char* fmt, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    Serial.print(buf);
+    Serial0.print(buf);
+}
+
 static void syncSignalGenPattern() {
     signalGen.setChannelEnables(engineState.ckpEnabled, engineState.cmp1Enabled, engineState.cmp2Enabled, wheelCfg.inverted);
     signalGen.setVvtConfig(engineState.vvt);
@@ -219,6 +230,35 @@ void taskCore0UiWeb(void *pvParameters) {
 
             epsController.update(dtSec);
             epsDriver.updateOutputs(epsController.getState());
+
+            static bool s_lastEpsRunning = false;
+            static uint32_t s_lastEpsLogMs = 0;
+            bool epsRunning = epsController.getState().isRunning;
+            if (epsRunning != s_lastEpsRunning) {
+                s_lastEpsRunning = epsRunning;
+                ecuLog("[EPS] STATUS BERUBAH: %s | Spd: %.1f km/h | VSS: %.1f Hz (GPIO %d & mirror %d) | RPM: %u (GPIO %d & mirror %d) | TRQ1: %.2fV (GPIO %d) | TRQ2: %.2fV (GPIO %d)\n",
+                       epsRunning ? "RUNNING" : "STOPPED",
+                       epsController.getState().currentSpeedKmh,
+                       epsController.getState().vssFreqHz,
+                       PinConfig::EPS_VSS, PinConfig::SIG_CKP,
+                       epsController.getState().currentRpm,
+                       PinConfig::EPS_RPM, PinConfig::SIG_CMP,
+                       epsController.getState().trq1Voltage, PinConfig::EPS_TRQ1,
+                       epsController.getState().trq2Voltage, PinConfig::EPS_TRQ2);
+            }
+            if (epsRunning && (now - s_lastEpsLogMs >= 1000)) {
+                s_lastEpsLogMs = now;
+                ecuLog("[EPS PULSE HEARTBEAT] Spd: %.1f km/h | VSS: %.1f Hz (Toggles: %lu on Pin %d & %d) | RPM: %u (Toggles: %lu on Pin %d & %d) | TRQ1: %.2fV | TRQ2: %.2fV\n",
+                       epsController.getState().currentSpeedKmh,
+                       epsController.getState().vssFreqHz,
+                       epsDriver.getVssToggles(),
+                       PinConfig::EPS_VSS, PinConfig::SIG_CKP,
+                       epsController.getState().currentRpm,
+                       epsDriver.getRpmToggles(),
+                       PinConfig::EPS_RPM, PinConfig::SIG_CMP,
+                       epsController.getState().trq1Voltage,
+                       epsController.getState().trq2Voltage);
+            }
         }
 
         if (now - lastSpeedo >= 20) {
@@ -396,7 +436,13 @@ static void handleWebCommand(const JsonDocument& doc) {
 
 void setup() {
     Serial.begin(115200);
+    Serial0.begin(115200);
     delay(800);
+    ecuLog("\n\n==============================================\n");
+    ecuLog("[BOOT] ECUSniff ESP32-S3 Firmware Booting...\n");
+    ecuLog("[BOOT] Serial Logging active on USB CDC & UART0 (COM8)\n");
+    ecuLog("==============================================\n");
+
     EcuApp::loadSettings(engineState, wheelCfg, camCfg);
 
     webManager.setCommandCallback(handleWebCommand);
@@ -435,29 +481,29 @@ void setup() {
     Wire.setTimeOut(50);
 
     // 3. I2C Scanner Diagnostik Otomatis saat Boot
-    Serial.println("\n[I2C] ==============================================");
-    Serial.printf("[I2C] Scanning bus on SDA=GPIO %d, SCL=GPIO %d...\n", PinConfig::I2C_SDA, PinConfig::I2C_SCL);
+    ecuLog("\n[I2C] ==============================================\n");
+    ecuLog("[I2C] Scanning bus on SDA=GPIO %d, SCL=GPIO %d...\n", PinConfig::I2C_SDA, PinConfig::I2C_SCL);
     uint8_t i2cFoundCount = 0;
     for (uint8_t addr = 1; addr < 127; ++addr) {
         Wire.beginTransmission(addr);
         if (Wire.endTransmission() == 0) {
-            Serial.printf("[I2C] -> Ditemukan device di alamat 0x%02X", addr);
-            if (addr == 0x20) Serial.print(" (MCP23017 I/O Expander)");
-            else if (addr == 0x48 || addr == 0x49) Serial.print(" (ADS1115 16-Bit ADC)");
-            else if (addr == 0x60) Serial.print(" (MCP4725 DAC TRQ1 / Fuel)");
-            else if (addr == 0x61) Serial.print(" (MCP4725 DAC TRQ2 / Temp)");
-            else if (addr == 0x62 || addr == 0x63) Serial.print(" (MCP4725 DAC A1 / Amplitude)");
-            Serial.println();
+            ecuLog("[I2C] -> Ditemukan device di alamat 0x%02X", addr);
+            if (addr == 0x20) ecuLog(" (MCP23017 I/O Expander)");
+            else if (addr == 0x48 || addr == 0x49) ecuLog(" (ADS1115 16-Bit ADC)");
+            else if (addr == 0x60) ecuLog(" (MCP4725 DAC TRQ1 / Fuel)");
+            else if (addr == 0x61) ecuLog(" (MCP4725 DAC TRQ2 / Temp)");
+            else if (addr == 0x62 || addr == 0x63) ecuLog(" (MCP4725 DAC A1 / Amplitude)");
+            ecuLog("\n");
             i2cFoundCount++;
         }
     }
     if (i2cFoundCount == 0) {
-        Serial.printf("[I2C] PERINGATAN: Tidak ada modul I2C terdeteksi pada GPIO %d (SDA) & GPIO %d (SCL)!\n", PinConfig::I2C_SDA, PinConfig::I2C_SCL);
-        Serial.println("[I2C] Periksa: 1. Jalur daya VCC 3.3V/5V & GND, 2. Resistor pull-up 4.7k, 3. Pastikan pin SDA & SCL tidak tertukar.");
+        ecuLog("[I2C] PERINGATAN: Tidak ada modul I2C terdeteksi pada GPIO %d (SDA) & GPIO %d (SCL)!\n", PinConfig::I2C_SDA, PinConfig::I2C_SCL);
+        ecuLog("[I2C] Periksa: 1. Jalur daya VCC 3.3V/5V & GND, 2. Resistor pull-up 4.7k, 3. Pastikan pin SDA & SCL tidak tertukar.\n");
     } else {
-        Serial.printf("[I2C] Total %d modul I2C aktif terdeteksi.\n", i2cFoundCount);
+        ecuLog("[I2C] Total %d modul I2C aktif terdeteksi.\n", i2cFoundCount);
     }
-    Serial.println("[I2C] ==============================================\n");
+    ecuLog("[I2C] ==============================================\n\n");
 
     encoder.init(); joystick.init(); captureDriver.init(); signalGen.init();
     epsDriver.init(); speedoDriver.init();
@@ -468,7 +514,7 @@ void setup() {
     bool dacTrq1 = false, dacTrq2 = false;
     epsDriver.detectDacs(dacTrq1, dacTrq2);
     epsController.setDacFound(dacTrq1, dacTrq2);
-    Serial.printf("[EPS] Dual MCP4725 DAC: TRQ1=%s, TRQ2=%s\n", dacTrq1 ? "OK" : "NO", dacTrq2 ? "OK" : "NO");
+    ecuLog("[EPS] Dual MCP4725 DAC: TRQ1=%s, TRQ2=%s\n", dacTrq1 ? "OK" : "NO", dacTrq2 ? "OK" : "NO");
 
     // Inisialisasi MCP23017 (I/O Expander untuk sinyal STA & CHG)
     engineState.mcpFound = mcpExpander.init(EcuHal::Mcp23017Driver::DEFAULT_I2C_ADDR);
